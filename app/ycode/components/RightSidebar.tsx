@@ -41,8 +41,9 @@ import InputSettings from './InputSettings';
 import SelectOptionsSettings from './SelectOptionsSettings';
 import LabelSettings from './LabelSettings';
 import LinkSettings, { type LinkSettingsValue } from './LinkSettings';
-import RichTextEditor from './RichTextEditor';
 import ComponentVariableOverrides from './ComponentVariableOverrides';
+import ExpandableRichTextEditor from './ExpandableRichTextEditor';
+import ComponentVariableLabel, { VARIABLE_TYPE_ICONS } from './ComponentVariableLabel';
 import InteractionsPanel from './InteractionsPanel';
 import LayoutControls from './LayoutControls';
 import LayerStylesPanel from './LayerStylesPanel';
@@ -70,11 +71,13 @@ import { useLayerLocks } from '@/hooks/use-layer-locks';
 import { classesToDesign, mergeDesign, removeConflictsForClass, getRemovedPropertyClasses } from '@/lib/tailwind-class-mapper';
 import { cn } from '@/lib/utils';
 import { sanitizeHtmlId } from '@/lib/html-utils';
-import { isFieldVariable, getCollectionVariable, findParentCollectionLayer, findAllParentCollectionLayers, isTextEditable, findLayerWithParent, resetBindingsOnCollectionSourceChange } from '@/lib/layer-utils';
+import { isFieldVariable, getCollectionVariable, findParentCollectionLayer, isTextEditable, findLayerWithParent, resetBindingsOnCollectionSourceChange } from '@/lib/layer-utils';
 import { detachSpecificLayerFromComponent } from '@/lib/component-utils';
 import { convertContentToValue, parseValueToContent } from '@/lib/cms-variables-utils';
+import { createTextComponentVariableValue } from '@/lib/variable-utils';
+import { getRichTextValue } from '@/lib/tiptap-utils';
 import { DEFAULT_TEXT_STYLES, getTextStyle } from '@/lib/text-format-utils';
-import { buildFieldGroups, getFieldIcon, isMultipleAssetField, MULTI_ASSET_COLLECTION_ID } from '@/lib/collection-field-utils';
+import { buildFieldGroupsForLayer, getFieldIcon, isMultipleAssetField, MULTI_ASSET_COLLECTION_ID } from '@/lib/collection-field-utils';
 
 // 7. Types
 import type { Layer, FieldVariable, CollectionField, CollectionVariable } from '@/types';
@@ -83,12 +86,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuPortal,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
@@ -197,6 +194,7 @@ const RightSidebar = React.memo(function RightSidebar({
   const getComponentById = useComponentsStore((state) => state.getComponentById);
   const componentDrafts = useComponentsStore((state) => state.componentDrafts);
   const updateComponentDraft = useComponentsStore((state) => state.updateComponentDraft);
+  const addTextVariable = useComponentsStore((state) => state.addTextVariable);
   const updateTextVariable = useComponentsStore((state) => state.updateTextVariable);
 
   const collections = useCollectionsStore((state) => state.collections);
@@ -840,21 +838,7 @@ const RightSidebar = React.memo(function RightSidebar({
 
   // Get content value for display (returns Tiptap JSON or string)
   const getContentValue = useCallback((layer: Layer | null): any => {
-    if (!layer) return { type: 'doc', content: [{ type: 'paragraph' }] };
-
-    // Check layer.variables.text
-    if (layer.variables?.text) {
-      // DynamicRichTextVariable (new format with formatting support)
-      if (layer.variables.text.type === 'dynamic_rich_text') {
-        // Return Tiptap JSON directly for RichTextEditor (withFormatting mode)
-        return layer.variables.text.data.content;
-      } else if (layer.variables.text.type === 'dynamic_text') {
-        // Return string for DynamicTextVariable
-        return layer.variables.text.data.content;
-      }
-    }
-
-    return { type: 'doc', content: [{ type: 'paragraph' }] };
+    return getRichTextValue(layer?.variables);
   }, []);
 
   // Handle collection binding change (also resets child bindings when source changes)
@@ -1427,24 +1411,6 @@ const RightSidebar = React.memo(function RightSidebar({
     return findParentCollectionLayer(layers, selectedLayerId);
   }, [selectedLayerId, editingComponentId, componentDrafts, currentPageId, draftsByPageId]);
 
-  // Find all parent collection layers (for nested collections)
-  const allParentCollectionLayers = useMemo(() => {
-    if (!selectedLayerId || !currentPageId) return [];
-
-    // Get layers from either component draft or page draft
-    let layers: Layer[] = [];
-    if (editingComponentId) {
-      layers = componentDrafts[editingComponentId] || [];
-    } else {
-      const draft = draftsByPageId[currentPageId];
-      layers = draft ? draft.layers : [];
-    }
-
-    if (!layers.length) return [];
-
-    return findAllParentCollectionLayers(layers, selectedLayerId);
-  }, [selectedLayerId, editingComponentId, componentDrafts, currentPageId, draftsByPageId]);
-
   // Get collection fields if parent collection layer exists
   const currentPage = useMemo(() => {
     if (!currentPageId) {
@@ -1471,32 +1437,18 @@ const RightSidebar = React.memo(function RightSidebar({
   }, [parentCollectionLayer, fields, currentPage]);
 
   // Build field groups for multi-source inline variable selection
-  // This allows showing both collection layer fields AND page collection fields when applicable
   const fieldGroups = useMemo(() => {
-    const collectionVariable = parentCollectionLayer ? getCollectionVariable(parentCollectionLayer) : null;
-
-    // Check if parent is a multi-asset collection
-    const isMultiAssetParent = collectionVariable?.source_field_type === 'multi_asset';
-    const multiAssetContext = isMultiAssetParent && collectionVariable.source_field_id
-      ? {
-        sourceFieldId: collectionVariable.source_field_id,
-        source: (collectionVariable.source_field_source || 'collection') as 'page' | 'collection',
-      }
-      : null;
-
-    // Get all parent collection layers (closest first)
-    const parentCollectionLayers = allParentCollectionLayers
-      .map(layer => ({ layerId: layer.id, collectionId: getCollectionVariable(layer)?.id }))
-      .filter((item): item is { layerId: string; collectionId: string } => !!item.collectionId);
-
-    return buildFieldGroups({
-      parentCollectionLayers,
-      page: currentPage,
-      fieldsByCollectionId: fields,
-      collections,
-      multiAssetContext,
-    });
-  }, [parentCollectionLayer, allParentCollectionLayers, currentPage, fields, collections]);
+    if (!selectedLayerId) return undefined;
+    let layers: Layer[] = [];
+    if (editingComponentId) {
+      layers = componentDrafts[editingComponentId] || [];
+    } else if (currentPageId) {
+      const draft = draftsByPageId[currentPageId];
+      layers = draft ? draft.layers : [];
+    }
+    if (!layers.length) return undefined;
+    return buildFieldGroupsForLayer(selectedLayerId, layers, currentPage, fields, collections);
+  }, [selectedLayerId, editingComponentId, componentDrafts, currentPageId, draftsByPageId, currentPage, fields, collections]);
 
   // Get collection fields for the currently selected collection layer (for Sort By dropdown)
   const selectedCollectionFields = useMemo(() => {
@@ -1797,15 +1749,14 @@ const RightSidebar = React.memo(function RightSidebar({
                 collections={collections}
                 isInsideCollectionLayer={!!parentCollectionLayer}
                 renderTextOverride={(variable, value, onChange) => (
-                  <RichTextEditor
+                  <ExpandableRichTextEditor
+                    sheetDescription={`${component.name} override — ${variable.name}`}
                     value={value}
                     onChange={onChange}
-                    placeholder="Enter value..."
+                    placeholder={variable.placeholder || 'Enter text...'}
                     fieldGroups={fieldGroups}
                     allFields={fields}
                     collections={collections}
-                    withFormatting={true}
-                    showFormattingToolbar={false}
                   />
                 )}
               />
@@ -2153,47 +2104,26 @@ const RightSidebar = React.memo(function RightSidebar({
                   <div className="grid grid-cols-3">
                     {!(isTextEditingOnCanvas && editingLayerIdOnCanvas === selectedLayerId) && (
                       <div className="flex items-start gap-1 py-1">
-                        {editingComponentId ? (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="variable"
-                                size="xs"
-                                className="has-[>svg]:px-0 py-"
-                              >
-                                <Icon name="plus-circle-solid" />
-                                Content
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {componentVariables.length > 0 && (
-                                <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger>Link to variable</DropdownMenuSubTrigger>
-                                  <DropdownMenuPortal>
-                                    <DropdownMenuSubContent>
-                                      {componentVariables.map((variable) => (
-                                        <DropdownMenuItem
-                                          key={variable.id}
-                                          onClick={() => handleLinkVariable(variable.id)}
-                                        >
-                                          {variable.name}
-                                          {linkedVariableId === variable.id && (
-                                            <Icon name="check" className="ml-auto size-3" />
-                                          )}
-                                        </DropdownMenuItem>
-                                      ))}
-                                    </DropdownMenuSubContent>
-                                  </DropdownMenuPortal>
-                                </DropdownMenuSub>
-                              )}
-                              <DropdownMenuItem onClick={() => openVariablesDialog()}>
-                                Manage variables
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        ) : (
-                          <Label variant="muted">Content</Label>
-                        )}
+                        <ComponentVariableLabel
+                          label="Content"
+                          isEditingComponent={!!editingComponentId}
+                          variables={componentVariables}
+                          linkedVariableId={linkedVariableId}
+                          onLinkVariable={handleLinkVariable}
+                          onManageVariables={() => openVariablesDialog()}
+                          onCreateVariable={editingComponentId ? async () => {
+                            const contentValue = getContentValue(selectedLayer);
+                            const newId = await addTextVariable(editingComponentId, 'Text');
+                            if (newId) {
+                              await updateTextVariable(editingComponentId, newId, {
+                                default_value: createTextComponentVariableValue(contentValue),
+                              });
+                              handleLinkVariable(newId);
+                              openVariablesDialog(newId);
+                            }
+                          } : undefined}
+                          className="py-1"
+                        />
                       </div>
                     )}
 
@@ -2206,7 +2136,10 @@ const RightSidebar = React.memo(function RightSidebar({
                           onClick={() => openVariablesDialog(linkedVariable.id)}
                         >
                           <div>
-                            <span>{linkedVariable.name}</span>
+                            <span className="flex items-center gap-1.5">
+                              <Icon name={VARIABLE_TYPE_ICONS[linkedVariable.type || 'text']} className="size-3 opacity-60" />
+                              {linkedVariable.name}
+                            </span>
                             <Button
                               className="size-4! p-0!"
                               variant="outline"
@@ -2223,15 +2156,15 @@ const RightSidebar = React.memo(function RightSidebar({
                           <EmptyDescription>You are editing the text directly on canvas.</EmptyDescription>
                         </Empty>
                       ) : (
-                        <RichTextEditor
+                        <ExpandableRichTextEditor
+                          key={selectedLayerId}
                           value={getContentValue(selectedLayer)}
                           onChange={handleContentChange}
                           placeholder="Enter text..."
+                          sheetDescription="Element content"
                           fieldGroups={fieldGroups}
                           allFields={fields}
                           collections={collections}
-                          withFormatting={true}
-                          showFormattingToolbar={false}
                           disabled={showTextStyleControls}
                         />
                       )}

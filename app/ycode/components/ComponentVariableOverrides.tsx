@@ -6,8 +6,9 @@
  * RichTextComponentBlock (inline rich-text component).
  */
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import ImageSettings from './ImageSettings';
 import LinkSettings from './LinkSettings';
 import AudioSettings from './AudioSettings';
@@ -46,17 +47,8 @@ interface ComponentVariableOverridesProps {
     value: any,
     onChange: (tiptapContent: any) => void,
   ) => React.ReactNode;
-}
-
-function groupVariables(variables: ComponentVariable[]) {
-  return {
-    text: variables.filter(v => !v.type || v.type === 'text'),
-    image: variables.filter(v => v.type === 'image'),
-    link: variables.filter(v => v.type === 'link'),
-    audio: variables.filter(v => v.type === 'audio'),
-    video: variables.filter(v => v.type === 'video'),
-    icon: variables.filter(v => v.type === 'icon'),
-  };
+  /** Number of columns for the override layout (default: 1) */
+  columns?: 1 | 2;
 }
 
 export default function ComponentVariableOverrides({
@@ -68,9 +60,8 @@ export default function ComponentVariableOverrides({
   collections,
   isInsideCollectionLayer,
   renderTextOverride,
+  columns = 1,
 }: ComponentVariableOverridesProps) {
-  const groups = useMemo(() => groupVariables(variables), [variables]);
-
   const handleTextChange = useCallback(
     (variableId: string, tiptapContent: any) => {
       const value = createTextComponentVariableValue(tiptapContent);
@@ -112,136 +103,131 @@ export default function ComponentVariableOverrides({
 
   if (variables.length === 0) return null;
 
-  return (
-    <div className="flex flex-col gap-6 min-w-0">
-      {groups.text.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {groups.text.map(variable => (
-            <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
-              <Label variant="muted" className="truncate pt-2">
-                {variable.name}
-              </Label>
-              <div className="col-span-2 min-w-0 *:w-full">
-                {renderTextOverride
-                  ? renderTextOverride(
-                    variable,
-                    getTextValue(variable.id),
-                    (val) => handleTextChange(variable.id, val),
-                  )
-                  : null}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+  const isTwoCol = columns === 2;
 
-      {groups.image.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {groups.image.map(variable => (
-            <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
-              <Label variant="muted" className="truncate pt-2">
-                {variable.name}
-              </Label>
-              <div className="col-span-2">
-                <ImageSettings
-                  mode="standalone"
-                  value={getTypedValue('image', variable.id) as ImageSettingsValue | undefined}
-                  onChange={(val) => handleTypedChange('image', variable.id, val)}
-                  fieldGroups={fieldGroups}
-                  allFields={allFields}
-                  collections={collections}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+  /** Renders a group of variable items, using masonry-style columns when 2-col is enabled. */
+  const renderGroup = (items: React.ReactNode[], key: string) => {
+    if (!isTwoCol) {
+      return <div key={key} className="flex flex-col gap-3">{items}</div>;
+    }
 
-      {groups.link.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {groups.link.map(variable => (
-            <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
-              <Label variant="muted" className="truncate pt-2">
-                {variable.name}
-              </Label>
-              <div className="col-span-2">
-                <LinkSettings
-                  mode="standalone"
-                  value={getTypedValue('link', variable.id) as LinkSettingsValue | undefined}
-                  onChange={(val) => handleTypedChange('link', variable.id, val)}
-                  fieldGroups={fieldGroups}
-                  allFields={allFields}
-                  collections={collections}
-                  isInsideCollectionLayer={isInsideCollectionLayer}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    return (
+      <div
+        key={key}
+        className="columns-2 gap-x-10 [column-rule:1px_solid_var(--color-border)] [column-fill:balance]"
+      >
+        {items.map((item, i) => (
+          <div key={i} className="break-inside-avoid mb-5">{item}</div>
+        ))}
+      </div>
+    );
+  };
 
-      {groups.audio.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {groups.audio.map(variable => (
-            <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
-              <Label variant="muted" className="truncate pt-2">
-                {variable.name}
-              </Label>
-              <div className="col-span-2">
-                <AudioSettings
-                  mode="standalone"
-                  value={getTypedValue('audio', variable.id) as AudioSettingsValue | undefined}
-                  onChange={(val) => handleTypedChange('audio', variable.id, val)}
-                  fieldGroups={fieldGroups}
-                  allFields={allFields}
-                  collections={collections}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+  const renderItem = (variable: ComponentVariable) => {
+    const label = (
+      <Label variant="muted" className="truncate pt-2">
+        {variable.name}
+      </Label>
+    );
 
-      {groups.video.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {groups.video.map(variable => (
-            <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
-              <Label variant="muted" className="truncate pt-2">
-                {variable.name}
-              </Label>
-              <div className="col-span-2">
-                <VideoSettings
-                  mode="standalone"
-                  value={getTypedValue('video', variable.id) as VideoSettingsValue | undefined}
-                  onChange={(val) => handleTypedChange('video', variable.id, val)}
-                  fieldGroups={fieldGroups}
-                  allFields={allFields}
-                  collections={collections}
-                />
-              </div>
+    switch (variable.type) {
+      case 'image':
+        return (
+          <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+            {label}
+            <div className="col-span-2">
+              <ImageSettings
+                mode="standalone"
+                value={getTypedValue('image', variable.id) as ImageSettingsValue | undefined}
+                onChange={(val) => handleTypedChange('image', variable.id, val)}
+                fieldGroups={fieldGroups}
+                allFields={allFields}
+                collections={collections}
+              />
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        );
+      case 'link':
+        return (
+          <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+            {label}
+            <div className="col-span-2">
+              <LinkSettings
+                mode="standalone"
+                value={getTypedValue('link', variable.id) as LinkSettingsValue | undefined}
+                onChange={(val) => handleTypedChange('link', variable.id, val)}
+                fieldGroups={fieldGroups}
+                allFields={allFields}
+                collections={collections}
+                isInsideCollectionLayer={isInsideCollectionLayer}
+              />
+            </div>
+          </div>
+        );
+      case 'audio':
+        return (
+          <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+            {label}
+            <div className="col-span-2">
+              <AudioSettings
+                mode="standalone"
+                value={getTypedValue('audio', variable.id) as AudioSettingsValue | undefined}
+                onChange={(val) => handleTypedChange('audio', variable.id, val)}
+                fieldGroups={fieldGroups}
+                allFields={allFields}
+                collections={collections}
+              />
+            </div>
+          </div>
+        );
+      case 'video':
+        return (
+          <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+            {label}
+            <div className="col-span-2">
+              <VideoSettings
+                mode="standalone"
+                value={getTypedValue('video', variable.id) as VideoSettingsValue | undefined}
+                onChange={(val) => handleTypedChange('video', variable.id, val)}
+                fieldGroups={fieldGroups}
+                allFields={allFields}
+                collections={collections}
+              />
+            </div>
+          </div>
+        );
+      case 'icon':
+        return (
+          <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+            {label}
+            <div className="col-span-2">
+              <IconSettings
+                mode="standalone"
+                value={getTypedValue('icon', variable.id) as IconSettingsValue | undefined}
+                onChange={(val) => handleTypedChange('icon', variable.id, val)}
+              />
+            </div>
+          </div>
+        );
+      default:
+        return (
+          <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
+            {label}
+            <div className="col-span-2 min-w-0 *:w-full">
+              {renderTextOverride
+                ? renderTextOverride(
+                  variable,
+                  getTextValue(variable.id),
+                  (val) => handleTextChange(variable.id, val),
+                )
+                : null}
+            </div>
+          </div>
+        );
+    }
+  };
 
-      {groups.icon.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {groups.icon.map(variable => (
-            <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
-              <Label variant="muted" className="truncate pt-2">
-                {variable.name}
-              </Label>
-              <div className="col-span-2">
-                <IconSettings
-                  mode="standalone"
-                  value={getTypedValue('icon', variable.id) as IconSettingsValue | undefined}
-                  onChange={(val) => handleTypedChange('icon', variable.id, val)}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  const allItems = variables.map(renderItem);
+
+  return renderGroup(allItems, 'all');
 }

@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import SettingsPanel from './SettingsPanel';
 import RichTextEditor from './RichTextEditor';
 import { FieldSelectDropdown, type FieldGroup, type FieldSourceType } from './CollectionFieldSelector';
+import ComponentVariableLabel, { VARIABLE_TYPE_ICONS } from './ComponentVariableLabel';
 import type { Layer, CollectionField, Collection, AssetVariable, DynamicTextVariable, FieldVariable, ImageSettingsValue } from '@/types';
 import { createDynamicTextVariable, getDynamicTextContent, createAssetVariable, getImageUrlFromVariable, isAssetVariable, getAssetId, isDynamicTextVariable, isFieldVariable } from '@/lib/variable-utils';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
@@ -28,16 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuPortal,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
@@ -98,6 +89,8 @@ export default function ImageSettings(props: ImageSettingsProps) {
   const editingComponentId = useEditorStore((state) => state.editingComponentId);
   const getAsset = useAssetsStore((state) => state.getAsset);
   const getComponentById = useComponentsStore((state) => state.getComponentById);
+  const addImageVariable = useComponentsStore((state) => state.addImageVariable);
+  const updateTextVariable = useComponentsStore((state) => state.updateTextVariable);
 
   // Get component variables for image linking (when editing a component in layer mode)
   const editingComponent = !isStandaloneMode && editingComponentId ? getComponentById(editingComponentId) : undefined;
@@ -359,49 +352,26 @@ export default function ImageSettings(props: ImageSettingsProps) {
       <div className={isStandaloneMode ? '' : 'grid grid-cols-3 items-center'}>
         {!isStandaloneMode && (
           <div className="flex items-start gap-1 py-1">
-            {editingComponentId ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="variable"
-                    size="xs"
-                    className="has-[>svg]:px-0"
-                  >
-                    <Icon name="plus-circle-solid" />
-                    Source
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {imageComponentVariables.length > 0 && (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>Link to variable</DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                          {imageComponentVariables.map((variable) => (
-                            <DropdownMenuItem
-                              key={variable.id}
-                              onClick={() => handleLinkImageVariable(variable.id)}
-                            >
-                              {variable.name}
-                              {linkedImageVariableId === variable.id && (
-                                <Icon name="check" className="ml-auto size-3" />
-                              )}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-                  )}
-                  {onOpenVariablesDialog && (
-                    <DropdownMenuItem onClick={() => onOpenVariablesDialog?.()}>
-                      Manage variables
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Label variant="muted">Source</Label>
-            )}
+            <ComponentVariableLabel
+              label="Source"
+              isEditingComponent={!!editingComponentId}
+              variables={imageComponentVariables}
+              linkedVariableId={linkedImageVariableId}
+              onLinkVariable={handleLinkImageVariable}
+              onManageVariables={() => onOpenVariablesDialog?.()}
+              onCreateVariable={editingComponentId ? async () => {
+                const newId = await addImageVariable(editingComponentId, 'Image');
+                if (newId) {
+                  const currentValue: ImageSettingsValue = {
+                    src: layer?.variables?.image?.src,
+                    alt: layer?.variables?.image?.alt,
+                  };
+                  await updateTextVariable(editingComponentId, newId, { default_value: currentValue });
+                  handleLinkImageVariable(newId);
+                  onOpenVariablesDialog?.(newId);
+                }
+              } : undefined}
+            />
           </div>
         )}
 
@@ -414,7 +384,12 @@ export default function ImageSettings(props: ImageSettingsProps) {
               onClick={() => onOpenVariablesDialog?.(linkedImageVariable.id)}
             >
               <div>
-                <span>{linkedImageVariable.name}</span>
+                <span className="flex items-center gap-1.5">
+                  {linkedImageVariable.type && VARIABLE_TYPE_ICONS[linkedImageVariable.type] && (
+                    <Icon name={VARIABLE_TYPE_ICONS[linkedImageVariable.type]} className="size-3 opacity-60" />
+                  )}
+                  {linkedImageVariable.name}
+                </span>
                 <Button
                   className="size-4! p-0!"
                   variant="outline"

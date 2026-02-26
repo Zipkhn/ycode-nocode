@@ -37,6 +37,24 @@ export const RichTextComponent = Node.create({
   addStorage() {
     return {
       editorContext: {} as RichTextComponentEditorContext,
+      /** Move cursor after the component node, creating a paragraph if needed. */
+      handleArrowAfter(editor: any, typeName: string): boolean {
+        const { selection } = editor.state;
+        const node = editor.state.doc.nodeAt(selection.from);
+        if (node?.type.name !== typeName) return false;
+
+        const pos = selection.from + node.nodeSize;
+        const after = editor.state.doc.nodeAt(pos);
+
+        if (!after) {
+          editor.chain()
+            .insertContentAt(pos, { type: 'paragraph' })
+            .setTextSelection(pos + 1)
+            .run();
+          return true;
+        }
+        return false;
+      },
     };
   },
 
@@ -117,6 +135,32 @@ export const RichTextComponent = Node.create({
 
             return true;
           },
+    };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      Enter: ({ editor }) => {
+        const { selection } = editor.state;
+        const node = editor.state.doc.nodeAt(selection.from);
+        if (node?.type.name !== this.name) return false;
+
+        const pos = selection.from + node.nodeSize;
+        const after = editor.state.doc.nodeAt(pos);
+
+        if (!after) {
+          editor.chain()
+            .insertContentAt(pos, { type: 'paragraph' })
+            .setTextSelection(pos + 1)
+            .run();
+        } else {
+          editor.chain().setTextSelection(pos + 1).run();
+        }
+        return true;
+      },
+
+      ArrowDown: ({ editor }) => this.storage.handleArrowAfter(editor, this.name),
+      ArrowRight: ({ editor }) => this.storage.handleArrowAfter(editor, this.name),
     };
   },
 });

@@ -174,6 +174,36 @@ export function hasBlockElementsWithResolver(
   return content.content.some(checkNode);
 }
 
+/** Check if Tiptap JSON content contains a link mark or embedded component node. */
+export function hasLinkOrComponent(node: any): boolean {
+  if (!node || typeof node !== 'object') return false;
+  if (node.type === 'richTextComponent') return true;
+  if (node.marks?.some((m: any) => m.type === 'richTextLink')) return true;
+  if (Array.isArray(node.content)) {
+    return node.content.some(hasLinkOrComponent);
+  }
+  return false;
+}
+
+/** Check if Tiptap JSON content contains components or inline variables (non-editable on canvas). */
+export function hasComponentOrVariable(node: any): boolean {
+  if (!node || typeof node !== 'object') return false;
+  if (node.type === 'richTextComponent') return true;
+  if (node.type === 'dynamicVariable') return true;
+  if (Array.isArray(node.content)) {
+    return node.content.some(hasComponentOrVariable);
+  }
+  return false;
+}
+
+/** Extract the rich-text content value from a layer's text variable. */
+export function getRichTextValue(variables?: { text?: { type: string; data: { content: any } } }): any {
+  const textVar = variables?.text;
+  if (textVar?.type === 'dynamic_rich_text') return textVar.data.content;
+  if (textVar?.type === 'dynamic_text') return textVar.data.content;
+  return { type: 'doc', content: [{ type: 'paragraph' }] };
+}
+
 /**
  * Extract plain text from Tiptap JSON content
  * Useful for previews, search indexing, or fallback display

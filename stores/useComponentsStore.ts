@@ -110,7 +110,8 @@ interface ComponentsActions {
   addAudioVariable: (componentId: string, name: string) => Promise<string | null>;
   addVideoVariable: (componentId: string, name: string) => Promise<string | null>;
   addIconVariable: (componentId: string, name: string) => Promise<string | null>;
-  updateTextVariable: (componentId: string, variableId: string, updates: { name?: string; default_value?: any }) => Promise<void>;
+  updateTextVariable: (componentId: string, variableId: string, updates: { name?: string; placeholder?: string; default_value?: any }) => Promise<void>;
+  reorderVariables: (componentId: string, orderedIds: string[]) => Promise<void>;
   deleteTextVariable: (componentId: string, variableId: string) => Promise<void>;
 
   // Layer style operations
@@ -905,6 +906,49 @@ export const useComponentsStore = create<ComponentsStore>((set, get) => {
         }));
       } catch (error) {
         console.error('Failed to update text variable:', error);
+      }
+    },
+
+    reorderVariables: async (componentId, orderedIds) => {
+      const component = get().getComponentById(componentId);
+      if (!component) return;
+
+      const previous = component.variables || [];
+      const varMap = new Map(previous.map(v => [v.id, v]));
+      const reordered = orderedIds.map(id => varMap.get(id)).filter(Boolean) as typeof previous;
+
+      // Optimistic update
+      set((state) => ({
+        components: state.components.map((c) =>
+          c.id === componentId ? { ...c, variables: reordered } : c
+        ),
+      }));
+
+      try {
+        const response = await fetch(`/ycode/api/components/${componentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variables: reordered }),
+        });
+
+        const result = await response.json();
+        if (result.error) {
+          console.error('Failed to reorder variables:', result.error);
+          // Rollback on error
+          set((state) => ({
+            components: state.components.map((c) =>
+              c.id === componentId ? { ...c, variables: previous } : c
+            ),
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to reorder variables:', error);
+        // Rollback on error
+        set((state) => ({
+          components: state.components.map((c) =>
+            c.id === componentId ? { ...c, variables: previous } : c
+          ),
+        }));
       }
     },
 

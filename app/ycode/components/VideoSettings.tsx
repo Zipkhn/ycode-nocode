@@ -26,7 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
@@ -35,6 +34,7 @@ import { VIDEO_FIELD_TYPES, TEXT_FIELD_TYPES, filterFieldGroupsByType, flattenFi
 import { toast } from 'sonner';
 import Icon from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
+import ComponentVariableLabel, { VARIABLE_TYPE_ICONS } from './ComponentVariableLabel';
 
 // Re-export VideoSettingsValue from types for convenience
 export type { VideoSettingsValue } from '@/types';
@@ -84,6 +84,8 @@ export default function VideoSettings(props: VideoSettingsProps) {
   const editingComponentId = useEditorStore((state) => state.editingComponentId);
   const getAsset = useAssetsStore((state) => state.getAsset);
   const getComponentById = useComponentsStore((state) => state.getComponentById);
+  const addVideoVariable = useComponentsStore((state) => state.addVideoVariable);
+  const updateTextVariable = useComponentsStore((state) => state.updateTextVariable);
 
   // Get component variables for video linking (when editing a component in layer mode)
   const editingComponent = !isStandaloneMode && editingComponentId ? getComponentById(editingComponentId) : undefined;
@@ -454,49 +456,26 @@ export default function VideoSettings(props: VideoSettingsProps) {
       <div className={isStandaloneMode ? 'flex flex-col gap-2' : 'grid grid-cols-3 items-center'}>
         {!isStandaloneMode && (
           <div className="flex items-start gap-1 py-1">
-            {editingComponentId ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="variable"
-                    size="xs"
-                    className="has-[>svg]:px-0"
-                  >
-                    <Icon name="plus-circle-solid" />
-                    Source
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {videoComponentVariables.length > 0 && (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>Link to variable</DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                          {videoComponentVariables.map((variable) => (
-                            <DropdownMenuItem
-                              key={variable.id}
-                              onClick={() => handleLinkVideoVariable(variable.id)}
-                            >
-                              {variable.name}
-                              {linkedVideoVariableId === variable.id && (
-                                <Icon name="check" className="ml-auto size-3" />
-                              )}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-                  )}
-                  {onOpenVariablesDialog && (
-                    <DropdownMenuItem onClick={() => onOpenVariablesDialog?.()}>
-                      Manage variables
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Label variant="muted">Source</Label>
-            )}
+            <ComponentVariableLabel
+              label="Source"
+              isEditingComponent={!!editingComponentId}
+              variables={videoComponentVariables}
+              linkedVariableId={linkedVideoVariableId}
+              onLinkVariable={handleLinkVideoVariable}
+              onManageVariables={() => onOpenVariablesDialog?.()}
+              onCreateVariable={editingComponentId ? async () => {
+                const newId = await addVideoVariable(editingComponentId, 'Video');
+                if (newId) {
+                  const currentValue: VideoSettingsValue = {
+                    src: layer?.variables?.video?.src,
+                    poster: layer?.variables?.video?.poster,
+                  };
+                  await updateTextVariable(editingComponentId, newId, { default_value: currentValue });
+                  handleLinkVideoVariable(newId);
+                  onOpenVariablesDialog?.(newId);
+                }
+              } : undefined}
+            />
           </div>
         )}
 
@@ -509,7 +488,12 @@ export default function VideoSettings(props: VideoSettingsProps) {
               onClick={() => onOpenVariablesDialog?.(linkedVideoVariable.id)}
             >
               <div>
-                <span>{linkedVideoVariable.name}</span>
+                <span className="flex items-center gap-1.5">
+                  {linkedVideoVariable.type && VARIABLE_TYPE_ICONS[linkedVideoVariable.type] && (
+                    <Icon name={VARIABLE_TYPE_ICONS[linkedVideoVariable.type]} className="size-3 opacity-60" />
+                  )}
+                  {linkedVideoVariable.name}
+                </span>
                 <Button
                   className="size-4! p-0!"
                   variant="outline"

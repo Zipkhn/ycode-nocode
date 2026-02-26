@@ -14,12 +14,12 @@ import type { Layer, IconSettingsValue } from '@/types';
 import { createAssetVariable, isAssetVariable, getAssetId, isStaticTextVariable, getStaticTextContent } from '@/lib/variable-utils';
 import { DEFAULT_ASSETS, isAssetOfType, ASSET_CATEGORIES } from '@/lib/asset-utils';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { toast } from 'sonner';
 import Icon from '@/components/ui/icon';
+import ComponentVariableLabel, { VARIABLE_TYPE_ICONS } from './ComponentVariableLabel';
 
 // Re-export IconSettingsValue from types for convenience
 export type { IconSettingsValue } from '@/types';
@@ -65,6 +65,8 @@ export default function IconSettings(props: IconSettingsProps) {
   const editingComponentId = useEditorStore((state) => state.editingComponentId);
   const getAsset = useAssetsStore((state) => state.getAsset);
   const getComponentById = useComponentsStore((state) => state.getComponentById);
+  const addIconVariable = useComponentsStore((state) => state.addIconVariable);
+  const updateTextVariable = useComponentsStore((state) => state.updateTextVariable);
 
   // Get component variables for icon linking (when editing a component in layer mode)
   const editingComponent = !isStandaloneMode && editingComponentId ? getComponentById(editingComponentId) : undefined;
@@ -235,49 +237,26 @@ export default function IconSettings(props: IconSettingsProps) {
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-3 items-start">
           <div className="flex items-start gap-1 py-1">
-            {editingComponentId ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="variable"
-                    size="xs"
-                    className="has-[>svg]:px-0"
-                  >
-                    <Icon name="plus-circle-solid" />
-                    File
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {iconComponentVariables.length > 0 && (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>Link to variable</DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                          {iconComponentVariables.map((variable) => (
-                            <DropdownMenuItem
-                              key={variable.id}
-                              onClick={() => handleLinkIconVariable(variable.id)}
-                            >
-                              {variable.name}
-                              {linkedIconVariableId === variable.id && (
-                                <Icon name="check" className="ml-auto size-3" />
-                              )}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-                  )}
-                  {onOpenVariablesDialog && (
-                    <DropdownMenuItem onClick={() => onOpenVariablesDialog?.()}>
-                      Manage variables
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Label variant="muted" className="pt-1">File</Label>
-            )}
+            <ComponentVariableLabel
+              label="File"
+              isEditingComponent={!!editingComponentId}
+              variables={iconComponentVariables}
+              linkedVariableId={linkedIconVariableId}
+              onLinkVariable={handleLinkIconVariable}
+              onManageVariables={() => onOpenVariablesDialog?.()}
+              onCreateVariable={editingComponentId ? async () => {
+                const newId = await addIconVariable(editingComponentId, 'Icon');
+                if (newId) {
+                  const currentValue: IconSettingsValue = {
+                    src: layer?.variables?.icon?.src,
+                  };
+                  await updateTextVariable(editingComponentId, newId, { default_value: currentValue });
+                  handleLinkIconVariable(newId);
+                  onOpenVariablesDialog?.(newId);
+                }
+              } : undefined}
+              className="pt-1"
+            />
           </div>
           <div className="col-span-2">
             {linkedIconVariable ? (
@@ -288,7 +267,12 @@ export default function IconSettings(props: IconSettingsProps) {
                 onClick={() => onOpenVariablesDialog?.(linkedIconVariable.id)}
               >
                 <div>
-                  <span>{linkedIconVariable.name}</span>
+                  <span className="flex items-center gap-1.5">
+                    {linkedIconVariable.type && VARIABLE_TYPE_ICONS[linkedIconVariable.type] && (
+                      <Icon name={VARIABLE_TYPE_ICONS[linkedIconVariable.type]} className="size-3 opacity-60" />
+                    )}
+                    {linkedIconVariable.name}
+                  </span>
                   <Button
                     className="size-4! p-0!"
                     variant="outline"

@@ -52,14 +52,16 @@ import { CollectionFieldSelector } from './CollectionFieldSelector';
 import SelectionOverlay from '@/components/SelectionOverlay';
 import RichTextLinkPopover from './RichTextLinkPopover';
 import PageSelector from './PageSelector';
+import RichTextEditorSheet from './RichTextEditorSheet';
 
 // 6. Utils
 import { buildLocalizedSlugPath, buildLocalizedDynamicPageUrl } from '@/lib/page-utils';
 import { getTranslationValue } from '@/lib/localisation-utils';
 import { cn } from '@/lib/utils';
-import { getCollectionVariable, canDeleteLayer, findLayerById, findParentCollectionLayer, findAllParentCollectionLayers, canLayerHaveLink } from '@/lib/layer-utils';
+import { getCollectionVariable, canDeleteLayer, findLayerById, findParentCollectionLayer, canLayerHaveLink, updateLayerProps } from '@/lib/layer-utils';
 import { CANVAS_BORDER, CANVAS_PADDING } from '@/lib/canvas-utils';
-import { buildFieldGroups, hasFieldsMatching, flattenFieldGroups, DISPLAYABLE_FIELD_TYPES } from '@/lib/collection-field-utils';
+import { buildFieldGroupsForLayer, hasFieldsMatching, flattenFieldGroups, DISPLAYABLE_FIELD_TYPES } from '@/lib/collection-field-utils';
+import { getRichTextValue } from '@/lib/tiptap-utils';
 import { DropContainerIndicator, DropLineIndicator } from '@/components/DropIndicators';
 import { DragCaptureOverlay } from '@/components/DragCaptureOverlay';
 import { setDragCursor, clearDragCursor } from '@/lib/drag-cursor';
@@ -548,6 +550,8 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const setHoveredLayerId = useEditorStore((state) => state.setHoveredLayerId);
   const isPreviewMode = useEditorStore((state) => state.isPreviewMode);
   const activeInteractionTriggerLayerId = useEditorStore((state) => state.activeInteractionTriggerLayerId);
+  const richTextSheetLayerId = useEditorStore((state) => state.richTextSheetLayerId);
+  const closeRichTextSheet = useEditorStore((state) => state.closeRichTextSheet);
   const assets = useAssetsStore((state) => state.assets);
 
   // Note: Canvas drag-and-drop state is handled by useCanvasDropDetection hook
@@ -581,6 +585,13 @@ const CenterCanvas = React.memo(function CenterCanvas({
       requestFinishEditing();
     }
   }, [isTextEditing, editingLayerId, selectedLayerId, requestFinishEditing]);
+
+  // Close rich text sheet if a different layer is selected
+  useEffect(() => {
+    if (richTextSheetLayerId && selectedLayerId !== richTextSheetLayerId) {
+      closeRichTextSheet();
+    }
+  }, [richTextSheetLayerId, selectedLayerId, closeRichTextSheet]);
 
   // Load draft when page changes (ensure draft exists before rendering)
   const loadDraft = usePagesStore((state) => state.loadDraft);
@@ -966,51 +977,19 @@ const CenterCanvas = React.memo(function CenterCanvas({
     return findParentCollectionLayer(layersToSearch, editingLayerId);
   }, [editingLayerId, editingComponentId, componentDrafts, currentPageId, draftsByPageId]);
 
-  // Find all parent collection layers (for nested collections)
-  const allParentCollectionLayers = useMemo(() => {
-    if (!editingLayerId) return [];
-
-    let layersToSearch: Layer[] = [];
-    if (editingComponentId) {
-      layersToSearch = componentDrafts[editingComponentId] || [];
-    } else {
-      const draft = currentPageId ? draftsByPageId[currentPageId] : null;
-      layersToSearch = draft ? draft.layers : [];
-    }
-
-    if (!layersToSearch.length) return [];
-
-    return findAllParentCollectionLayers(layersToSearch, editingLayerId);
-  }, [editingLayerId, editingComponentId, componentDrafts, currentPageId, draftsByPageId]);
-
-  // Build field groups for multi-source inline variable selection
+  // Build field groups for the canvas text editor's inline variable selection
   const fieldGroups = useMemo(() => {
-    const collectionVariable = editingLayerParentCollection
-      ? getCollectionVariable(editingLayerParentCollection)
-      : null;
-
-    // Check if parent is a multi-asset collection
-    const isMultiAssetParent = collectionVariable?.source_field_type === 'multi_asset';
-    const multiAssetContext = isMultiAssetParent && collectionVariable.source_field_id
-      ? {
-        sourceFieldId: collectionVariable.source_field_id,
-        source: (collectionVariable.source_field_source || 'collection') as 'page' | 'collection',
-      }
-      : null;
-
-    // Get all parent collection layers (closest first)
-    const parentCollectionLayers = allParentCollectionLayers
-      .map(layer => ({ layerId: layer.id, collectionId: getCollectionVariable(layer)?.id }))
-      .filter((item): item is { layerId: string; collectionId: string } => !!item.collectionId);
-
-    return buildFieldGroups({
-      parentCollectionLayers,
-      page: currentPage,
-      fieldsByCollectionId: collectionFieldsFromStore,
-      collections: collectionsFromStore,
-      multiAssetContext,
-    });
-  }, [editingLayerParentCollection, allParentCollectionLayers, currentPage, collectionFieldsFromStore, collectionsFromStore]);
+    if (!editingLayerId) return undefined;
+    let layers: Layer[] = [];
+    if (editingComponentId) {
+      layers = componentDrafts[editingComponentId] || [];
+    } else if (currentPageId) {
+      const draft = draftsByPageId[currentPageId];
+      layers = draft ? draft.layers : [];
+    }
+    if (!layers.length) return undefined;
+    return buildFieldGroupsForLayer(editingLayerId, layers, currentPage, collectionFieldsFromStore, collectionsFromStore);
+  }, [editingLayerId, editingComponentId, componentDrafts, currentPageId, draftsByPageId, currentPage, collectionFieldsFromStore, collectionsFromStore]);
 
   // Create assets map for Canvas (asset ID -> asset)
   const assetsMap = useMemo(() => {
@@ -1063,27 +1042,10 @@ const CenterCanvas = React.memo(function CenterCanvas({
 
   const handleCanvasLayerUpdate = useCallback((layerId: string, updates: Partial<Layer>) => {
     if (editingComponentId) {
-      // Update layer in component draft
       const { updateComponentDraft } = useComponentsStore.getState();
       const currentDraft = componentDrafts[editingComponentId] || [];
-
-      // Helper to update a layer in the tree
-      const updateLayerInTree = (layers: Layer[], targetId: string, layerUpdates: Partial<Layer>): Layer[] => {
-        return layers.map(layer => {
-          if (layer.id === targetId) {
-            return { ...layer, ...layerUpdates };
-          }
-          if (layer.children) {
-            return { ...layer, children: updateLayerInTree(layer.children, targetId, layerUpdates) };
-          }
-          return layer;
-        });
-      };
-
-      const updatedLayers = updateLayerInTree(currentDraft, layerId, updates);
-      updateComponentDraft(editingComponentId, updatedLayers);
+      updateComponentDraft(editingComponentId, updateLayerProps(currentDraft, layerId, updates));
     } else if (currentPageId) {
-      // Update layer in page draft
       updateLayer(currentPageId, layerId, updates);
     }
   }, [editingComponentId, componentDrafts, currentPageId, updateLayer]);
@@ -1140,6 +1102,74 @@ const CenterCanvas = React.memo(function CenterCanvas({
     // Update the layer
     updateLayer(currentPageId, layerId, { classes: newClasses });
   }, [currentPageId, draftsByPageId, updateLayer]);
+
+  // Rich text sheet for canvas double-click (layers with components/variables)
+  // Build field groups using the sheet target layer (not the canvas text editor layer)
+  const richTextSheetFieldGroups = useMemo(() => {
+    if (!richTextSheetLayerId || !currentPageId) return undefined;
+    let layers: Layer[] = [];
+    if (editingComponentId) {
+      layers = componentDrafts[editingComponentId] || [];
+    } else {
+      const draft = draftsByPageId[currentPageId];
+      layers = draft ? draft.layers : [];
+    }
+    if (!layers.length) return undefined;
+    return buildFieldGroupsForLayer(richTextSheetLayerId, layers, currentPage, collectionFieldsFromStore, collectionsFromStore);
+  }, [richTextSheetLayerId, editingComponentId, componentDrafts, currentPageId, draftsByPageId, currentPage, collectionFieldsFromStore, collectionsFromStore]);
+
+  // Track the current value locally so the value prop always matches the editor's
+  // internal state. This prevents the editor's sync effect from resetting content
+  // when other deps (fields, allFields) change.
+  const [richTextSheetValue, setRichTextSheetValue] = useState<any>(null);
+
+  useEffect(() => {
+    if (!richTextSheetLayerId) {
+      setRichTextSheetValue(null);
+      return;
+    }
+    const source = editingComponentId
+      ? componentDrafts[editingComponentId]
+      : currentPageId ? draftsByPageId[currentPageId]?.layers : null;
+    const layer = source ? findLayerById(source as Layer[], richTextSheetLayerId) : null;
+    setRichTextSheetValue(getRichTextValue(layer?.variables));
+  // Only re-derive when the sheet target layer changes, not on every draft update
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [richTextSheetLayerId]);
+
+  const handleRichTextSheetChange = useCallback((value: any) => {
+    if (!richTextSheetLayerId) return;
+    // Keep local state in sync so the value prop matches the editor's content
+    setRichTextSheetValue(value);
+    const textVariable = value && (typeof value === 'object' || (typeof value === 'string' && value.trim())) ? {
+      type: 'dynamic_rich_text' as const,
+      data: {
+        content: typeof value === 'object' ? value : {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: value }] }],
+        },
+      },
+    } : undefined;
+
+    const compId = useEditorStore.getState().editingComponentId;
+    if (compId) {
+      const { componentDrafts: drafts, updateComponentDraft } = useComponentsStore.getState();
+      const currentDraft = drafts[compId];
+      if (!currentDraft) return;
+      const layer = findLayerById(currentDraft, richTextSheetLayerId);
+      updateComponentDraft(compId, updateLayerProps(currentDraft, richTextSheetLayerId, {
+        variables: { ...layer?.variables, text: textVariable },
+      }));
+    } else {
+      const pageId = useEditorStore.getState().currentPageId;
+      if (!pageId) return;
+      const draft = usePagesStore.getState().draftsByPageId[pageId];
+      const layer = draft ? findLayerById(draft.layers, richTextSheetLayerId) : null;
+      updateLayer(pageId, richTextSheetLayerId, {
+        variables: { ...layer?.variables, text: textVariable },
+      });
+    }
+  }, [richTextSheetLayerId, updateLayer]);
 
   // Handle iframe ready callback (for SelectionOverlay)
   const handleIframeReady = useCallback((iframeElement: HTMLIFrameElement) => {
@@ -2480,6 +2510,21 @@ const CenterCanvas = React.memo(function CenterCanvas({
           )}
         </div>
       </div>
+
+      {/* Rich text sheet for canvas double-click on layers with components/variables */}
+      {richTextSheetValue && (
+        <RichTextEditorSheet
+          open={!!richTextSheetLayerId}
+          onOpenChange={(open) => { if (!open) closeRichTextSheet(); }}
+          title="Content editor"
+          description="Element content"
+          value={richTextSheetValue}
+          onChange={handleRichTextSheetChange}
+          fieldGroups={richTextSheetFieldGroups}
+          allFields={collectionFieldsFromStore}
+          collections={collectionsFromStore}
+        />
+      )}
     </div>
   );
 });

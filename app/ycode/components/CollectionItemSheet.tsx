@@ -34,6 +34,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import RichTextEditor from './RichTextEditor';
+import RichTextEditorSheet from './RichTextEditorSheet';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { useCollectionLayerStore } from '@/stores/useCollectionLayerStore';
 import { usePagesStore } from '@/stores/usePagesStore';
@@ -98,6 +99,7 @@ export default function CollectionItemSheet({
 
   const [editingItem, setEditingItem] = useState<CollectionItemWithValues | null>(null);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [expandedRichTextField, setExpandedRichTextField] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const pendingStatusActionRef = useRef<StatusAction | null>(null);
 
@@ -559,14 +561,25 @@ export default function CollectionItemSheet({
                         <FormLabel>{field.name}</FormLabel>
                         <FormControl>
                           {field.type === 'rich_text' ? (
-                            <RichTextEditor
-                              value={formField.value || ''}
-                              onChange={formField.onChange}
-                              placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
-                              variant="full"
-                              withFormatting={true}
-                              excludedLinkTypes={['asset', 'field']}
-                            />
+                            <div>
+                              <RichTextEditor
+                                value={formField.value || ''}
+                                onChange={formField.onChange}
+                                placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
+                                variant="full"
+                                withFormatting={true}
+                                excludedLinkTypes={['asset', 'field']}
+                                onExpandClick={() => setExpandedRichTextField(field.id)}
+                              />
+                              <RichTextEditorSheet
+                                open={expandedRichTextField === field.id}
+                                onOpenChange={(open) => { if (!open) setExpandedRichTextField(null); }}
+                                description={`CMS item "${field.name}" field`}
+                                value={formField.value || ''}
+                                onChange={formField.onChange}
+                                placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
+                              />
+                            </div>
                           ) : field.type === 'reference' && field.reference_collection_id ? (
                             <ReferenceFieldCombobox
                               collectionId={field.reference_collection_id}

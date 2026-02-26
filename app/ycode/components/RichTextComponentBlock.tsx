@@ -6,18 +6,21 @@
  * controls for each variable the component exposes.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import Icon from '@/components/ui/icon';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { useEditorStore } from '@/stores/useEditorStore';
-import {
-  extractTiptapFromComponentVariable,
-} from '@/lib/variable-utils';
 import { isCircularComponentReference } from '@/lib/component-utils';
 import ComponentVariableOverrides from './ComponentVariableOverrides';
+import ExpandableRichTextEditor from './ExpandableRichTextEditor';
 import type { CollectionField, Collection } from '@/types';
 import type { RichTextComponentOverrides } from '@/lib/tiptap-extensions/rich-text-component';
 import type { FieldGroup } from '@/lib/collection-field-utils';
@@ -100,49 +103,52 @@ export default function RichTextComponentBlock({
   return (
     <div className="rounded-md border border-border bg-background text-xs select-none">
       {/* Header */}
-      <div
-        role={hasVariables ? 'button' : undefined}
-        tabIndex={hasVariables ? 0 : undefined}
-        className={cn(
-          'flex w-full items-center gap-2 px-4 py-4 text-left',
-          hasVariables && 'cursor-pointer',
-        )}
-        onClick={() => hasVariables && setIsExpanded(prev => !prev)}
-        onKeyDown={(e) => {
-          if (hasVariables && (e.key === 'Enter' || e.key === ' ')) {
-            e.preventDefault();
-            setIsExpanded(prev => !prev);
-          }
-        }}
-      >
-        <Icon name="component" className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="flex-1 truncate font-medium">{component.name}</span>
-
-        {hasVariables && (
-          <Icon
-            name="chevronRight"
-            className={cn('size-3 text-muted-foreground transition-transform', isExpanded && 'rotate-90')}
-          />
-        )}
+      <div className="flex w-full items-center gap-2 px-4 py-3 text-left">
+        <button
+          type="button"
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-2 text-left',
+            hasVariables && 'cursor-pointer',
+          )}
+          onClick={() => hasVariables && setIsExpanded(prev => !prev)}
+        >
+          {hasVariables && (
+            <Icon
+              name="chevronRight"
+              className={cn('size-3 shrink-0 text-muted-foreground transition-transform', isExpanded && 'rotate-90')}
+            />
+          )}
+          <Icon name="component" className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate font-medium">{component.name}</span>
+        </button>
 
         {isEditable && (
-          <Button
-            size="xs"
-            variant="ghost"
-            className="size-5! p-0! shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-          >
-            <Icon name="x" className="size-3" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+              >
+                <Icon name="dotsHorizontal" className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {hasVariables && (
+                <DropdownMenuItem onClick={() => onOverridesChange(undefined)}>
+                  Reset variables
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={onDelete}>
+                Remove component
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
       {/* Collapsible override controls */}
       {isExpanded && hasVariables && (
-        <div className="border-t border-border px-3 py-3">
+        <div className="border-t border-border px-4 py-5">
           <ComponentVariableOverrides
             variables={variables}
             componentOverrides={componentOverrides}
@@ -151,76 +157,21 @@ export default function RichTextComponentBlock({
             allFields={allFields}
             collections={collections}
             isInsideCollectionLayer={isInsideCollectionLayer}
+            columns={2}
             renderTextOverride={(variable, value, onChange) => (
-              <InlineTextOverride value={value} onChange={onChange} />
+              <ExpandableRichTextEditor
+                sheetDescription={`${component.name} override — ${variable.name}`}
+                value={value}
+                onChange={onChange}
+                placeholder={variable.placeholder || 'Enter text...'}
+                fieldGroups={fieldGroups}
+                allFields={allFields}
+                collections={collections}
+              />
             )}
           />
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * Simple text input for overriding text variables inline.
- * Uses local state while typing and commits on blur to avoid
- * triggering Tiptap transactions on every keystroke.
- */
-function InlineTextOverride({
-  value,
-  onChange,
-}: {
-  value: any;
-  onChange: (val: any) => void;
-}) {
-  const externalText = useMemo(() => {
-    const doc = value as any;
-    if (doc?.type !== 'doc' || !doc.content) return '';
-    return doc.content
-      .map((block: any) =>
-        block.content?.map((n: any) => n.text ?? '').join('') ?? '',
-      )
-      .join('\n');
-  }, [value]);
-
-  const [localText, setLocalText] = useState(externalText);
-  const [isFocused, setIsFocused] = useState(false);
-
-  React.useEffect(() => {
-    if (!isFocused) {
-      setLocalText(externalText);
-    }
-  }, [externalText, isFocused]);
-
-  const commit = useCallback((text: string) => {
-    onChange({
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: text ? [{ type: 'text', text }] : [],
-        },
-      ],
-    });
-  }, [onChange]);
-
-  return (
-    <Input
-      value={localText}
-      onChange={(e) => setLocalText(e.target.value)}
-      onFocus={() => setIsFocused(true)}
-      onBlur={() => {
-        setIsFocused(false);
-        commit(localText);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          commit(localText);
-          (e.target as HTMLInputElement).blur();
-        }
-      }}
-      className="text-xs"
-      placeholder="Enter value..."
-    />
   );
 }

@@ -23,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
@@ -32,6 +31,7 @@ import { AUDIO_FIELD_TYPES, filterFieldGroupsByType, flattenFieldGroups } from '
 import { toast } from 'sonner';
 import Icon from '@/components/ui/icon';
 import { Slider } from '@/components/ui/slider';
+import ComponentVariableLabel, { VARIABLE_TYPE_ICONS } from './ComponentVariableLabel';
 
 // Re-export AudioSettingsValue from types for convenience
 export type { AudioSettingsValue } from '@/types';
@@ -81,6 +81,8 @@ export default function AudioSettings(props: AudioSettingsProps) {
   const editingComponentId = useEditorStore((state) => state.editingComponentId);
   const getAsset = useAssetsStore((state) => state.getAsset);
   const getComponentById = useComponentsStore((state) => state.getComponentById);
+  const addAudioVariable = useComponentsStore((state) => state.addAudioVariable);
+  const updateTextVariable = useComponentsStore((state) => state.updateTextVariable);
 
   // Get component variables for audio linking (when editing a component in layer mode)
   const editingComponent = !isStandaloneMode && editingComponentId ? getComponentById(editingComponentId) : undefined;
@@ -370,49 +372,25 @@ export default function AudioSettings(props: AudioSettingsProps) {
       <div className={isStandaloneMode ? 'flex flex-col gap-2' : 'grid grid-cols-3 items-center'}>
         {!isStandaloneMode && (
           <div className="flex items-start gap-1 py-1">
-            {editingComponentId ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="variable"
-                    size="xs"
-                    className="has-[>svg]:px-0"
-                  >
-                    <Icon name="plus-circle-solid" />
-                    Source
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {audioComponentVariables.length > 0 && (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>Link to variable</DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                          {audioComponentVariables.map((variable) => (
-                            <DropdownMenuItem
-                              key={variable.id}
-                              onClick={() => handleLinkAudioVariable(variable.id)}
-                            >
-                              {variable.name}
-                              {linkedAudioVariableId === variable.id && (
-                                <Icon name="check" className="ml-auto size-3" />
-                              )}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-                  )}
-                  {onOpenVariablesDialog && (
-                    <DropdownMenuItem onClick={() => onOpenVariablesDialog?.()}>
-                      Manage variables
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Label variant="muted">Source</Label>
-            )}
+            <ComponentVariableLabel
+              label="Source"
+              isEditingComponent={!!editingComponentId}
+              variables={audioComponentVariables}
+              linkedVariableId={linkedAudioVariableId}
+              onLinkVariable={handleLinkAudioVariable}
+              onManageVariables={() => onOpenVariablesDialog?.()}
+              onCreateVariable={editingComponentId ? async () => {
+                const newId = await addAudioVariable(editingComponentId, 'Audio');
+                if (newId) {
+                  const currentValue: AudioSettingsValue = {
+                    src: layer?.variables?.audio?.src,
+                  };
+                  await updateTextVariable(editingComponentId, newId, { default_value: currentValue });
+                  handleLinkAudioVariable(newId);
+                  onOpenVariablesDialog?.(newId);
+                }
+              } : undefined}
+            />
           </div>
         )}
 
@@ -425,7 +403,12 @@ export default function AudioSettings(props: AudioSettingsProps) {
               onClick={() => onOpenVariablesDialog?.(linkedAudioVariable.id)}
             >
               <div>
-                <span>{linkedAudioVariable.name}</span>
+                <span className="flex items-center gap-1.5">
+                  {linkedAudioVariable.type && VARIABLE_TYPE_ICONS[linkedAudioVariable.type] && (
+                    <Icon name={VARIABLE_TYPE_ICONS[linkedAudioVariable.type]} className="size-3 opacity-60" />
+                  )}
+                  {linkedAudioVariable.name}
+                </span>
                 <Button
                   className="size-4! p-0!"
                   variant="outline"

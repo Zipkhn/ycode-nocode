@@ -95,6 +95,10 @@ interface RichTextEditorProps {
   size?: 'xs' | 'sm';
   /** Link types to exclude from the link settings dropdown */
   excludedLinkTypes?: LinkType[];
+  /** Stretch editor to fill parent height (scrolls content instead of growing) */
+  fullHeight?: boolean;
+  /** Callback to open the full editor sheet (shown as expand button in toolbar) */
+  onExpandClick?: () => void;
 }
 
 export interface RichTextEditorHandle {
@@ -222,8 +226,12 @@ const RichTextComponentWithNodeView = RichTextComponent.extend({
       return {
         dom: container,
         stopEvent: () => true,
-        // Handle attribute changes without destroying/recreating the node view
-        // so React state (isExpanded, input focus) is preserved
+        selectNode: () => {
+          container.classList.add('ring-1', 'ring-ring/30', 'rounded-md');
+        },
+        deselectNode: () => {
+          container.classList.remove('ring-1', 'ring-ring/30', 'rounded-md');
+        },
         update: (updatedNode) => {
           if (updatedNode.type.name !== 'richTextComponent') return false;
           currentNode = updatedNode;
@@ -307,6 +315,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   variant = 'compact',
   size = 'xs',
   excludedLinkTypes = [],
+  fullHeight = false,
+  onExpandClick,
 }, ref) => {
   const isFullVariant = variant === 'full';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -422,7 +432,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
           !isFullVariant && size === 'sm' && 'min-h-[2.5rem] text-sm leading-6 px-3 py-1.5',
           // Full variant - larger text, more padding
           // Element styles (h1-h6, p, ul, ol, li, blockquote, code) defined in globals.css
-          isFullVariant && 'rich-text-editor-full min-h-[200px] leading-relaxed px-3 py-2.5',
+          isFullVariant && !fullHeight && 'rich-text-editor-full min-h-[200px] leading-relaxed px-3 py-2.5',
+          isFullVariant && fullHeight && 'rich-text-editor-full leading-relaxed px-3 py-2.5 focus-visible:border-ring/30 focus-visible:ring-ring/15',
           className
         ),
       },
@@ -735,7 +746,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   };
 
   return (
-    <div className={cn('flex-1 rich-text-editor relative', isFullVariant && 'flex flex-col gap-2')}>
+    <div className={cn('flex-1 rich-text-editor relative', isFullVariant && 'flex flex-col gap-2', fullHeight && 'min-h-0')}>
       {/* Formatting toolbar - Full variant (CMS style like original TiptapEditor) */}
       {withFormatting && showFormattingToolbar && isFullVariant && (
         <div className="flex items-center gap-2">
@@ -998,6 +1009,23 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               <Icon name="redo" className="size-3" />
             </ToggleGroupItem>
           </ToggleGroup>
+
+          {onExpandClick && !fullHeight && (
+            <ToggleGroup
+              type="single"
+              value=""
+              size="xs"
+              variant="secondary"
+            >
+              <ToggleGroupItem
+                value="expand"
+                onClick={onExpandClick}
+                title="Open full editor"
+              >
+                <Icon name="expand" className="size-3" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
         </div>
       )}
 
@@ -1250,7 +1278,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
         </div>
       )}
 
-      <div className="relative">
+      <div className={cn('relative', fullHeight && 'flex-1 min-h-0 flex flex-col [&>div]:flex-1 [&>div]:min-h-0 [&>div]:flex [&>div]:flex-col [&_.tiptap]:flex-1 [&_.tiptap]:min-h-0 [&_.tiptap]:overflow-y-auto')}>
         <EditorContent editor={editor} />
       </div>
 

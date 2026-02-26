@@ -8,6 +8,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import RichTextEditor from './RichTextEditor';
+import ExpandableRichTextEditor from './ExpandableRichTextEditor';
 import ImageSettings, { type ImageSettingsValue } from './ImageSettings';
 import LinkSettings, { type LinkSettingsValue } from './LinkSettings';
 import AudioSettings, { type AudioSettingsValue } from './AudioSettings';
@@ -33,6 +38,73 @@ import IconSettings, { type IconSettingsValue } from './IconSettings';
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { createTextComponentVariableValue, extractTiptapFromComponentVariable } from '@/lib/variable-utils';
+import { VARIABLE_TYPE_ICONS } from './ComponentVariableLabel';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
+import type { ComponentVariable } from '@/types';
+
+/** Sortable variable item in the sidebar list. */
+function SortableVariableItem({
+  variable,
+  isSelected,
+  onSelect,
+  onDelete,
+}: {
+  variable: ComponentVariable;
+  isSelected: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    isDragging,
+  } = useSortable({
+    id: variable.id,
+    animateLayoutChanges: () => false,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative',
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  const iconName = (variable.type && VARIABLE_TYPE_ICONS[variable.type]) || 'text';
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+    >
+      <Button
+        variant={isSelected ? 'secondary' : 'ghost'}
+        className="w-full justify-start group"
+        onClick={onSelect}
+      >
+        <Icon name={iconName} className="size-3 shrink-0" />
+        <span className="truncate flex-1 text-left">{variable.name}</span>
+        <span
+          role="button"
+          tabIndex={-1}
+          className={cn(
+            'ml-auto text-muted-foreground/50 hover:text-muted-foreground',
+            isSelected ? '' : 'opacity-0 group-hover:opacity-100',
+          )}
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          aria-label={`Delete ${variable.name}`}
+        >
+          <Icon name="x" className="size-3.5" />
+        </span>
+      </Button>
+    </div>
+  );
+}
 
 interface ComponentVariablesDialogProps {
   open: boolean;
@@ -55,12 +127,18 @@ export default function ComponentVariablesDialog({
   const addVideoVariable = useComponentsStore((state) => state.addVideoVariable);
   const addIconVariable = useComponentsStore((state) => state.addIconVariable);
   const updateTextVariable = useComponentsStore((state) => state.updateTextVariable);
+  const reorderVariables = useComponentsStore((state) => state.reorderVariables);
   const deleteTextVariable = useComponentsStore((state) => state.deleteTextVariable);
   const fields = useCollectionsStore((state) => state.fields);
   const collections = useCollectionsStore((state) => state.collections);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
   const [selectedVariableId, setSelectedVariableId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [editingPlaceholder, setEditingPlaceholder] = useState('');
   const [editingDefaultValue, setEditingDefaultValue] = useState<any>(null);
 
   // Get component and its variables
@@ -83,14 +161,17 @@ export default function ComponentVariablesDialog({
       if (target) {
         setSelectedVariableId(target.id);
         setEditingName(target.name);
+        setEditingPlaceholder(target.placeholder || '');
         setEditingDefaultValue(extractTiptapFromComponentVariable(target.default_value));
       } else if (textVariables.length > 0) {
         setSelectedVariableId(textVariables[0].id);
         setEditingName(textVariables[0].name);
+        setEditingPlaceholder(textVariables[0].placeholder || '');
         setEditingDefaultValue(extractTiptapFromComponentVariable(textVariables[0].default_value));
       } else {
         setSelectedVariableId(null);
         setEditingName('');
+        setEditingPlaceholder('');
         setEditingDefaultValue(getEmptyTiptapDoc());
       }
     }
@@ -101,6 +182,7 @@ export default function ComponentVariablesDialog({
   useEffect(() => {
     if (selectedVariable) {
       setEditingName(selectedVariable.name);
+      setEditingPlaceholder(selectedVariable.placeholder || '');
       setEditingDefaultValue(extractTiptapFromComponentVariable(selectedVariable.default_value));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -212,6 +294,15 @@ export default function ComponentVariablesDialog({
     }
   };
 
+  // Save placeholder on blur
+  const handlePlaceholderBlur = async () => {
+    if (!componentId || !selectedVariableId) return;
+    const trimmed = editingPlaceholder.trim();
+    if (selectedVariable && (selectedVariable.placeholder || '') !== trimmed) {
+      await updateTextVariable(componentId, selectedVariableId, { placeholder: trimmed || undefined });
+    }
+  };
+
   // Handle updating default value (local state only)
   const handleDefaultValueChange = (tiptapContent: any) => {
     setEditingDefaultValue(tiptapContent);
@@ -251,11 +342,24 @@ export default function ComponentVariablesDialog({
     }
   };
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!componentId || !over || active.id === over.id) return;
+
+    const ids = textVariables.map(v => v.id);
+    const oldIndex = ids.indexOf(active.id as string);
+    const newIndex = ids.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(ids, oldIndex, newIndex);
+    reorderVariables(componentId, reordered);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-0 pb-0" aria-describedby={undefined}>
+      <DialogContent className="gap-0 pb-0 sm:max-w-xl" aria-describedby={undefined}>
         <DialogTitle className="sr-only">Component Variables</DialogTitle>
-        <div className="flex -mx-6 -mt-6 h-120">
+        <div className="flex -mx-6 -mt-6 min-h-130">
           {/* Left sidebar - variable list */}
           <div className="w-60 border-r border-border noscrollbar overflow-y-auto px-5 flex flex-col">
             <header className="py-5 flex justify-between shrink-0">
@@ -299,26 +403,27 @@ export default function ComponentVariablesDialog({
 
             {/* Variable list */}
             <div className="flex flex-col gap-0.5">
-              {textVariables.map((variable) => (
-                <Button
-                  key={variable.id}
-                  variant={selectedVariableId === variable.id ? 'secondary' : 'ghost'}
-                  className="justify-start group"
-                  onClick={() => setSelectedVariableId(variable.id)}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={textVariables.map(v => v.id)}
+                  strategy={verticalListSortingStrategy}
                 >
-                  <Icon name={variable.type === 'image' ? 'image' : variable.type === 'link' ? 'link' : variable.type === 'audio' ? 'audio' : variable.type === 'video' ? 'video' : variable.type === 'icon' ? 'icon' : 'text'} className="size-3 shrink-0" />
-                  <span className="truncate flex-1 text-left">{variable.name}</span>
-                  <span
-                    role="button"
-                    tabIndex={-1}
-                    className={`ml-auto text-muted-foreground/50 hover:text-muted-foreground ${selectedVariableId === variable.id ? '' : 'opacity-0 group-hover:opacity-100'}`}
-                    onClick={(e) => { e.stopPropagation(); handleDeleteVariable(variable.id); }}
-                    aria-label={`Delete ${variable.name}`}
-                  >
-                    <Icon name="x" className="size-3.5" />
-                  </span>
-                </Button>
-              ))}
+                  {textVariables.map((variable) => (
+                    <SortableVariableItem
+                      key={variable.id}
+                      variable={variable}
+                      isSelected={selectedVariableId === variable.id}
+                      onSelect={() => setSelectedVariableId(variable.id)}
+                      onDelete={() => handleDeleteVariable(variable.id)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
 
               {textVariables.length === 0 && (
                 <p className="text-xs text-muted-foreground py-2">
@@ -344,6 +449,23 @@ export default function ComponentVariablesDialog({
                     />
                   </div>
                 </div>
+
+                {(!selectedVariable.type || selectedVariable.type === 'text') && (
+                  <div className="grid grid-cols-3">
+                    <Label variant="muted">Placeholder</Label>
+                    <div className="col-span-2 *:w-full">
+                      <Input
+                        type="text"
+                        placeholder="Enter text..."
+                        value={editingPlaceholder}
+                        onChange={(e) => setEditingPlaceholder(e.target.value)}
+                        onBlur={handlePlaceholderBlur}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Separator className="my-1" />
 
                 <div className="grid grid-cols-3 items-start">
                   <Label variant="muted" className="pt-2">Default</Label>
@@ -387,15 +509,14 @@ export default function ComponentVariablesDialog({
                         onChange={handleIconDefaultValueChange}
                       />
                     ) : (
-                      <RichTextEditor
+                      <ExpandableRichTextEditor
                         value={editingDefaultValue}
                         onChange={handleDefaultValueChange}
                         onBlur={handleDefaultValueBlur}
                         placeholder="Default value..."
+                        sheetDescription={`${selectedVariable.name} default value`}
                         allFields={fields}
                         collections={collections}
-                        withFormatting={true}
-                        showFormattingToolbar={false}
                       />
                     )}
                   </div>

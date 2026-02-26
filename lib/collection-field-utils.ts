@@ -13,9 +13,11 @@ import type {
   CollectionField,
   CollectionFieldType,
   CollectionItemWithValues,
+  Layer,
   VisibilityOperator,
 } from '@/types';
 import { ASSET_CATEGORIES, isAssetOfType } from '@/lib/asset-utils';
+import { findAllParentCollectionLayers, getCollectionVariable } from '@/lib/layer-utils';
 
 // =============================================================================
 // Field Types Configuration
@@ -654,4 +656,39 @@ export function getEncodedFieldValue(fieldId: string | null | undefined, fieldGr
     }
   }
   return fieldId; // Fallback to just field ID
+}
+
+/**
+ * Build field groups for a specific layer by resolving its parent collection context.
+ * Encapsulates the repeated pattern of finding parent collections, extracting
+ * multi-asset context, and calling buildFieldGroups.
+ */
+export function buildFieldGroupsForLayer(
+  layerId: string,
+  layers: Layer[],
+  page: BuildFieldGroupsConfig['page'],
+  fieldsByCollectionId: Record<string, CollectionField[]>,
+  collections: { id: string; name: string }[],
+): FieldGroup[] | undefined {
+  const parents = findAllParentCollectionLayers(layers, layerId);
+  const parentCollection = parents[0] || null;
+  const collectionVariable = parentCollection ? getCollectionVariable(parentCollection) : null;
+  const isMultiAssetParent = collectionVariable?.source_field_type === 'multi_asset';
+  const multiAssetContext = isMultiAssetParent && collectionVariable.source_field_id
+    ? {
+      sourceFieldId: collectionVariable.source_field_id,
+      source: (collectionVariable.source_field_source || 'collection') as FieldSourceType,
+    }
+    : null;
+  const parentCollectionLayers = parents
+    .map(layer => ({ layerId: layer.id, collectionId: getCollectionVariable(layer)?.id }))
+    .filter((item): item is ParentCollectionLayer => !!item.collectionId);
+
+  return buildFieldGroups({
+    parentCollectionLayers,
+    page,
+    fieldsByCollectionId,
+    collections,
+    multiAssetContext,
+  });
 }

@@ -25,6 +25,7 @@ import { useEditorStore } from '@/stores/useEditorStore';
 import { toast } from 'sonner';
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
 import { renderRichText, hasBlockElementsWithInlineVariables, getTextStyleClasses, type RichTextLinkContext, type RenderComponentBlockFn } from '@/lib/text-format-utils';
+import { hasComponentOrVariable } from '@/lib/tiptap-utils';
 import LayerContextMenu from '@/app/ycode/components/LayerContextMenu';
 import CanvasTextEditor from '@/app/ycode/components/CanvasTextEditor';
 import { useComponentsStore } from '@/stores/useComponentsStore';
@@ -468,15 +469,26 @@ const LayerItem: React.FC<{
         `${layer.id}-rtc-${key}`
       );
       return (
-      <>
-        <LayerRenderer
-          key={key}
-          layers={uniqueLayers}
-          {...sharedRendererProps}
-          parentComponentLayerId={layer.id}
-        />
-        {!isEditMode && <AnimationInitializer layers={uniqueLayers} />}
-      </>
+      <React.Fragment key={key}>
+        {isEditMode ? (
+          <div className="pointer-events-none">
+            <LayerRenderer
+              layers={uniqueLayers}
+              {...sharedRendererProps}
+              parentComponentLayerId={layer.id}
+            />
+          </div>
+        ) : (
+          <>
+            <LayerRenderer
+              layers={uniqueLayers}
+              {...sharedRendererProps}
+              parentComponentLayerId={layer.id}
+            />
+            <AnimationInitializer layers={uniqueLayers} />
+          </>
+        )}
+      </React.Fragment>
       );
     },
     [layer.id, sharedRendererProps, isEditMode]
@@ -1353,6 +1365,16 @@ const LayerItem: React.FC<{
         if (layer.name === 'image' || htmlTag === 'img') {
           openImageFileManager();
           return;
+        }
+
+        // Rich text with components or inline variables: open sheet editor instead of canvas editing
+        if (textEditable) {
+          const textVar = layer.variables?.text;
+          const richContent = textVar?.type === 'dynamic_rich_text' ? textVar.data.content : null;
+          if (richContent && hasComponentOrVariable(richContent)) {
+            useEditorStore.getState().openRichTextSheet(layer.id);
+            return;
+          }
         }
 
         // Text-editable layers: start inline editing

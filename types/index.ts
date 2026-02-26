@@ -467,6 +467,7 @@ export interface ComponentVariable {
   id: string;        // Unique variable ID
   name: string;      // Display name (e.g., "Button title")
   type?: 'text' | 'image' | 'link' | 'audio' | 'video' | 'icon'; // Variable type (defaults to 'text' for backwards compatibility)
+  placeholder?: string; // Placeholder text shown in text override inputs
   default_value?: ComponentVariableValue; // Default value
 }
 
