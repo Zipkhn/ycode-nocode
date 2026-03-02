@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { TemplateCard } from './TemplateCard';
 import { TemplateApplyDialog } from './TemplateApplyDialog';
 import { Spinner } from '@/components/ui/spinner';
@@ -18,6 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import Icon from '@/components/ui/icon';
+import { Label } from '@/components/ui/label';
+import BuilderLoading from '@/components/BuilderLoading';
 
 interface Template {
   id: string;
@@ -37,12 +41,17 @@ interface Category {
 interface TemplateGalleryProps {
   onApplySuccess?: () => void;
   className?: string;
+  startFromScratchHref?: string;
+  applyImmediately?: boolean;
 }
 
 export function TemplateGallery({
   onApplySuccess,
   className,
+  startFromScratchHref,
+  applyImmediately,
 }: TemplateGalleryProps) {
+  const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +61,8 @@ export function TemplateGallery({
   );
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showApplyDialog, setShowApplyDialog] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   // Fetch templates and categories on mount
   useEffect(() => {
@@ -102,7 +113,38 @@ export function TemplateGallery({
     }
   }, [filteredTemplates, selectedTemplate]);
 
+  const handleApplyImmediately = async (template: Template) => {
+    setApplying(true);
+    setApplyError(null);
+    setSelectedTemplate(template);
+
+    try {
+      const response = await fetch(`/api/templates/${template.id}/apply`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to apply template');
+      }
+
+      onApplySuccess?.();
+      window.location.href = '/ycode';
+    } catch (err) {
+      console.error('[TemplateGallery] Apply error:', err);
+      setApplyError(
+        err instanceof Error ? err.message : 'Failed to apply template'
+      );
+      setApplying(false);
+    }
+  };
+
   const handleTemplateClick = (template: Template) => {
+    if (applyImmediately) {
+      handleApplyImmediately(template);
+      return;
+    }
     setSelectedTemplate(template);
     setShowApplyDialog(true);
   };
@@ -146,8 +188,24 @@ export function TemplateGallery({
     );
   }
 
+  if (applying) {
+    return (
+      <BuilderLoading
+        title="Please wait"
+        message={`Applying ${selectedTemplate?.name ?? 'template'}...`}
+      />
+    );
+  }
+
   return (
     <div className={className}>
+      {/* Apply error */}
+      {applyError && (
+        <div className="mb-6 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          {applyError}
+        </div>
+      )}
+
       {/* Category Filter Dropdown */}
       {categories.length > 0 && (
         <div className="mb-6">
@@ -169,6 +227,18 @@ export function TemplateGallery({
 
       {/* Template Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {startFromScratchHref && (
+          <button
+            type="button"
+            onClick={() => router.push(startFromScratchHref)}
+            className="group flex flex-col gap-3"
+          >
+            <div className="rounded-lg bg-muted/50 p-8 flex items-center justify-center text-center transition-colors hover:bg-muted aspect-[72/85]">
+              <Icon name="plus" className="size-3.5 opacity-75" />
+            </div>
+            <Label>Start from scratch</Label>
+          </button>
+        )}
         {filteredTemplates.map((template) => (
           <TemplateCard
             key={template.id}
@@ -190,13 +260,15 @@ export function TemplateGallery({
         />
       )}
 
-      {/* Apply Confirmation Dialog */}
-      <TemplateApplyDialog
-        open={showApplyDialog}
-        onOpenChange={setShowApplyDialog}
-        template={selectedTemplate}
-        onSuccess={handleApplySuccess}
-      />
+      {/* Apply Confirmation Dialog (only when not in immediate mode) */}
+      {!applyImmediately && (
+        <TemplateApplyDialog
+          open={showApplyDialog}
+          onOpenChange={setShowApplyDialog}
+          template={selectedTemplate}
+          onSuccess={handleApplySuccess}
+        />
+      )}
     </div>
   );
 }

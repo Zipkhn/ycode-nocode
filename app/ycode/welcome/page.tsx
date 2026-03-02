@@ -33,6 +33,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import BuilderLoading from '@/components/BuilderLoading';
 import { Spinner } from '@/components/ui/spinner';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { TemplateGallery } from '@/components/templates/TemplateGallery';
 
 function LogoBottomRight() {
   return (
@@ -777,8 +778,7 @@ export default function WelcomePage() {
         }
 
         markComplete();
-        // Redirect to builder (will auto-login since signUp sets session)
-        router.push('/ycode');
+        setStep('template');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Setup failed');
       } finally {
@@ -927,6 +927,40 @@ export default function WelcomePage() {
         )}
 
       </div>
+
+      </div>
+    );
+  }
+
+  // Step 5: Choose a Template or Start from Scratch
+  if (currentStep === 'template') {
+    return (
+      <div className="min-h-screen flex flex-col bg-neutral-950">
+
+        <LogoBottomRight />
+
+        <div className="flex-1 flex flex-col items-center justify-center py-10">
+
+          <div className="w-full max-w-4xl animate-in fade-in slide-in-from-bottom-1 duration-700" style={{ animationFillMode: 'both' }}>
+
+            <div className="flex flex-col items-center text-center gap-1 mb-10">
+              <Label size="sm">Choose a template</Label>
+              <Label
+                variant="muted"
+                size="sm"
+              >
+                Pick a pre-built design or start with a blank canvas.
+              </Label>
+            </div>
+
+            <TemplateGallery
+              startFromScratchHref="/ycode"
+              applyImmediately
+            />
+
+          </div>
+
+        </div>
 
       </div>
     );

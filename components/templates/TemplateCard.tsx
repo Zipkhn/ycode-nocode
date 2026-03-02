@@ -43,7 +43,7 @@ export function TemplateCard({
           <img
             src={preview}
             alt={`${name} preview`}
-            className="h-full w-full object-cover object-top transition-transform group-hover:scale-[1.02]"
+            className="aspect-[72/85] object-cover object-top transition-transform group-hover:scale-[1.02]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900">

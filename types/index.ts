@@ -41,6 +41,7 @@ export interface TypographyDesign {
   underlineOffset?: string;
   verticalAlign?: string;
   color?: string;
+  placeholderColor?: string;
 }
 
 export interface SpacingDesign {
@@ -381,6 +382,7 @@ export interface LayerVariables {
     borderColor?: DesignColorVariable;
     divideColor?: DesignColorVariable;
     textDecorationColor?: DesignColorVariable;
+    placeholderColor?: DesignColorVariable;
   };
 }
 
@@ -755,7 +757,7 @@ export interface VercelConfig {
 }
 
 // Setup Wizard Types
-export type SetupStep = 'welcome' | 'supabase' | 'migrate' | 'admin' | 'complete';
+export type SetupStep = 'welcome' | 'supabase' | 'migrate' | 'admin' | 'template' | 'complete';
 
 export interface SetupState {
   currentStep: SetupStep;
