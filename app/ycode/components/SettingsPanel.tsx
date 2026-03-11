@@ -58,7 +58,7 @@ export default function SettingsPanel({
         </header>
       )}
 
-      {isOpen && (
+      {isOpen && children && (
         <div className="flex flex-col gap-2 pb-5">
           {children}
         </div>

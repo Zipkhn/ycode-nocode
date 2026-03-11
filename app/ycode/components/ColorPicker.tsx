@@ -903,11 +903,21 @@ function ColorVariablesSection({
         isOpen={true}
         onToggle={() => {}}
         collapsible={false}
-        className="pt-2"
+        className={cn('pt-2', colorVariables.length === 0 && !isActiveEdit && '-mb-1.5')}
+        action={!isActiveEdit ? (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={handleStartCreate}
+          >
+            <Icon name="plus" />
+          </Button>
+        ) : undefined}
       >
+        {(isActiveEdit || colorVariables.length > 0) && (
         <div className="-mt-3 -mb-5 flex flex-col">
           {isActiveEdit && editState ? (
-            <div className="flex gap-2 py-1.5">
+            <div className="flex gap-2 pt-1.5 pb-2">
               <Button
                 variant="secondary"
                 size="sm"
@@ -925,7 +935,7 @@ function ColorVariablesSection({
               </Button>
             </div>
           ) : (
-            <>
+            <div className="max-h-24 overflow-y-auto no-scrollbar pb-2">
               {colorVariables.map((v) => (
                 <ContextMenu key={v.id}>
                   <ContextMenuTrigger asChild>
@@ -988,18 +998,10 @@ function ColorVariablesSection({
                   </ContextMenuContent>
                 </ContextMenu>
               ))}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="justify-start"
-                onClick={handleStartCreate}
-              >
-                <Icon name="plus" />
-                Add variable
-              </Button>
-            </>
+            </div>
           )}
         </div>
+        )}
       </SettingsPanel>
     </div>
   );
@@ -1874,7 +1876,9 @@ export default function ColorPicker({
       )}
 
       <PopoverContent
-        className="w-56 p-2 relative z-50" align="end"
+        className="w-56 p-2 pb-0 relative z-50"
+        align="end"
+        collisionPadding={16}
         onKeyDown={handleKeyDown}
       >
         <Tabs
@@ -2321,6 +2325,8 @@ export default function ColorPicker({
 
         </Tabs>
 
+        {activeTab !== 'image' && (
+        <>
         <Separator className="my-2" />
 
         <ColorVariablesSection
@@ -2352,6 +2358,8 @@ export default function ColorPicker({
             }
           }}
         />
+        </>
+        )}
 
       </PopoverContent>
     </Popover>
