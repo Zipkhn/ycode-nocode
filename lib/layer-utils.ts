@@ -445,8 +445,22 @@ export function isTextEditable(layer: Layer): boolean {
  * Use this for checks that should apply to both headings and text elements,
  * such as showing typography controls, text content editing, etc.
  */
-export function isTextContentLayer(layer: Layer): boolean {
+export function isTextContentLayer(layer: Layer | null | undefined): boolean {
+  if (!layer) return false;
   return layer.name === 'heading' || layer.name === 'text';
+}
+
+/**
+ * Check if a layer is a heading element.
+ * Includes backward compat: text layers with h1-h6 tag are treated as headings.
+ */
+export function isHeadingLayer(layer: Layer | null | undefined): boolean {
+  if (!layer) return false;
+  if (layer.name === 'heading') return true;
+  if (layer.name === 'text') {
+    return ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(layer.settings?.tag || '');
+  }
+  return false;
 }
 
 /**

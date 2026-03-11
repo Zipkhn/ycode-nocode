@@ -11,7 +11,7 @@ import { useLocalisationStore } from '@/stores/useLocalisationStore';
 import type { Layer, Locale, ComponentVariable, FormSettings, LinkSettings, Breakpoint, CollectionItemWithValues, Component } from '@/types';
 import type { UseLiveLayerUpdatesReturn } from '@/hooks/use-live-layer-updates';
 import type { UseLiveComponentUpdatesReturn } from '@/hooks/use-live-component-updates';
-import { getLayerHtmlTag, getClassesString, getText, resolveFieldValue, isTextEditable, getCollectionVariable, evaluateVisibility, findAncestorByName, filterDisabledSliderLayers } from '@/lib/layer-utils';
+import { getLayerHtmlTag, getClassesString, getText, resolveFieldValue, isTextEditable, isTextContentLayer, getCollectionVariable, evaluateVisibility, findAncestorByName, filterDisabledSliderLayers } from '@/lib/layer-utils';
 import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/templates/utilities';
 import { useCanvasSlider } from '@/hooks/use-canvas-slider';
 import { resolveFieldFromSources } from '@/lib/cms-variables-utils';
@@ -532,8 +532,7 @@ const LayerItem: React.FC<{
 
   let htmlTag = getLayerHtmlTag(layer);
 
-  // Heading/text elements hold plain text — no rich text block handling needed
-  const isSimpleTextLayer = layer.name === 'heading' || layer.name === 'text';
+  const isSimpleTextLayer = isTextContentLayer(layer);
 
   // Check if we need to override the tag for rich text with block elements
   // Tags like <p>, <h1>-<h6> cannot contain block elements like <ul>/<ol>

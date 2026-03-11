@@ -3,6 +3,7 @@
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEditorStore } from '@/stores/useEditorStore';
 import type { UIState, Layer } from '@/types';
+import { isTextContentLayer } from '@/lib/layer-utils';
 import { DEFAULT_TEXT_STYLES, getTextStyleLabel } from '@/lib/text-format-utils';
 
 interface UIStateSelectorProps {
@@ -25,7 +26,7 @@ export default function UIStateSelector({ selectedLayer }: UIStateSelectorProps)
     return applicableTypes.includes(selectedLayer.name || '');
   };
 
-  const isTextLayer = selectedLayer?.name === 'heading' || selectedLayer?.name === 'text';
+  const isTextLayer = isTextContentLayer(selectedLayer);
 
   // Filter out dynamic styles (dts-*) from the dropdown - they're not user-selectable
   const allTextStyles = { ...DEFAULT_TEXT_STYLES, ...selectedLayer?.textStyles };

@@ -34,7 +34,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 // 6. Utils/lib
 import { cn } from '@/lib/utils';
 import { flattenTree, type FlattenedItem } from '@/lib/tree-utilities';
-import { canHaveChildren, getLayerIcon, getLayerName, getCollectionVariable, canMoveLayer, updateLayerProps, filterDisabledSliderLayers } from '@/lib/layer-utils';
+import { canHaveChildren, getLayerIcon, getLayerName, getCollectionVariable, isTextContentLayer, canMoveLayer, updateLayerProps, filterDisabledSliderLayers } from '@/lib/layer-utils';
 import { MULTI_ASSET_COLLECTION_ID } from '@/lib/collection-field-utils';
 import { hasStyleOverrides } from '@/lib/layer-style-utils';
 import { getUserInitials, getDisplayName } from '@/lib/collaboration-utils';
@@ -93,7 +93,7 @@ function getLayerDisplayLabel(
   }
 
   // For text-content layers (heading and text), show the actual text content
-  if ((layer.name === 'heading' || layer.name === 'text') && layer.variables?.text) {
+  if (isTextContentLayer(layer) && layer.variables?.text) {
     const textVar = layer.variables.text as { type: string; data?: { content?: any } };
 
     let textContent = '';

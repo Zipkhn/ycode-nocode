@@ -85,7 +85,7 @@ import { useLayerLocks } from '@/hooks/use-layer-locks';
 import { classesToDesign, mergeDesign, removeConflictsForClass, getRemovedPropertyClasses } from '@/lib/tailwind-class-mapper';
 import { cn } from '@/lib/utils';
 import { sanitizeHtmlId } from '@/lib/html-utils';
-import { isFieldVariable, getCollectionVariable, findParentCollectionLayer, findAllParentCollectionLayers, isTextEditable, findLayerWithParent, resetBindingsOnCollectionSourceChange, isInputInsideFilter } from '@/lib/layer-utils';
+import { isFieldVariable, getCollectionVariable, findParentCollectionLayer, findAllParentCollectionLayers, isTextEditable, isTextContentLayer, isHeadingLayer, findLayerWithParent, resetBindingsOnCollectionSourceChange, isInputInsideFilter } from '@/lib/layer-utils';
 import { detachSpecificLayerFromComponent } from '@/lib/component-utils';
 import { convertContentToValue, parseValueToContent } from '@/lib/cms-variables-utils';
 import { createTextComponentVariableValue } from '@/lib/variable-utils';
@@ -405,17 +405,6 @@ const RightSidebar = React.memo(function RightSidebar({
     }
   }, [selectedLayerId]);
 
-  // Helper function to check if layer is a heading
-  const isHeadingLayer = (layer: Layer | null): boolean => {
-    if (!layer) return false;
-    if (layer.name === 'heading') return true;
-    // Backward compat: text layers with h1-h6 tag
-    if (layer.name === 'text') {
-      return ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(layer.settings?.tag || '');
-    }
-    return false;
-  };
-
   // Helper function to check if layer is a container/section/block
   const isContainerLayer = (layer: Layer | null): boolean => {
     if (!layer) return false;
@@ -428,11 +417,7 @@ const RightSidebar = React.memo(function RightSidebar({
            containerTags.includes(layer.settings?.tag || '');
   };
 
-  // Helper function to check if layer is a text-content element (heading or text)
-  const isTextLayer = (layer: Layer | null): boolean => {
-    if (!layer) return false;
-    return layer.name === 'heading' || layer.name === 'text';
-  };
+  const isTextLayer = isTextContentLayer;
 
   // Helper function to check if layer is a button element
   const isButtonLayer = (layer: Layer | null): boolean => {
