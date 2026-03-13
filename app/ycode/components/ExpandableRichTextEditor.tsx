@@ -104,7 +104,6 @@ export default function ExpandableRichTextEditor({
           variant="secondary"
           className="flex-1 gap-2.5"
           onClick={() => setSheetOpen(true)}
-          disabled={disabled}
         >
           Expand
           <span><Icon name="expand" className="size-2.5" /></span>
