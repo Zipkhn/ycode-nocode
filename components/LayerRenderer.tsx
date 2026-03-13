@@ -1163,7 +1163,7 @@ const LayerItem: React.FC<{
     }
 
     return items;
-  }, [allCollectionItems, sourceFieldId, sourceFieldType, sourceFieldSource, collectionLayerData, pageCollectionItemData, collectionLayerItemId, pageCollectionItemId, getAsset, collectionVariable?.filters]);
+  }, [allCollectionItems, sourceFieldId, sourceFieldType, sourceFieldSource, collectionLayerData, pageCollectionItemData, collectionLayerItemId, pageCollectionItemId, getAsset, assetsById, collectionVariable?.filters]);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -2504,7 +2504,11 @@ const LayerItem: React.FC<{
                     collectionItemId={item.id}
                     layerDataMap={updatedLayerDataMap}
                     pageCollectionItemId={pageCollectionItemId}
-                    pageCollectionItemData={pageCollectionItemData}
+                    pageCollectionItemData={
+                      sourceFieldType === 'multi_asset' && sourceFieldSource === 'page'
+                        ? { ...pageCollectionItemData, ...enhancedItemValues }
+                        : pageCollectionItemData
+                    }
                     hiddenLayerInfo={hiddenLayerInfo}
                     editorHiddenLayerIds={editorHiddenLayerIds}
                     editorBreakpoint={editorBreakpoint}
