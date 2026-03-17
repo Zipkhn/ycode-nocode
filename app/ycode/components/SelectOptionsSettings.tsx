@@ -8,7 +8,7 @@
  * (each item becomes an option with value=itemId, label=displayField).
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 
 import {
   DndContext,
@@ -58,6 +58,13 @@ import { findDisplayField, getItemDisplayName } from '@/lib/collection-field-uti
 import { toast } from 'sonner';
 
 import type { Layer, CollectionItemWithValues } from '@/types';
+
+function isCheckboxWrapperLayer(layer: Layer | null): boolean {
+  if (!layer || layer.name !== 'div') return false;
+  return !!layer.children?.some(
+    (c) => c.name === 'input' && c.attributes?.type === 'checkbox'
+  );
+}
 
 interface SelectOptionsSettingsProps {
   layer: Layer | null;
@@ -333,6 +340,7 @@ export default function SelectOptionsSettings({
   const { collections, fields, loadFields } = useCollectionsStore();
 
   const isSelectLayer = layer?.name === 'select';
+  const isCheckboxWrapper = isCheckboxWrapperLayer(layer);
   const optionsSource = layer?.settings?.optionsSource;
   const isCollectionSource = !!optionsSource?.collectionId;
   const explicitOptionsMode = layer?.settings?.selectOptionsMode;
@@ -372,6 +380,22 @@ export default function SelectOptionsSettings({
   const handleSourceChange = useCallback((value: string) => {
     if (!layer) return;
 
+    if (value === 'none' && isCheckboxWrapper) {
+      autoBindAppliedForRef.current = null;
+      const { optionsSource: _, sortByCollectionId: _sb, sortByFieldIds: _sf, selectOptionsMode: _sm, ...restSettings } = layer.settings || {};
+      const textChild = layer.children?.find(c => c.name === 'text');
+      if (textChild) {
+        onLayerUpdate(textChild.id, {
+          variables: { ...textChild.variables, text: { type: 'dynamic_text' as const, data: { content: 'Checkbox label' } } },
+        });
+      }
+      onLayerUpdate(layer.id, {
+        settings: { ...restSettings, tag: 'label' },
+        variables: { ...layer.variables, collection: undefined },
+      });
+      return;
+    }
+
     if (value === 'none' || value === 'list') {
       const { optionsSource: _, sortByCollectionId: _sb, sortByFieldIds: _sf, ...restSettings } = layer.settings || {};
       onLayerUpdate(layer.id, {
@@ -398,6 +422,16 @@ export default function SelectOptionsSettings({
         },
         children: SORT_ORDER_PRESET_OPTIONS.map((opt, idx) => buildOptionLayer(`${layer.id}-preset-${idx}-${generateId('opt')}`, opt.label, opt.value)),
       });
+    } else if (isCheckboxWrapper) {
+      const { sortByCollectionId: _sb, sortByFieldIds: _sf, ...restSettings } = layer.settings || {};
+      onLayerUpdate(layer.id, {
+        settings: {
+          ...restSettings,
+          selectOptionsMode: undefined,
+          optionsSource: { collectionId: value },
+        },
+        variables: { ...layer.variables, collection: { id: value } },
+      });
     } else {
       const { sortByCollectionId: _sb, sortByFieldIds: _sf, ...restSettings } = layer.settings || {};
       onLayerUpdate(layer.id, {
@@ -408,7 +442,7 @@ export default function SelectOptionsSettings({
         },
       });
     }
-  }, [layer, onLayerUpdate]);
+  }, [layer, isCheckboxWrapper, onLayerUpdate]);
 
   const handleSortByCollectionChange = useCallback((collectionId: string) => {
     if (!layer) return;
@@ -712,8 +746,44 @@ export default function SelectOptionsSettings({
     onLayerUpdate(layer.id, { children: [noneChild, ...fieldChildren] });
   }, [layer?.id, isSortByMode, sortByCollectionId, sortByFieldIds, sortByCollectionFields, currentOptionSignature, onLayerUpdate]);
 
-  // Only show for select elements
-  if (!layer || !isSelectLayer) {
+  // Track which collection has already had its text child auto-bound to prevent re-binding
+  const autoBindAppliedForRef = useRef<string | null>(null);
+
+  // Checkbox wrapper: auto-bind text child to the display field once when a collection is first assigned
+  useEffect(() => {
+    if (!layer || !isCheckboxWrapper || !isCollectionSource || !displayField) return;
+    const collectionId = layer.settings?.optionsSource?.collectionId;
+    if (!collectionId || autoBindAppliedForRef.current === collectionId) return;
+    const textChild = layer.children?.find(c => c.name === 'text');
+    if (!textChild) return;
+    if (textChild.variables?.text?.type === 'dynamic_rich_text') {
+      autoBindAppliedForRef.current = collectionId;
+      return;
+    }
+    onLayerUpdate(textChild.id, {
+      variables: {
+        ...textChild.variables,
+        text: {
+          type: 'dynamic_rich_text' as const,
+          data: {
+            content: {
+              type: 'doc',
+              content: [{ type: 'paragraph', content: [{
+                type: 'dynamicVariable',
+                attrs: {
+                  variable: { type: 'field', data: { field_id: displayField.id, field_type: displayField.type, relationships: [], source: 'collection', collection_layer_id: layer.id } },
+                  label: displayField.name || 'Name',
+                },
+              }] }],
+            },
+          },
+        },
+      },
+    });
+    autoBindAppliedForRef.current = collectionId;
+  }, [layer?.id, isCheckboxWrapper, isCollectionSource, displayField, layer?.children, onLayerUpdate]);
+
+  if (!layer || (!isSelectLayer && !isCheckboxWrapper)) {
     return null;
   }
 
@@ -724,7 +794,7 @@ export default function SelectOptionsSettings({
       isOpen={isOpen}
       onToggle={() => setIsOpen(!isOpen)}
       action={
-        !isCollectionSource && !isSortOrderMode && !isSortByMode ? (
+        isSelectLayer && !isCollectionSource && !isSortOrderMode && !isSortByMode ? (
           <Popover open={showAddPopover} onOpenChange={setShowAddPopover}>
             <PopoverTrigger asChild>
               <Button
@@ -796,17 +866,21 @@ export default function SelectOptionsSettings({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">None</SelectItem>
-                <SelectItem value="list">
-                  <span className="flex items-center gap-2">
-                    <Icon name="listUnordered" className="size-3 opacity-60" />
-                    List
-                  </span>
-                </SelectItem>
-                <SelectGroup>
-                  <SelectLabel>Sorting options</SelectLabel>
-                  <SelectItem value={SOURCE_SORT_BY}>Sort by</SelectItem>
-                  <SelectItem value={SOURCE_SORT_ORDER}>Sort order</SelectItem>
-                </SelectGroup>
+                {isSelectLayer && (
+                  <>
+                    <SelectItem value="list">
+                      <span className="flex items-center gap-2">
+                        <Icon name="listUnordered" className="size-3 opacity-60" />
+                        List
+                      </span>
+                    </SelectItem>
+                    <SelectGroup>
+                      <SelectLabel>Sorting options</SelectLabel>
+                      <SelectItem value={SOURCE_SORT_BY}>Sort by</SelectItem>
+                      <SelectItem value={SOURCE_SORT_ORDER}>Sort order</SelectItem>
+                    </SelectGroup>
+                  </>
+                )}
                 {collections.length > 0 && (
                   <SelectGroup>
                     <SelectLabel>Collections</SelectLabel>
@@ -1002,8 +1076,8 @@ export default function SelectOptionsSettings({
           </>
         )}
 
-        {/* Static options editor (only when not using collection source) */}
-        {!isCollectionSource && !isSortByMode && (
+        {/* Static options editor (select only, not when using collection source) */}
+        {isSelectLayer && !isCollectionSource && !isSortByMode && (
           <>
             {isSortOrderMode ? (
               <div className="flex flex-col gap-2">

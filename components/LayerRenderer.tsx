@@ -884,12 +884,14 @@ const LayerItem: React.FC<{
     // Check for inline variables in DynamicTextVariable format (legacy)
     if (textVariable?.type === 'dynamic_text') {
       const content = textVariable.data.content;
-      if (content.includes('<ycode-inline-variable>')) {
-        // Resolve inline variables with timezone-aware date formatting
-        return resolveInlineVariablesFromData(content, collectionLayerData, pageCollectionItemData ?? undefined, timezone, effectiveLayerDataMap);
+      if (typeof content === 'string') {
+        if (content.includes('<ycode-inline-variable>')) {
+          return resolveInlineVariablesFromData(content, collectionLayerData, pageCollectionItemData ?? undefined, timezone, effectiveLayerDataMap);
+        }
+        return content;
       }
-      // No inline variables, return plain content
-      return content;
+      // Tiptap JSON content (e.g. dynamicVariable nodes) — skip, rendered by RichTextEditor
+      return undefined;
     }
     const text = getText(layer);
     if (text) return text;
@@ -2019,6 +2021,41 @@ const LayerItem: React.FC<{
             }
           } else {
             payload[key] = value;
+          }
+        });
+
+        // Resolve select values to display text instead of raw IDs
+        const selects = form.querySelectorAll('select[name]');
+        selects.forEach((sel) => {
+          const select = sel as HTMLSelectElement;
+          if (select.name && select.selectedIndex >= 0) {
+            const selectedOption = select.options[select.selectedIndex];
+            if (selectedOption && selectedOption.value && selectedOption.text && selectedOption.value !== selectedOption.text) {
+              payload[select.name] = selectedOption.text;
+            }
+          }
+        });
+
+        // Resolve checkbox/radio values to display text instead of raw IDs
+        form.querySelectorAll('input[type="checkbox"]:checked, input[type="radio"]:checked').forEach((el) => {
+          const input = el as HTMLInputElement;
+          if (!input.name || !input.value) return;
+          const parent = input.closest('label') || input.parentElement;
+          if (!parent) return;
+          const labelText = Array.from(parent.children)
+            .filter((n) => n !== input && n.tagName !== 'INPUT')
+            .map((n) => n.textContent?.trim())
+            .filter(Boolean)
+            .join(' ')
+            .trim();
+          if (labelText && labelText !== input.value) {
+            const currentVal = payload[input.name];
+            if (Array.isArray(currentVal)) {
+              const idx = currentVal.indexOf(input.value);
+              if (idx >= 0) currentVal[idx] = labelText;
+            } else if (currentVal === input.value) {
+              payload[input.name] = labelText;
+            }
           }
         });
 

@@ -2143,8 +2143,8 @@ const RightSidebar = React.memo(function RightSidebar({
               </SettingsPanel>
             )}
 
-            {/* Collection Binding Panel - only show for collection layers */}
-            {selectedLayer && getCollectionVariable(selectedLayer) && (
+            {/* Collection Binding Panel - only show for collection layers (hide when optionsSource manages it) */}
+            {selectedLayer && getCollectionVariable(selectedLayer) && !selectedLayer.settings?.optionsSource && (
               <SettingsPanel
                 title="CMS"
                 isOpen={collectionBindingOpen}

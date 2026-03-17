@@ -1577,8 +1577,9 @@ export async function resolveCollectionLayers(
     const layerDataMap = { ...parentLayerDataMap, ...(layer._layerDataMap || {}) };
     // Check if this is a collection layer
     const isCollectionLayer = !!layer.variables?.collection?.id;
+    const hasCheckboxOptionsSource = layer.name === 'div' && !!layer.settings?.optionsSource?.collectionId;
 
-    if (isCollectionLayer) {
+    if (isCollectionLayer && !hasCheckboxOptionsSource) {
       const collectionVariable = getCollectionVariable(layer);
 
       if (collectionVariable && collectionVariable.id) {
@@ -1987,6 +1988,82 @@ export async function resolveCollectionLayers(
         };
       } catch (error) {
         console.error(`Failed to resolve collection-sourced select options for layer ${layer.id}:`, error);
+      }
+    }
+
+    // Collection-sourced checkbox group: replace children with checkboxes from a collection
+    if (
+      layer.name === 'div' &&
+      layer.settings?.optionsSource?.collectionId
+    ) {
+      try {
+        const sourceCollectionId = layer.settings.optionsSource.collectionId;
+        let { items: sourceItems } = await getItemsWithValues(sourceCollectionId, isPublished);
+        const sourceFields = await getFieldsByCollectionId(sourceCollectionId, isPublished);
+        const opts = layer.settings.optionsSource;
+
+        const displayField = findDisplayField(sourceFields);
+
+        if (opts.sortFieldId) {
+          const sortField = sourceFields.find(f => f.id === opts.sortFieldId);
+          if (sortField) {
+            const dir = opts.sortOrder === 'desc' ? -1 : 1;
+            sourceItems = [...sourceItems].sort((a, b) => {
+              const aVal = String(a.values[sortField.id] ?? '');
+              const bVal = String(b.values[sortField.id] ?? '');
+              return aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' }) * dir;
+            });
+          }
+        }
+
+        const findCheckboxInput = (children: Layer[] | undefined): Layer | undefined => {
+          if (!children) return undefined;
+          for (const c of children) {
+            if (c.name === 'input' && c.attributes?.type === 'checkbox') return c;
+            if (c.children) { const found = findCheckboxInput(c.children); if (found) return found; }
+          }
+          return undefined;
+        };
+        const checkboxInput = findCheckboxInput(layer.children);
+        const baseName = checkboxInput?.attributes?.name || checkboxInput?.settings?.id || layer.id;
+        const checkboxName = baseName.endsWith('[]') ? baseName : `${baseName}[]`;
+
+        const generatedChildren: Layer[] = sourceItems.map(item => {
+          const label = displayField ? (item.values[displayField.id] || 'Untitled') : 'Untitled';
+          return {
+            id: `${layer.id}-cb-${item.id}`,
+            name: 'div',
+            settings: { tag: 'label' },
+            classes: layer.classes || '',
+            children: [
+              {
+                id: `${layer.id}-cb-${item.id}-input`,
+                name: 'input',
+                classes: checkboxInput?.classes || '',
+                attributes: { type: 'checkbox', name: checkboxName, value: item.id },
+                design: checkboxInput?.design,
+              },
+              {
+                id: `${layer.id}-cb-${item.id}-text`,
+                name: 'text',
+                classes: '',
+                variables: {
+                  text: { type: 'dynamic_text' as const, data: { content: String(label) } },
+                },
+              },
+            ],
+          } as Layer;
+        });
+
+        const { collection: _col, ...restVariables } = layer.variables || {};
+        return {
+          ...layer,
+          settings: { ...layer.settings, tag: undefined },
+          variables: Object.keys(restVariables).length > 0 ? restVariables : undefined,
+          children: generatedChildren,
+        };
+      } catch (error) {
+        console.error(`Failed to resolve collection-sourced checkbox options for layer ${layer.id}:`, error);
       }
     }
 

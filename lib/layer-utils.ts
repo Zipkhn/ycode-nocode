@@ -1347,8 +1347,8 @@ export function getLayerIcon(
   // Component layers
   if (layer.componentId) return 'component';
 
-  // Collection layers
-  if (getCollectionVariable(layer)) {
+  // Collection layers (skip when optionsSource manages the binding, e.g. checkbox groups)
+  if (getCollectionVariable(layer) && !layer.settings?.optionsSource) {
     return 'database';
   }
 
@@ -1381,10 +1381,14 @@ export function getLayerIcon(
   // Other named layers
   if (layer.customName === 'Container') return 'container';
 
-  // Input elements - use type-specific icons for checkbox and radio
-  if (layer.name === 'input' && layer.attributes?.type) {
-    if (layer.attributes.type === 'checkbox') return 'checkbox';
-    if (layer.attributes.type === 'radio') return 'radio';
+  // Input elements - use type-specific icons for radio
+  if (layer.name === 'input' && layer.attributes?.type === 'radio') {
+    return 'radio';
+  }
+
+  // Checkbox wrapper div (contains a checkbox input child)
+  if (layer.name === 'div' && layer.children?.some(c => c.name === 'input' && c.attributes?.type === 'checkbox')) {
+    return 'checkbox';
   }
 
   // Fallback to block icon (based on name)
@@ -1418,8 +1422,8 @@ export function getLayerName(
     return context?.component_name || 'Component';
   }
 
-  // Use field name or collection name in parentheses after "Collection"
-  if (getCollectionVariable(layer)) {
+  // Use field name or collection name in parentheses after "Collection" (skip when optionsSource manages the binding)
+  if (getCollectionVariable(layer) && !layer.settings?.optionsSource) {
     const label = context?.source_field_name ?? context?.collection_name;
     return label ? `Collection (${label})` : 'Collection';
   }
@@ -1438,10 +1442,14 @@ export function getLayerName(
     return layer.customName;
   }
 
-  // Input elements - use type-specific names for checkbox and radio
-  if (layer.name === 'input' && layer.attributes?.type) {
-    if (layer.attributes.type === 'checkbox') return 'Checkbox';
-    if (layer.attributes.type === 'radio') return 'Radio';
+  // Input elements - use type-specific names for radio
+  if (layer.name === 'input' && layer.attributes?.type === 'radio') {
+    return 'Radio';
+  }
+
+  // Checkbox wrapper div (contains a checkbox input child)
+  if (layer.name === 'div' && layer.children?.some(c => c.name === 'input' && c.attributes?.type === 'checkbox')) {
+    return 'Checkbox';
   }
 
   return getBlockName(layer.name) || 'Layer';
