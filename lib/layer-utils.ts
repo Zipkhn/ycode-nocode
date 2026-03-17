@@ -2820,6 +2820,326 @@ export function resetBindingsAfterMove(layers: Layer[], movedLayerId: string): L
 }
 
 /**
+ * Clean all CMS bindings that won't be valid inside a standalone component.
+ * Strips page-source bindings, external collection layer references,
+ * and nested collection sources whose parent is outside the component.
+ */
+export function cleanLayersForComponentCreation(layers: Layer[]): Layer[] {
+  // 1. Strip all page-source bindings (dynamic page collection fields)
+  let cleaned = stripPageSourceBindings(layers);
+
+  // 2. Reset nested collection sources that reference parents outside the component
+  cleaned = resetOrphanedCollectionSources(cleaned, cleaned);
+
+  // 3. Strip collection-sourced field bindings referencing layers outside the component
+  cleaned = resetInvalidBindings(cleaned, cleaned, new Map());
+
+  return cleaned;
+}
+
+/** Recursively strip page-source CMS bindings from a layer tree */
+function stripPageSourceBindings(layers: Layer[]): Layer[] {
+  return layers.map(layer => {
+    let changed = false;
+    let updated = layer;
+
+    if (updated.variables) {
+      const cleanedVars = stripPageSourceFromVariables(updated.variables);
+      if (cleanedVars) {
+        updated = { ...updated, variables: cleanedVars };
+        changed = true;
+      }
+    }
+
+    if (layer.children && layer.children.length > 0) {
+      const cleanedChildren = stripPageSourceBindings(changed ? updated.children || [] : layer.children);
+      if (cleanedChildren !== layer.children) {
+        updated = { ...updated, children: cleanedChildren };
+        changed = true;
+      }
+    }
+
+    return changed ? updated : layer;
+  });
+}
+
+/**
+ * Reset collection layer sources that depend on a parent collection layer
+ * not present in the given layer tree.
+ */
+function resetOrphanedCollectionSources(subtree: Layer[], fullTree: Layer[]): Layer[] {
+  return subtree.map(layer => {
+    let changed = false;
+    let updated = layer;
+
+    const cv = getCollectionVariable(layer);
+    if (cv?.source_field_id && cv.source_field_source === 'collection') {
+      const parents = findAllParentCollectionLayers(fullTree, layer.id);
+      if (parents.length === 0) {
+        updated = {
+          ...updated,
+          variables: {
+            ...updated.variables,
+            collection: { id: '', source_field_id: undefined, source_field_type: undefined, source_field_source: undefined },
+          },
+        };
+        changed = true;
+      }
+    }
+
+    if (layer.children && layer.children.length > 0) {
+      const cleanedChildren = resetOrphanedCollectionSources(
+        changed ? updated.children || [] : layer.children,
+        fullTree,
+      );
+      if (cleanedChildren !== layer.children) {
+        updated = { ...updated, children: cleanedChildren };
+        changed = true;
+      }
+    }
+
+    return changed ? updated : layer;
+  });
+}
+
+/** Check if a FieldVariable is page-sourced */
+function isPageBoundField(fv: FieldVariable): boolean {
+  return fv.data?.source === 'page';
+}
+
+/** Strip page-source inline variables from a text string */
+function stripPageSourceInlineVariables(text: string): string | null {
+  if (!text) return null;
+  let changed = false;
+  const result = text.replace(INLINE_VAR_REGEX, (match, content) => {
+    try {
+      const parsed = JSON.parse(content.trim());
+      if (parsed.type === 'field' && isPageBoundField(parsed as FieldVariable)) {
+        changed = true;
+        return '';
+      }
+    } catch { /* leave as-is */ }
+    return match;
+  });
+  return changed ? result : null;
+}
+
+/** Strip page-source dynamicVariable nodes from Tiptap JSON */
+function stripPageSourceFromTiptap(content: object): object | null {
+  if (!content || typeof content !== 'object') return null;
+  const doc = content as { type?: string; content?: any[] };
+  if (!doc.content || !Array.isArray(doc.content)) return null;
+
+  let changed = false;
+  const cleanedBlocks = doc.content.map((block: any) => {
+    if (!block.content || !Array.isArray(block.content)) return block;
+    const cleanedNodes = block.content.filter((node: any) => {
+      if (node.type === 'dynamicVariable' && node.attrs?.variable) {
+        const fv = node.attrs.variable as FieldVariable;
+        if (fv.type === 'field' && isPageBoundField(fv)) {
+          changed = true;
+          return false;
+        }
+      }
+      return true;
+    });
+    if (cleanedNodes.length !== block.content.length) return { ...block, content: cleanedNodes };
+    return block;
+  });
+  return changed ? { ...doc, content: cleanedBlocks } : null;
+}
+
+/** Strip page-source field bindings from a DesignColorVariable */
+function stripPageSourceFromDesignColor(dcv: DesignColorVariable): DesignColorVariable | undefined {
+  let changed = false;
+  const result = { ...dcv };
+
+  if (result.field && isPageBoundField(result.field)) {
+    result.field = undefined;
+    changed = true;
+  }
+  if (result.linear?.stops) {
+    const cleanedStops = result.linear.stops.map((stop: BoundColorStop) => {
+      if (stop.field && isPageBoundField(stop.field)) {
+        changed = true;
+        const { field: _, ...rest } = stop;
+        return rest;
+      }
+      return stop;
+    });
+    if (changed) result.linear = { ...result.linear, stops: cleanedStops };
+  }
+  if (result.radial?.stops) {
+    let radialChanged = false;
+    const cleanedStops = result.radial.stops.map((stop: BoundColorStop) => {
+      if (stop.field && isPageBoundField(stop.field)) {
+        radialChanged = true;
+        const { field: _, ...rest } = stop;
+        return rest;
+      }
+      return stop;
+    });
+    if (radialChanged) {
+      result.radial = { ...result.radial, stops: cleanedStops };
+      changed = true;
+    }
+  }
+  return changed ? result : dcv;
+}
+
+/** Strip all page-source CMS bindings from a layer's variables */
+function stripPageSourceFromVariables(variables: LayerVariables): LayerVariables | null {
+  let changed = false;
+  const updated = { ...variables };
+
+  // Collection variable sourced from page
+  if (updated.collection?.source_field_source === 'page') {
+    updated.collection = {
+      id: '',
+      source_field_id: undefined,
+      source_field_type: undefined,
+      source_field_source: undefined,
+    };
+    changed = true;
+  }
+
+  // Conditional visibility referencing page collection
+  if (updated.conditionalVisibility?.groups) {
+    let cvChanged = false;
+    const cleanedGroups = updated.conditionalVisibility.groups.map(group => {
+      const cleanedConditions = group.conditions.filter(c => {
+        if (c.source === 'page_collection') {
+          cvChanged = true;
+          return false;
+        }
+        return true;
+      });
+      return cleanedConditions.length !== group.conditions.length ? { ...group, conditions: cleanedConditions } : group;
+    });
+    if (cvChanged) {
+      updated.conditionalVisibility = { groups: cleanedGroups };
+      changed = true;
+    }
+  }
+
+  // Text variable
+  if (updated.text) {
+    if (updated.text.type === 'dynamic_text' && typeof updated.text.data?.content === 'string') {
+      const cleaned = stripPageSourceInlineVariables(updated.text.data.content);
+      if (cleaned !== null) {
+        updated.text = { ...updated.text, data: { content: cleaned } };
+        changed = true;
+      }
+    }
+    if (updated.text.type === 'dynamic_rich_text' && typeof updated.text.data?.content === 'object') {
+      const cleaned = stripPageSourceFromTiptap(updated.text.data.content);
+      if (cleaned !== null) {
+        updated.text = { ...updated.text, data: { content: cleaned } };
+        changed = true;
+      }
+    }
+  }
+
+  // Image variable
+  if (updated.image?.src && updated.image.src.type === 'field' && isPageBoundField(updated.image.src as FieldVariable)) {
+    updated.image = { ...updated.image, src: { type: 'asset', data: { asset_id: null } } };
+    changed = true;
+  }
+  if (updated.image?.alt?.type === 'dynamic_text' && typeof updated.image.alt.data?.content === 'string') {
+    const cleaned = stripPageSourceInlineVariables(updated.image.alt.data.content);
+    if (cleaned !== null) {
+      updated.image = { ...updated.image, alt: { ...updated.image.alt, data: { content: cleaned } } };
+      changed = true;
+    }
+  }
+
+  // Audio variable
+  if (updated.audio?.src?.type === 'field' && isPageBoundField(updated.audio.src as FieldVariable)) {
+    updated.audio = { ...updated.audio, src: { type: 'asset', data: { asset_id: null } } };
+    changed = true;
+  }
+
+  // Video variable
+  if (updated.video?.src?.type === 'field' && isPageBoundField(updated.video.src as FieldVariable)) {
+    updated.video = { ...updated.video, src: undefined };
+    changed = true;
+  }
+  if (updated.video?.poster?.type === 'field' && isPageBoundField(updated.video.poster as FieldVariable)) {
+    updated.video = { ...updated.video, poster: undefined };
+    changed = true;
+  }
+
+  // Iframe variable
+  if (updated.iframe?.src?.type === 'dynamic_text' && typeof updated.iframe.src.data?.content === 'string') {
+    const cleaned = stripPageSourceInlineVariables(updated.iframe.src.data.content);
+    if (cleaned !== null) {
+      updated.iframe = { ...updated.iframe, src: { ...updated.iframe.src, data: { content: cleaned } } };
+      changed = true;
+    }
+  }
+
+  // Link variable
+  if (updated.link) {
+    let linkChanged = false;
+    const updatedLink = { ...updated.link };
+
+    if (updatedLink.field && isPageBoundField(updatedLink.field)) {
+      updatedLink.type = 'url';
+      updatedLink.field = undefined;
+      linkChanged = true;
+    }
+    if (updatedLink.url?.type === 'dynamic_text' && typeof updatedLink.url.data?.content === 'string') {
+      const cleaned = stripPageSourceInlineVariables(updatedLink.url.data.content);
+      if (cleaned !== null) {
+        updatedLink.url = { ...updatedLink.url, data: { content: cleaned } };
+        linkChanged = true;
+      }
+    }
+    if (updatedLink.email?.type === 'dynamic_text' && typeof updatedLink.email.data?.content === 'string') {
+      const cleaned = stripPageSourceInlineVariables(updatedLink.email.data.content);
+      if (cleaned !== null) {
+        updatedLink.email = { ...updatedLink.email, data: { content: cleaned } };
+        linkChanged = true;
+      }
+    }
+    if (updatedLink.phone?.type === 'dynamic_text' && typeof updatedLink.phone.data?.content === 'string') {
+      const cleaned = stripPageSourceInlineVariables(updatedLink.phone.data.content);
+      if (cleaned !== null) {
+        updatedLink.phone = { ...updatedLink.phone, data: { content: cleaned } };
+        linkChanged = true;
+      }
+    }
+    if (linkChanged) {
+      updated.link = updatedLink;
+      changed = true;
+    }
+  }
+
+  // Design color bindings
+  if (updated.design) {
+    const designKeys = ['backgroundColor', 'color', 'borderColor', 'divideColor', 'textDecorationColor'] as const;
+    let designChanged = false;
+    const newDesign = { ...updated.design };
+    for (const key of designKeys) {
+      const dcv = newDesign[key];
+      if (dcv) {
+        const cleaned = stripPageSourceFromDesignColor(dcv);
+        if (cleaned !== dcv) {
+          (newDesign as Record<string, DesignColorVariable | undefined>)[key] = cleaned;
+          designChanged = true;
+        }
+      }
+    }
+    if (designChanged) {
+      updated.design = newDesign;
+      changed = true;
+    }
+  }
+
+  return changed ? updated : null;
+}
+
+/**
  * Reset CMS bindings on all descendants of a layer whose collection source has changed.
  * Strips any binding that references the changed collection layer (by collection_layer_id)
  * or implicitly depends on it (source='collection' without a specific layer ID).

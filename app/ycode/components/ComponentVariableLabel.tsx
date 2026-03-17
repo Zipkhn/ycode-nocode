@@ -23,6 +23,7 @@ import type { ComponentVariable } from '@/types';
 
 export const VARIABLE_TYPE_ICONS: Record<string, IconProps['name']> = {
   text: 'text',
+  rich_text: 'rich-text',
   image: 'image',
   link: 'link',
   audio: 'audio',

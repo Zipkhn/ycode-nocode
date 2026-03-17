@@ -565,8 +565,9 @@ const LayerItem: React.FC<{
         const componentVariables = parentComponentVariables || editingComponentVariables;
         const linkedVariableId = (textVariable as any)?.id;
         if (linkedVariableId && componentVariables) {
-          const overrideValue = parentComponentOverrides?.text?.[linkedVariableId];
           const variableDef = componentVariables.find(v => v.id === linkedVariableId);
+          const overrideCategory = variableDef?.type === 'rich_text' ? 'rich_text' : 'text';
+          const overrideValue = parentComponentOverrides?.[overrideCategory]?.[linkedVariableId];
           const valueToCheck = overrideValue ?? variableDef?.default_value;
           if (valueToCheck && 'type' in valueToCheck && valueToCheck.type === 'dynamic_rich_text') {
             hasLists = hasBlockElementsWithInlineVariables(
@@ -852,9 +853,9 @@ const LayerItem: React.FC<{
     const componentVariables = parentComponentVariables || editingComponentVariables;
     const linkedVariableId = textVariable?.id;
     if (linkedVariableId && componentVariables) {
-      // Check for override value first (only when viewing an instance, not when editing component)
-      const overrideValue = parentComponentOverrides?.text?.[linkedVariableId];
       const variableDef = componentVariables.find(v => v.id === linkedVariableId);
+      const overrideCategory = variableDef?.type === 'rich_text' ? 'rich_text' : 'text';
+      const overrideValue = parentComponentOverrides?.[overrideCategory]?.[linkedVariableId];
       const valueToRender = overrideValue ?? variableDef?.default_value;
 
       if (valueToRender !== undefined) {

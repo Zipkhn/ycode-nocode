@@ -351,10 +351,16 @@ export default function PagesTree({
     [pages, folders]
   );
 
-  // Flatten the tree for rendering
+  // Flatten the tree for rendering (respects collapsed state)
   const flattenedNodes = useMemo(
     () => flattenPageTree(tree, null, 0, collapsedIds),
     [tree, collapsedIds]
+  );
+
+  // Complete flattened list ignoring collapse — used for rebuild so collapsed children aren't lost
+  const allFlattenedNodes = useMemo(
+    () => flattenPageTree(tree, null, 0, new Set()),
+    [tree]
   );
 
   // Calculate which depth levels should be highlighted (selected folders)
@@ -482,10 +488,8 @@ export default function PagesTree({
     },
 
     canDrop: (activeNode, overNode, position, targetParentId) => {
-      if (!overNode) return false;
-
       // Prevent dropping into self or descendant
-      if (checkIsDescendant(activeNode, overNode, flattenedNodes)) {
+      if (overNode && checkIsDescendant(activeNode, overNode, flattenedNodes)) {
         return false;
       }
 
@@ -563,7 +567,7 @@ export default function PagesTree({
       // Handle end drop zone
       if (overId === 'end-drop-zone') {
         // Find the last root item
-        const rootNodes = flattenedNodes.filter(n => n.parentId === null);
+        const rootNodes = allFlattenedNodes.filter(n => n.parentId === null);
         const lastRootNode = rootNodes[rootNodes.length - 1];
         
         if (lastRootNode) {
@@ -572,8 +576,8 @@ export default function PagesTree({
         }
       }
 
-      // Rebuild the tree structure
-      const newTree = rebuildPageTree(flattenedNodes, activeNode.id, newParentId, newOrder);
+      // Rebuild from the complete node list so collapsed children aren't lost
+      const newTree = rebuildPageTree(allFlattenedNodes, activeNode.id, newParentId, newOrder);
 
       // Extract updated pages and folders from the new tree
       const extractPagesAndFolders = (

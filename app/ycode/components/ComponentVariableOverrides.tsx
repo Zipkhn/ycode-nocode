@@ -20,6 +20,8 @@ import IconSettings from './IconSettings';
 import {
   extractTiptapFromComponentVariable,
   createTextComponentVariableValue,
+  tiptapEqual,
+  EMPTY_OVERRIDES,
 } from '@/lib/variable-utils';
 import type {
   ComponentVariable,
@@ -49,6 +51,7 @@ interface ComponentVariableOverridesProps {
     variable: ComponentVariable,
     value: any,
     onChange: (tiptapContent: any) => void,
+    onClear: () => void,
   ) => React.ReactNode;
   /** Number of columns for the override layout (default: 1) */
   columns?: 1 | 2;
@@ -83,20 +86,54 @@ export default function ComponentVariableOverrides({
   onCreateOverrideVariable,
   onManageVariables,
 }: ComponentVariableOverridesProps) {
+  const getTextOverrideCategory = useCallback(
+    (variableId: string): 'text' | 'rich_text' => {
+      const variable = variables.find(v => v.id === variableId);
+      return variable?.type === 'rich_text' ? 'rich_text' : 'text';
+    },
+    [variables],
+  );
+
   const handleTextChange = useCallback(
     (variableId: string, tiptapContent: any) => {
+      const category = getTextOverrideCategory(variableId);
+      const defaultTiptap = extractTiptapFromComponentVariable(
+        variables.find(v => v.id === variableId)?.default_value,
+      );
+      if (tiptapEqual(tiptapContent, defaultTiptap)) {
+        const updated = { ...(componentOverrides?.[category] ?? {}) };
+        delete updated[variableId];
+        onOverridesChange({ ...EMPTY_OVERRIDES, ...componentOverrides, [category]: updated });
+        return;
+      }
       const value = createTextComponentVariableValue(tiptapContent);
       onOverridesChange({
+        ...EMPTY_OVERRIDES,
         ...componentOverrides,
-        text: { ...(componentOverrides?.text ?? {}), [variableId]: value },
+        [category]: { ...(componentOverrides?.[category] ?? {}), [variableId]: value },
       });
     },
-    [componentOverrides, onOverridesChange],
+    [componentOverrides, onOverridesChange, getTextOverrideCategory, variables],
+  );
+
+  const handleTextClear = useCallback(
+    (variableId: string) => {
+      const category = getTextOverrideCategory(variableId);
+      const updated = { ...(componentOverrides?.[category] ?? {}) };
+      delete updated[variableId];
+      onOverridesChange({
+        ...EMPTY_OVERRIDES,
+        ...componentOverrides,
+        [category]: updated,
+      });
+    },
+    [componentOverrides, onOverridesChange, getTextOverrideCategory],
   );
 
   const handleTypedChange = useCallback(
     (category: keyof NonNullable<Overrides>, variableId: string, value: any) => {
       onOverridesChange({
+        ...EMPTY_OVERRIDES,
         ...componentOverrides,
         [category]: { ...(componentOverrides?.[category] ?? {}), [variableId]: value },
       });
@@ -106,11 +143,12 @@ export default function ComponentVariableOverrides({
 
   const getTextValue = useCallback(
     (variableId: string) => {
-      const override = componentOverrides?.text?.[variableId];
+      const category = getTextOverrideCategory(variableId);
+      const override = componentOverrides?.[category]?.[variableId];
       const def = variables.find(v => v.id === variableId)?.default_value;
       return extractTiptapFromComponentVariable(override ?? def);
     },
-    [componentOverrides, variables],
+    [componentOverrides, variables, getTextOverrideCategory],
   );
 
   const getTypedValue = useCallback(
@@ -144,8 +182,8 @@ export default function ComponentVariableOverrides({
 
   const isTwoCol = columns === 2;
 
-  /** Renders a group of variable items, using masonry-style columns when 2-col is enabled. */
   const renderGroup = (items: React.ReactNode[], key: string) => {
+    // One column layout, used in the component instance right sidebar
     if (!isTwoCol) {
       return (
         <div
@@ -157,14 +195,16 @@ export default function ComponentVariableOverrides({
       );
     }
 
+    // Two column layout, used in the component variables dialog
     return (
-      <div
-        key={key}
-        className="columns-2 gap-x-10 [column-rule:1px_solid_var(--color-border)] [column-fill:balance]"
-      >
-        {items.map((item, i) => (
-          <div key={i} className="break-inside-avoid mb-5">{item}</div>
-        ))}
+      <div key={key} className="overflow-hidden">
+        <div className="-mb-5">
+          <div className="columns-2 gap-x-10 [column-rule:1px_solid_var(--color-border)] [column-fill:balance]">
+            {items.map((item, i) => (
+              <div key={i} className="break-inside-avoid pb-5">{item}</div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   };
@@ -325,6 +365,7 @@ export default function ComponentVariableOverrides({
             </div>
           </div>
         );
+      case 'rich_text':
       default:
         return (
           <div key={variable.id} className="grid grid-cols-3 gap-2 items-start">
@@ -335,6 +376,7 @@ export default function ComponentVariableOverrides({
                   variable,
                   getTextValue(variable.id),
                   (val) => handleTextChange(variable.id, val),
+                  () => handleTextClear(variable.id),
                 )
                 : null}
             </div>

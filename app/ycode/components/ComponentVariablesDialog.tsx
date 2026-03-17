@@ -121,6 +121,7 @@ export default function ComponentVariablesDialog({
 }: ComponentVariablesDialogProps) {
   const getComponentById = useComponentsStore((state) => state.getComponentById);
   const addTextVariable = useComponentsStore((state) => state.addTextVariable);
+  const addRichTextVariable = useComponentsStore((state) => state.addRichTextVariable);
   const addImageVariable = useComponentsStore((state) => state.addImageVariable);
   const addLinkVariable = useComponentsStore((state) => state.addLinkVariable);
   const addAudioVariable = useComponentsStore((state) => state.addAudioVariable);
@@ -188,7 +189,6 @@ export default function ComponentVariablesDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVariableId]);
 
-  // Handle creating a new text variable
   const handleAddTextVariable = async () => {
     if (!componentId) return;
 
@@ -196,6 +196,16 @@ export default function ComponentVariablesDialog({
     if (newId) {
       setSelectedVariableId(newId);
       setEditingName('Text');
+    }
+  };
+
+  const handleAddRichTextVariable = async () => {
+    if (!componentId) return;
+
+    const newId = await addRichTextVariable(componentId, 'Rich text');
+    if (newId) {
+      setSelectedVariableId(newId);
+      setEditingName('Rich text');
     }
   };
 
@@ -358,7 +368,7 @@ export default function ComponentVariablesDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="gap-0 overflow-hidden p-0 sm:max-w-xl h-[85vh] max-h-[85vh]"
+        className="gap-0 overflow-hidden p-0 sm:max-w-xl h-[85vh] max-h-160"
         aria-describedby={undefined}
       >
         <DialogTitle className="sr-only">Component Variables</DialogTitle>
@@ -378,6 +388,10 @@ export default function ComponentVariablesDialog({
                     <DropdownMenuItem onClick={handleAddTextVariable}>
                       <Icon name="text" className="size-3" />
                       Text
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleAddRichTextVariable}>
+                      <Icon name="rich-text" className="size-3" />
+                      Rich text
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleAddLinkVariable}>
                       <Icon name="link" className="size-3" />
@@ -453,7 +467,7 @@ export default function ComponentVariablesDialog({
                   </div>
                 </div>
 
-                {(!selectedVariable.type || selectedVariable.type === 'text') && (
+                {(!selectedVariable.type || selectedVariable.type === 'text' || selectedVariable.type === 'rich_text') && (
                   <div className="grid grid-cols-3">
                     <Label variant="muted">Placeholder</Label>
                     <div className="col-span-2 *:w-full">
@@ -511,7 +525,7 @@ export default function ComponentVariablesDialog({
                         value={selectedVariable.default_value as IconSettingsValue}
                         onChange={handleIconDefaultValueChange}
                       />
-                    ) : (
+                    ) : selectedVariable.type === 'rich_text' ? (
                       <ExpandableRichTextEditor
                         value={editingDefaultValue}
                         onChange={handleDefaultValueChange}
@@ -520,6 +534,17 @@ export default function ComponentVariablesDialog({
                         sheetDescription={`${selectedVariable.name} default value`}
                         allFields={fields}
                         collections={collections}
+                      />
+                    ) : (
+                      <RichTextEditor
+                        value={editingDefaultValue}
+                        onChange={handleDefaultValueChange}
+                        onBlur={handleDefaultValueBlur}
+                        placeholder="Default value..."
+                        allFields={fields}
+                        collections={collections}
+                        withFormatting
+                        showFormattingToolbar={false}
                       />
                     )}
                   </div>

@@ -20,7 +20,9 @@ import { useComponentsStore } from '@/stores/useComponentsStore';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { isCircularComponentReference } from '@/lib/component-utils';
 import ComponentVariableOverrides from './ComponentVariableOverrides';
+import RichTextEditor from './RichTextEditor';
 import ExpandableRichTextEditor from './ExpandableRichTextEditor';
+import { SIMPLE_TEXT_FIELD_TYPES } from '@/lib/collection-field-utils';
 import type { CollectionField, Collection } from '@/types';
 import type { RichTextComponentOverrides } from '@/lib/tiptap-extensions/rich-text-component';
 import type { FieldGroup } from '@/lib/collection-field-utils';
@@ -159,17 +161,32 @@ export default function RichTextComponentBlock({
             collections={collections}
             isInsideCollectionLayer={isInsideCollectionLayer}
             columns={2}
-            renderTextOverride={(variable, value, onChange) => (
-              <ExpandableRichTextEditor
-                sheetDescription={`${component.name} override — ${variable.name}`}
-                value={value}
-                onChange={onChange}
-                placeholder={variable.placeholder || 'Enter text...'}
-                fieldGroups={fieldGroups}
-                allFields={allFields}
-                collections={collections}
-              />
-            )}
+            renderTextOverride={(variable, value, onChange, onClear) =>
+              variable.type === 'rich_text' ? (
+                <ExpandableRichTextEditor
+                  sheetDescription={`${component.name} override — ${variable.name}`}
+                  value={value}
+                  onChange={onChange}
+                  onClear={onClear}
+                  placeholder={variable.placeholder || 'Enter text...'}
+                  fieldGroups={fieldGroups}
+                  allFields={allFields}
+                  collections={collections}
+                />
+              ) : (
+                <RichTextEditor
+                  value={value}
+                  onChange={onChange}
+                  placeholder={variable.placeholder || 'Enter text...'}
+                  fieldGroups={fieldGroups}
+                  allFields={allFields}
+                  collections={collections}
+                  withFormatting
+                  showFormattingToolbar={false}
+                  allowedFieldTypes={SIMPLE_TEXT_FIELD_TYPES}
+                />
+              )
+            }
           />
         </div>
       )}

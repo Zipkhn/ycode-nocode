@@ -468,7 +468,10 @@ export default function ImageSettings(props: ImageSettingsProps) {
                 />
 
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center px-2 py-1 opacity-0 group-hover:opacity-100 z-20">
-                  <Button variant="overlay" size="sm">{assetFilename ? 'Change file' : 'Choose file'}</Button>
+                  <Button
+                    type="button" variant="overlay"
+                    size="sm"
+                  >{assetFilename ? 'Change file' : 'Choose file'}</Button>
                 </div>
               </div>
             </div>

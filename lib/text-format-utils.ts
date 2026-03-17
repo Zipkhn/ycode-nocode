@@ -3,7 +3,7 @@ import type { TextStyle, DynamicRichTextVariable, LinkSettings, Component } from
 import { cn } from '@/lib/utils';
 import { formatFieldValue, resolveFieldFromSources } from '@/lib/cms-variables-utils';
 import { generateLinkHref, type LinkResolutionContext } from '@/lib/link-utils';
-import { extractInlineNodesFromRichText, contentHasBlockElements, hasBlockElementsWithResolver } from '@/lib/tiptap-utils';
+import { contentHasBlockElements, hasBlockElementsWithResolver } from '@/lib/tiptap-utils';
 import { applyComponentOverrides, resolveComponents } from '@/lib/resolve-components';
 
 /**
@@ -433,9 +433,10 @@ function renderTextNode(
 }
 
 /**
- * Render nested rich text content from a Tiptap JSON structure
- * Used when a rich_text CMS field is inserted as an inline variable
- * Flattens the content to render inline with surrounding text
+ * Render nested rich text content from a Tiptap JSON structure.
+ * Used when a rich_text CMS field is inserted as an inline variable.
+ * Delegates to renderBlock with useSpanForParagraphs=true since this
+ * content is always nested inside another element.
  */
 function renderNestedRichTextContent(
   richTextValue: any,
@@ -451,136 +452,27 @@ function renderNestedRichTextContent(
   renderComponentBlock?: RenderComponentBlockFn,
   ancestorComponentIds?: Set<string>,
 ): React.ReactNode[] {
-  // richTextValue should be a Tiptap doc structure: { type: 'doc', content: [...] }
   if (!richTextValue) {
     return [];
   }
 
-  // Parse string to object if needed (published pages may store as JSON string)
   let parsed = richTextValue;
   if (typeof richTextValue === 'string') {
     try {
       parsed = JSON.parse(richTextValue);
     } catch {
-      // If parsing fails, return as plain text
       return [React.createElement('span', { key }, richTextValue)];
     }
   }
 
-  // After parsing, verify it's an object
   if (typeof parsed !== 'object') {
     return [];
   }
 
-  // Handle Tiptap doc structure
   if (parsed.type === 'doc' && Array.isArray(parsed.content)) {
-    // Check if content has block elements that need proper block rendering
-    // (headings, multiple paragraphs, lists)
-    const hasBlockStructure = parsed.content.length > 1 ||
-      parsed.content.some((block: any) =>
-        block.type === 'heading' ||
-        block.type === 'bulletList' ||
-        block.type === 'orderedList' ||
-        block.type === 'richTextComponent'
-      );
-
-    if (hasBlockStructure) {
-      // Render each block properly to preserve structure
-      // Use spans instead of p/h tags since we're inside another element
-      return parsed.content.map((block: any, blockIdx: number) => {
-        const blockKey = `${key}-block-${blockIdx}`;
-
-        if (block.type === 'heading') {
-          const level = block.attrs?.level || 1;
-          const styleKey = `h${level}`;
-          const headingClass = textStyles?.[styleKey]?.classes ??
-            DEFAULT_TEXT_STYLES[styleKey]?.classes ?? '';
-          const props: Record<string, any> = { key: blockKey, className: headingClass };
-          if (isEditMode) {
-            props['data-style'] = styleKey;
-          }
-          // Empty headings use non-breaking space to preserve the empty line
-          if (!block.content || block.content.length === 0) {
-            return React.createElement('span', props, '\u00A0');
-          }
-          const content = renderInlineContent(block.content, collectionItemData, pageCollectionItemData, textStyles, isEditMode, linkContext, timezone, layerDataMap, components, renderComponentBlock, ancestorComponentIds);
-          return React.createElement('span', props, ...content);
-        }
-
-        if (block.type === 'paragraph') {
-          const paragraphClass = textStyles?.paragraph?.classes ??
-            DEFAULT_TEXT_STYLES.paragraph?.classes ?? '';
-          const props: Record<string, any> = { key: blockKey, className: paragraphClass };
-          if (isEditMode) {
-            props['data-style'] = 'paragraph';
-          }
-          // Empty paragraphs use non-breaking space to preserve the empty line
-          if (!block.content || block.content.length === 0) {
-            return React.createElement('span', props, '\u00A0');
-          }
-          const content = renderInlineContent(block.content, collectionItemData, pageCollectionItemData, textStyles, isEditMode, linkContext, timezone, layerDataMap, components, renderComponentBlock, ancestorComponentIds);
-          return React.createElement('span', props, ...content);
-        }
-
-        if (block.type === 'bulletList' || block.type === 'orderedList') {
-          const listClass = textStyles?.[block.type]?.classes ??
-            DEFAULT_TEXT_STYLES[block.type]?.classes ?? '';
-          const tag = block.type === 'bulletList' ? 'ul' : 'ol';
-          const listProps: Record<string, any> = { key: blockKey, className: listClass };
-          if (isEditMode) {
-            listProps['data-style'] = block.type;
-          }
-          const items = block.content?.map((item: any, itemIdx: number) =>
-            renderListItem(item, `${blockKey}-${itemIdx}`, collectionItemData, pageCollectionItemData, textStyles, isEditMode, linkContext, timezone, layerDataMap, components, renderComponentBlock, ancestorComponentIds, itemIdx)
-          ) || [];
-          return React.createElement(tag, listProps, ...items);
-        }
-
-        // Handle embedded component blocks
-        if (block.type === 'richTextComponent' && block.attrs?.componentId) {
-          return renderRichTextComponentBlock(block, blockKey, components, renderComponentBlock, ancestorComponentIds);
-        }
-
-        // Fallback: render inline content
-        if (block.content) {
-          const content = renderInlineContent(block.content, collectionItemData, pageCollectionItemData, textStyles, isEditMode, linkContext, timezone, layerDataMap, components, renderComponentBlock, ancestorComponentIds);
-          return React.createElement('span', { key: blockKey }, ...content);
-        }
-
-        return null;
-      }).filter(Boolean);
-    }
-
-    // Simple case: flatten to inline nodes
-    const inlineNodes = extractInlineNodesFromRichText(parsed.content);
-
-    if (inlineNodes.length === 0) {
-      return [];
-    }
-
-    // Render the flattened inline content
-    const rendered = renderInlineContent(
-      inlineNodes,
-      collectionItemData,
-      pageCollectionItemData,
-      textStyles,
-      isEditMode,
-      linkContext,
-      timezone,
-      layerDataMap,
-      components,
-      renderComponentBlock,
-      ancestorComponentIds
-    );
-
-    // Add unique keys to each rendered node
-    return rendered.map((node, nodeIdx) => {
-      if (React.isValidElement(node)) {
-        return React.cloneElement(node, { key: `${key}-nested-${nodeIdx}` });
-      }
-      // Wrap non-element nodes (strings, etc.) in a span
-      return React.createElement('span', { key: `${key}-nested-${nodeIdx}` }, node);
-    });
+    return parsed.content.map((block: any, blockIdx: number) =>
+      renderBlock(block, blockIdx, collectionItemData, pageCollectionItemData, textStyles, true, isEditMode, linkContext, timezone, layerDataMap, components, renderComponentBlock, ancestorComponentIds)
+    ).filter(Boolean);
   }
 
   return [];

@@ -416,8 +416,10 @@ export function collectLayerAssetIds(
   /** Scan component overrides directly for asset IDs. */
   const scanOverrideAssets = (overrides: Layer['componentOverrides'], ancestors: Set<string>): void => {
     if (!overrides) return;
-    if (overrides.text) {
-      for (const val of Object.values(overrides.text)) {
+    for (const category of ['text', 'rich_text'] as const) {
+      const textOverrides = overrides[category];
+      if (!textOverrides) continue;
+      for (const val of Object.values(textOverrides)) {
         const content = (val as any)?.data?.content;
         if (content && typeof content === 'object') {
           scanRichTextMarks(content);

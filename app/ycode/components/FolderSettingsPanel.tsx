@@ -70,6 +70,7 @@ const FolderSettingsPanel = React.forwardRef<FolderSettingsPanelHandle, FolderSe
   const [pageFolderId, setPageFolderId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   const [authEnabled, setAuthEnabled] = useState(false);
   const [authPassword, setAuthPassword] = useState('');
@@ -225,6 +226,14 @@ const FolderSettingsPanel = React.forwardRef<FolderSettingsPanelHandle, FolderSe
       };
     }
     setError(null);
+
+    // Auto-focus and select name input for newly created folders
+    if (currentFolder?.id.startsWith('temp-folder-')) {
+      requestAnimationFrame(() => {
+        nameInputRef.current?.focus();
+        nameInputRef.current?.select();
+      });
+    }
   }, [currentFolder]);
 
   // Auto-generate slug from name for new folders
@@ -519,6 +528,7 @@ const FolderSettingsPanel = React.forwardRef<FolderSettingsPanelHandle, FolderSe
                   <Field>
                     <FieldLabel>Folder name</FieldLabel>
                     <Input
+                      ref={nameInputRef}
                       type="text"
                       value={name}
                       onChange={(e) => {

@@ -210,6 +210,7 @@ const RightSidebar = React.memo(function RightSidebar({
   const getComponentById = useComponentsStore((state) => state.getComponentById);
   const componentDrafts = useComponentsStore((state) => state.componentDrafts);
   const addTextVariable = useComponentsStore((state) => state.addTextVariable);
+  const addRichTextVariable = useComponentsStore((state) => state.addRichTextVariable);
   const updateTextVariable = useComponentsStore((state) => state.updateTextVariable);
 
   const collections = useCollectionsStore((state) => state.collections);
@@ -1507,19 +1508,21 @@ const RightSidebar = React.memo(function RightSidebar({
       collectionId = undefined;
     }
 
-    if (!collectionId && currentPage?.is_dynamic) {
+    if (!collectionId && !editingComponentId && currentPage?.is_dynamic) {
       collectionId = currentPage.settings?.cms?.collection_id || undefined;
     }
 
     if (!collectionId) return [];
     return fields[collectionId] || [];
-  }, [parentCollectionLayer, fields, currentPage]);
+  }, [parentCollectionLayer, fields, currentPage, editingComponentId]);
 
   // Build field groups for multi-source inline variable selection
+  // Components are page-agnostic, so exclude dynamic page-collection fields when editing a component
   const fieldGroups = useMemo(() => {
     if (!selectedLayerId || !allLayers.length) return undefined;
-    return buildFieldGroupsForLayer(selectedLayerId, allLayers, currentPage, fields, collections);
-  }, [selectedLayerId, allLayers, currentPage, fields, collections]);
+    const page = editingComponentId ? null : currentPage;
+    return buildFieldGroupsForLayer(selectedLayerId, allLayers, page, fields, collections);
+  }, [selectedLayerId, allLayers, currentPage, fields, collections, editingComponentId]);
 
   // Get collection fields for the currently selected collection layer (for Sort By dropdown)
   const selectedCollectionFields = useMemo(() => {
@@ -1582,15 +1585,16 @@ const RightSidebar = React.memo(function RightSidebar({
   }, [parentCollectionFields]);
 
   // Get reference fields from dynamic page's source collection (for top-level collection layers on dynamic pages)
+  // Not available when editing a component — components are page-agnostic
   const dynamicPageReferenceFields = useMemo(() => {
-    if (!currentPage?.is_dynamic) return [];
+    if (editingComponentId || !currentPage?.is_dynamic) return [];
     const collectionId = currentPage.settings?.cms?.collection_id;
     if (!collectionId) return [];
     const collectionFields = fields[collectionId] || [];
     return collectionFields.filter(
       f => (f.type === 'reference' || f.type === 'multi_reference') && f.reference_collection_id
     );
-  }, [currentPage, fields]);
+  }, [editingComponentId, currentPage, fields]);
 
   // Get multi-asset fields from parent context (for multi-asset nested collections)
   const parentMultiAssetFields = useMemo(() => {
@@ -1598,13 +1602,14 @@ const RightSidebar = React.memo(function RightSidebar({
   }, [parentCollectionFields]);
 
   // Get multi-asset fields from dynamic page's source collection
+  // Not available when editing a component — components are page-agnostic
   const dynamicPageMultiAssetFields = useMemo(() => {
-    if (!currentPage?.is_dynamic) return [];
+    if (editingComponentId || !currentPage?.is_dynamic) return [];
     const collectionId = currentPage.settings?.cms?.collection_id;
     if (!collectionId) return [];
     const collectionFields = fields[collectionId] || [];
     return collectionFields.filter(f => isMultipleAssetField(f));
-  }, [currentPage, fields]);
+  }, [editingComponentId, currentPage, fields]);
 
   // Inverse reference fields: fields in OTHER collections that reference the parent collection
   // E.g., if parent is "Authors" and "Books" has a reference field "author" → Authors,
@@ -1613,20 +1618,21 @@ const RightSidebar = React.memo(function RightSidebar({
     const collectionVariable = parentCollectionLayer ? getCollectionVariable(parentCollectionLayer) : null;
     let collectionId = collectionVariable?.id;
     if (collectionId === MULTI_ASSET_COLLECTION_ID) collectionId = undefined;
-    if (!collectionId && currentPage?.is_dynamic) {
+    if (!collectionId && !editingComponentId && currentPage?.is_dynamic) {
       collectionId = currentPage.settings?.cms?.collection_id || undefined;
     }
     if (!collectionId) return [];
     return getInverseReferenceFields(collectionId, fields, collections);
-  }, [parentCollectionLayer, fields, collections, currentPage]);
+  }, [parentCollectionLayer, fields, collections, currentPage, editingComponentId]);
 
   // Inverse reference fields for dynamic page context (top-level collection layers on dynamic pages)
+  // Not available when editing a component — components are page-agnostic
   const dynamicPageInverseReferenceFields = useMemo(() => {
-    if (!currentPage?.is_dynamic) return [];
+    if (editingComponentId || !currentPage?.is_dynamic) return [];
     const collectionId = currentPage.settings?.cms?.collection_id;
     if (!collectionId) return [];
     return getInverseReferenceFields(collectionId, fields, collections);
-  }, [currentPage, fields, collections]);
+  }, [editingComponentId, currentPage, fields, collections]);
 
   // Handle adding custom attribute
   const handleAddAttribute = () => {
@@ -1943,10 +1949,13 @@ const RightSidebar = React.memo(function RightSidebar({
 
             {/* Content Panel - show for text-editable layers */}
             {selectedLayer && isTextEditable(selectedLayer) && (() => {
-              // Get component variables if editing a component (only text variables for text content)
+              // Get component variables filtered to matching type for this layer
               const editingComponent = editingComponentId ? getComponentById(editingComponentId) : undefined;
               const allComponentVariables = editingComponent?.variables || [];
-              const componentVariables = allComponentVariables.filter(v => v.type !== 'image');
+              const isRichText = isRichTextLayer(selectedLayer);
+              const componentVariables = allComponentVariables.filter(v =>
+                isRichText ? v.type === 'rich_text' : (!v.type || v.type === 'text')
+              );
               const linkedVariableId = selectedLayer.variables?.text?.id;
               const linkedVariable = componentVariables.find(v => v.id === linkedVariableId);
 
@@ -1995,7 +2004,8 @@ const RightSidebar = React.memo(function RightSidebar({
                           onManageVariables={() => openVariablesDialog()}
                           onCreateVariable={editingComponentId ? async () => {
                             const contentValue = getContentValue(selectedLayer);
-                            const newId = await addTextVariable(editingComponentId, 'Text');
+                            const addFn = isRichText ? addRichTextVariable : addTextVariable;
+                            const newId = await addFn(editingComponentId, isRichText ? 'Rich text' : 'Text');
                             if (newId) {
                               await updateTextVariable(editingComponentId, newId, {
                                 default_value: createTextComponentVariableValue(contentValue),
@@ -2215,8 +2225,8 @@ const RightSidebar = React.memo(function RightSidebar({
                             )}
                           </SelectContent>
                         </Select>
-                      ) : currentPage?.is_dynamic ? (
-                        /* On dynamic pages, show CMS page data fields + all collections */
+                      ) : !editingComponentId && currentPage?.is_dynamic ? (
+                        /* On dynamic pages, show CMS page data fields + all collections (not in component edit mode) */
                         <Select
                           value={getDynamicPageSourceValue === 'none' ? '' : getDynamicPageSourceValue}
                           onValueChange={handleDynamicPageSourceChange}

@@ -127,6 +127,8 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
   const [customCodeHead, setCustomCodeHead] = useState('');
   const [customCodeBody, setCustomCodeBody] = useState('');
   const [headVariableSelectKey, setHeadVariableSelectKey] = useState(0);
@@ -625,6 +627,14 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
 
     // Clear error state when page changes
     setError(null);
+
+    // Auto-focus and select name input for newly created pages
+    if (currentPage?.id.startsWith('temp-page-')) {
+      requestAnimationFrame(() => {
+        nameInputRef.current?.focus();
+        nameInputRef.current?.select();
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, isErrorPage]);
 
@@ -1300,6 +1310,7 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
                     <Field>
                       <FieldLabel>Page name</FieldLabel>
                       <Input
+                        ref={nameInputRef}
                         type="text"
                         value={name}
                         onChange={(e) => {

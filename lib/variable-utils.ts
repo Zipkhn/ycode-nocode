@@ -8,11 +8,23 @@
  * - StaticTextVariable
  */
 
-import type { AssetVariable, FieldVariable, DynamicTextVariable, DynamicRichTextVariable, StaticTextVariable, ComponentVariableValue } from '@/types';
+import type { AssetVariable, FieldVariable, DynamicTextVariable, DynamicRichTextVariable, StaticTextVariable, ComponentVariableValue, Layer } from '@/types';
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
 import { resolveFieldFromSources } from '@/lib/cms-variables-utils';
 import { DEFAULT_ASSETS } from '@/lib/asset-constants';
 import { stringToTiptapContent } from '@/lib/text-format-utils';
+
+/** Canonical empty componentOverrides structure — use when setting/resetting overrides */
+export const EMPTY_OVERRIDES: NonNullable<Layer['componentOverrides']> = {
+  text: {},
+  rich_text: {},
+  image: {},
+  link: {},
+  audio: {},
+  video: {},
+  icon: {},
+  variableLinks: {},
+};
 
 /**
  * Create a DynamicTextVariable from a string (with or without inline variables)
@@ -105,6 +117,42 @@ export function extractTiptapFromComponentVariable(value?: ComponentVariableValu
   }
 
   return emptyDoc;
+}
+
+/** Whether a value is "empty" in Tiptap terms (null, undefined, [], {}) */
+function isEmptyValue(val: unknown): boolean {
+  if (val === null || val === undefined) return true;
+  if (Array.isArray(val) && val.length === 0) return true;
+  if (typeof val === 'object' && !Array.isArray(val) && Object.keys(val as object).length === 0) return true;
+  return false;
+}
+
+/**
+ * Deep-compare two Tiptap JSON values, ignoring key order and
+ * treating null / undefined / [] / {} as equivalent absent values.
+ */
+export function tiptapEqual(a: unknown, b: unknown): boolean {
+  const aEmpty = isEmptyValue(a);
+  const bEmpty = isEmptyValue(b);
+  if (aEmpty && bEmpty) return true;
+  if (aEmpty !== bEmpty) return false;
+
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== 'object') return a === b;
+
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b)) return false;
+    if (a.length !== (b as unknown[]).length) return false;
+    return a.every((item, i) => tiptapEqual(item, (b as unknown[])[i]));
+  }
+
+  const objA = a as Record<string, unknown>;
+  const objB = b as Record<string, unknown>;
+  const keysA = Object.keys(objA).filter(k => !isEmptyValue(objA[k]));
+  const keysB = Object.keys(objB).filter(k => !isEmptyValue(objB[k]));
+  if (keysA.length !== keysB.length) return false;
+
+  return keysA.every(k => tiptapEqual(objA[k], objB[k]));
 }
 
 /**

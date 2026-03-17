@@ -18,6 +18,7 @@ import {
   resetBindingsAfterMove,
   resetBindingsForDeletedCollection,
   resetBindingsForDeletedField,
+  cleanLayersForComponentCreation,
 } from '../lib/layer-utils';
 import { generateId } from '../lib/utils';
 import { getDescendantFolderIds, isHomepage, findHomepage, findNextSelection } from '../lib/page-utils';
@@ -2860,7 +2861,9 @@ export const usePagesStore = create<PagesStore>((set, get) => ({
     const layerToCopy = copyLayer(pageId, layerId);
     if (!layerToCopy) return null;
 
-    const newComponent = await createComponentViaApi(componentName, [layerToCopy]);
+    // Strip CMS bindings that won't be valid inside a standalone component
+    const cleanedLayers = cleanLayersForComponentCreation([layerToCopy]);
+    const newComponent = await createComponentViaApi(componentName, cleanedLayers);
     if (!newComponent) return null;
 
     // Add to components store

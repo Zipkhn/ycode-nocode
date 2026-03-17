@@ -10,6 +10,7 @@ import {
   createComponentViaApi,
   replaceLayerWithComponentInstance,
   findLayerById,
+  cleanLayersForComponentCreation,
 } from '@/lib/layer-utils';
 import { detachStyleFromLayers, updateLayersWithStyle } from '@/lib/layer-style-utils';
 import { generateId } from '@/lib/utils';
@@ -129,6 +130,7 @@ interface ComponentsActions {
 
   // Component variables
   addTextVariable: (componentId: string, name: string) => Promise<string | null>;
+  addRichTextVariable: (componentId: string, name: string) => Promise<string | null>;
   addImageVariable: (componentId: string, name: string) => Promise<string | null>;
   addLinkVariable: (componentId: string, name: string) => Promise<string | null>;
   addAudioVariable: (componentId: string, name: string) => Promise<string | null>;
@@ -630,7 +632,9 @@ export const useComponentsStore = create<ComponentsStore>((set, get) => {
       const layerToCopy = findLayerById(layers, layerId);
       if (!layerToCopy) return null;
 
-      const newComponent = await createComponentViaApi(componentName, [layerToCopy]);
+      // Strip CMS bindings that won't be valid inside a standalone component
+      const cleanedLayers = cleanLayersForComponentCreation([layerToCopy]);
+      const newComponent = await createComponentViaApi(componentName, cleanedLayers);
       if (!newComponent) return null;
 
       // Add to local store
@@ -727,7 +731,40 @@ export const useComponentsStore = create<ComponentsStore>((set, get) => {
       }
     },
 
-    // Add an image variable to a component
+    addRichTextVariable: async (componentId, name) => {
+      const component = get().getComponentById(componentId);
+      if (!component) return null;
+
+      const variableId = generateId('cpv');
+      const newVariable = { id: variableId, name, type: 'rich_text' as const };
+      const updatedVariables = [...(component.variables || []), newVariable];
+
+      try {
+        const response = await fetch(`/ycode/api/components/${componentId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ variables: updatedVariables }),
+        });
+
+        const result = await response.json();
+        if (result.error) {
+          console.error('Failed to add rich text variable:', result.error);
+          return null;
+        }
+
+        set((state) => ({
+          components: state.components.map((c) =>
+            c.id === componentId ? { ...c, variables: updatedVariables } : c
+          ),
+        }));
+
+        return variableId;
+      } catch (error) {
+        console.error('Failed to add rich text variable:', error);
+        return null;
+      }
+    },
+
     addImageVariable: async (componentId, name) => {
       const component = get().getComponentById(componentId);
       if (!component) return null;

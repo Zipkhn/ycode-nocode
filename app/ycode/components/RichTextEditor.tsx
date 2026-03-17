@@ -331,6 +331,12 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
   // Track if update is coming from editor to prevent infinite loop
   const isInternalUpdateRef = useRef(false);
 
+  // Refs to avoid stale closures in useEditor's onUpdate callback
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+  valueRef.current = value;
+  onChangeRef.current = onChange;
+
   // Derive a flat list of fields from fieldGroups (for internal use like parseValueToContent)
   const fields = useMemo(() => flattenFieldGroups(fieldGroups), [fieldGroups]);
 
@@ -466,14 +472,12 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
         : convertContentToValue(editor.getJSON());
 
       if (withFormatting) {
-        // Compare JSON objects
-        if (JSON.stringify(newValue) !== JSON.stringify(value)) {
-          onChange(newValue);
+        if (JSON.stringify(newValue) !== JSON.stringify(valueRef.current)) {
+          onChangeRef.current(newValue);
         }
       } else {
-        // Compare strings
-        if (newValue !== value) {
-          onChange(newValue);
+        if (newValue !== valueRef.current) {
+          onChangeRef.current(newValue);
         }
       }
     },

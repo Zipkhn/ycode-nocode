@@ -980,6 +980,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   }, [editingLayerId, editingComponentId, componentDrafts, currentPageId, currentDraft]);
 
   // Build field groups for the canvas text editor's inline variable selection
+  // Components are page-agnostic, so exclude dynamic page-collection fields when editing a component
   const fieldGroups = useMemo(() => {
     if (!editingLayerId) return undefined;
     let layers: Layer[] = [];
@@ -989,7 +990,8 @@ const CenterCanvas = React.memo(function CenterCanvas({
       layers = currentDraft ? currentDraft.layers : [];
     }
     if (!layers.length) return undefined;
-    return buildFieldGroupsForLayer(editingLayerId, layers, currentPage, collectionFieldsFromStore, collectionsFromStore);
+    const page = editingComponentId ? null : currentPage;
+    return buildFieldGroupsForLayer(editingLayerId, layers, page, collectionFieldsFromStore, collectionsFromStore);
   }, [editingLayerId, editingComponentId, componentDrafts, currentPageId, currentDraft, currentPage, collectionFieldsFromStore, collectionsFromStore]);
 
   const textFieldGroups = useMemo(
@@ -1147,6 +1149,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
 
   // Rich text sheet for canvas double-click (layers with components/variables)
   // Build field groups using the sheet target layer (not the canvas text editor layer)
+  // Components are page-agnostic, so exclude dynamic page-collection fields when editing a component
   const richTextSheetFieldGroups = useMemo(() => {
     if (!richTextSheetLayerId || !currentPageId) return undefined;
     let layers: Layer[] = [];
@@ -1156,7 +1159,8 @@ const CenterCanvas = React.memo(function CenterCanvas({
       layers = currentDraft ? currentDraft.layers : [];
     }
     if (!layers.length) return undefined;
-    return buildFieldGroupsForLayer(richTextSheetLayerId, layers, currentPage, collectionFieldsFromStore, collectionsFromStore);
+    const page = editingComponentId ? null : currentPage;
+    return buildFieldGroupsForLayer(richTextSheetLayerId, layers, page, collectionFieldsFromStore, collectionsFromStore);
   }, [richTextSheetLayerId, editingComponentId, componentDrafts, currentPageId, currentDraft, currentPage, collectionFieldsFromStore, collectionsFromStore]);
 
   // Track the current value locally so the value prop always matches the editor's

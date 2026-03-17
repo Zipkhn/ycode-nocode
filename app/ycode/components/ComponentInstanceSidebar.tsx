@@ -15,6 +15,7 @@ import {
 
 import ComponentVariableOverrides from './ComponentVariableOverrides';
 import ComponentVariablesDialog from './ComponentVariablesDialog';
+import RichTextEditor from './RichTextEditor';
 import ExpandableRichTextEditor from './ExpandableRichTextEditor';
 import SettingsPanel from './SettingsPanel';
 
@@ -23,9 +24,10 @@ import { useComponentsStore } from '@/stores/useComponentsStore';
 import { usePagesStore } from '@/stores/usePagesStore';
 import { useEditorActions } from '@/hooks/use-editor-url';
 import { detachSpecificLayerFromComponent } from '@/lib/component-utils';
+import { EMPTY_OVERRIDES } from '@/lib/variable-utils';
 
 import type { Layer, ComponentVariable, Component, Collection, CollectionField } from '@/types';
-import type { FieldGroup } from '@/lib/collection-field-utils';
+import { SIMPLE_TEXT_FIELD_TYPES, type FieldGroup } from '@/lib/collection-field-utils';
 
 interface ComponentInstanceSidebarProps {
   selectedLayerId: string;
@@ -58,6 +60,7 @@ export default function ComponentInstanceSidebar({
   const getComponentById = useComponentsStore((state) => state.getComponentById);
   const updateComponentDraft = useComponentsStore((state) => state.updateComponentDraft);
   const addTextVariable = useComponentsStore((state) => state.addTextVariable);
+  const addRichTextVariable = useComponentsStore((state) => state.addRichTextVariable);
   const addImageVariable = useComponentsStore((state) => state.addImageVariable);
   const addLinkVariable = useComponentsStore((state) => state.addLinkVariable);
   const addAudioVariable = useComponentsStore((state) => state.addAudioVariable);
@@ -79,7 +82,7 @@ export default function ComponentInstanceSidebar({
 
   const allVariables = component.variables || [];
   const overrides = selectedLayer.componentOverrides;
-  const hasOverrides = ['text', 'image', 'link', 'audio', 'video', 'icon']
+  const hasOverrides = ['text', 'rich_text', 'image', 'link', 'audio', 'video', 'icon']
     .some(cat => Object.keys(overrides?.[cat as keyof typeof overrides] || {}).length > 0);
 
   const handleEditMasterComponent = useCallback(async () => {
@@ -146,6 +149,7 @@ export default function ComponentInstanceSidebar({
 
   const addVariableByType: Record<string, (id: string, name: string) => Promise<string | null>> = {
     text: addTextVariable,
+    rich_text: addRichTextVariable,
     image: addImageVariable,
     link: addLinkVariable,
     audio: addAudioVariable,
@@ -190,18 +194,9 @@ export default function ComponentInstanceSidebar({
 
   const handleResetAllOverrides = useCallback(() => {
     onLayerUpdate(selectedLayerId, {
-      componentOverrides: {
-        ...overrides,
-        text: {},
-        image: {},
-        link: {},
-        audio: {},
-        video: {},
-        icon: {},
-        variableLinks: {},
-      },
+      componentOverrides: { ...EMPTY_OVERRIDES },
     });
-  }, [selectedLayerId, onLayerUpdate, overrides]);
+  }, [selectedLayerId, onLayerUpdate]);
 
   return (
     <div className="w-64 shrink-0 bg-background border-l flex flex-col p-4 pb-0 h-full overflow-hidden">
@@ -294,17 +289,32 @@ export default function ComponentInstanceSidebar({
               onUnlinkOverrideVariable={handleUnlinkOverrideVariable}
               onCreateOverrideVariable={handleCreateOverrideVariable}
               onManageVariables={(varId) => openVariablesDialog(varId)}
-              renderTextOverride={(variable, value, onChange) => (
-                <ExpandableRichTextEditor
-                  sheetDescription={`${component.name} override — ${variable.name}`}
-                  value={value}
-                  onChange={onChange}
-                  placeholder={variable.placeholder || 'Enter text...'}
-                  fieldGroups={fieldGroups}
-                  allFields={fields}
-                  collections={collections}
-                />
-              )}
+              renderTextOverride={(variable, value, onChange, onClear) =>
+                variable.type === 'rich_text' ? (
+                  <ExpandableRichTextEditor
+                    sheetDescription={`${component.name} override — ${variable.name}`}
+                    value={value}
+                    onChange={onChange}
+                    onClear={onClear}
+                    placeholder={variable.placeholder || 'Enter text...'}
+                    fieldGroups={fieldGroups}
+                    allFields={fields}
+                    collections={collections}
+                  />
+                ) : (
+                  <RichTextEditor
+                    value={value}
+                    onChange={onChange}
+                    placeholder={variable.placeholder || 'Enter text...'}
+                    fieldGroups={fieldGroups}
+                    allFields={fields}
+                    collections={collections}
+                    withFormatting
+                    showFormattingToolbar={false}
+                    allowedFieldTypes={SIMPLE_TEXT_FIELD_TYPES}
+                  />
+                )
+              }
             />
 
             {allVariables.length === 0 && (

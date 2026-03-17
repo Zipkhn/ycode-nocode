@@ -41,13 +41,15 @@ export function collectComponentIds(layers: Layer[]): Set<string> {
         collectComponentIdsFromTiptap((textVar as any).data.content, ids);
       }
 
-      // Scan component override text values
-      const overrideTexts = layer.componentOverrides?.text;
-      if (overrideTexts) {
-        for (const val of Object.values(overrideTexts)) {
-          const content = (val as any)?.data?.content;
-          if (content && typeof content === 'object') {
-            collectComponentIdsFromTiptap(content, ids);
+      // Scan component override text values (both text and rich_text categories)
+      for (const category of ['text', 'rich_text'] as const) {
+        const overrideTexts = layer.componentOverrides?.[category];
+        if (overrideTexts) {
+          for (const val of Object.values(overrideTexts)) {
+            const content = (val as any)?.data?.content;
+            if (content && typeof content === 'object') {
+              collectComponentIdsFromTiptap(content, ids);
+            }
           }
         }
       }

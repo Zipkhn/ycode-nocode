@@ -585,6 +585,7 @@ export function filterFieldGroupsByType(
     .map(group => ({
       ...group,
       fields: group.fields.filter(field => {
+        if (field.type === 'reference' && field.reference_collection_id) return true;
         if (!allowedTypes.includes(field.type)) return false;
         if (options?.excludeMultipleAsset && isMultipleAssetField(field)) return false;
         return true;

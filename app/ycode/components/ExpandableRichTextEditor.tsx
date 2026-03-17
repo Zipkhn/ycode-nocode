@@ -38,6 +38,8 @@ interface ExpandableRichTextEditorProps {
   disabled?: boolean;
   /** Only show the button, hide the inline editor */
   buttonOnly?: boolean;
+  /** Called when the user clears the CMS binding via the X button (falls back to resetting content if not provided) */
+  onClear?: () => void;
   /** CMS field types allowed for variable binding (defaults to RICH_TEXT_ONLY_FIELD_TYPES) */
   allowedFieldTypes?: CollectionFieldType[];
 }
@@ -53,7 +55,8 @@ export default function ExpandableRichTextEditor({
   allFields,
   collections,
   disabled = false,
-  buttonOnly = false,
+  buttonOnly = true,
+  onClear,
   allowedFieldTypes = RICH_TEXT_ONLY_FIELD_TYPES,
 }: ExpandableRichTextEditorProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -124,10 +127,11 @@ export default function ExpandableRichTextEditor({
               variant="outline"
               onClick={(e) => {
                 e.stopPropagation();
-                onChange({
-                  type: 'doc',
-                  content: [{ type: 'paragraph' }],
-                });
+                if (onClear) {
+                  onClear();
+                } else {
+                  onChange({ type: 'doc', content: [{ type: 'paragraph' }] });
+                }
               }}
             >
               <Icon name="x" className="size-2" />

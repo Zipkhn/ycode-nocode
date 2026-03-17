@@ -91,7 +91,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'classes': 'flex flex-col w-[100%] max-w-[560px]',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '36',
@@ -493,7 +493,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
               'classes': 'flex flex-col gap-[16px] items-center w-[100%] max-w-[680px]',
               'children': [
                 {
-                  'name': 'text',
+                  'name': 'heading',
                   'design': {
                     'typography': {
                       'fontSize': '36',
@@ -812,7 +812,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'classes': 'flex flex-col gap-[16px]',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '36',
@@ -1195,7 +1195,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'classes': 'flex flex-col gap-[16px] items-center w-[100%] max-w-[680px]',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '36',
@@ -1579,7 +1579,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
               'classes': 'flex flex-col gap-[16px] items-center w-[100%] max-w-[680px]',
               'children': [
                 {
-                  'name': 'text',
+                  'name': 'heading',
                   'design': {
                     'typography': {
                       'fontSize': '36',
@@ -1905,7 +1905,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'customName': 'Text'
                 },
                 {
-                  'name': 'text',
+                  'name': 'heading',
                   'design': {
                     'typography': {
                       'fontSize': '36',
@@ -2213,7 +2213,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
               'classes': 'flex flex-col gap-[16px] w-[100%] max-w-[640px]',
               'children': [
                 {
-                  'name': 'text',
+                  'name': 'heading',
                   'design': {
                     'typography': {
                       'fontSize': '36',
@@ -2420,7 +2420,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       'customName': 'Text'
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '36',
@@ -2817,7 +2817,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'customName': 'Text'
                 },
                 {
-                  'name': 'text',
+                  'name': 'heading',
                   'design': {
                     'typography': {
                       'fontSize': '36',
@@ -3198,7 +3198,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       'classes': 'flex flex-col gap-[16px]',
                       'children': [
                         {
-                          'name': 'text',
+                          'name': 'heading',
                           'design': {
                             'typography': {
                               'fontSize': '48',
@@ -3407,7 +3407,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       'classes': 'flex flex-col gap-[16px]',
                       'children': [
                         {
-                          'name': 'text',
+                          'name': 'heading',
                           'design': {
                             'typography': {
                               'fontSize': '48',
@@ -3587,7 +3587,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       'customName': 'Text'
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'isActive': true,
@@ -4151,7 +4151,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                           'customName': 'Text'
                         },
                         {
-                          'name': 'text',
+                          'name': 'heading',
                           'design': {
                             'typography': {
                               'fontSize': '48',
@@ -4931,7 +4931,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -5965,7 +5965,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                           'customName': 'Text'
                         },
                         {
-                          'name': 'text',
+                          'name': 'heading',
                           'design': {
                             'typography': {
                               'fontSize': '48',
@@ -6691,7 +6691,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'color': '#ffffff',
@@ -7440,7 +7440,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -8444,7 +8444,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                           'customName': 'Text'
                         },
                         {
-                          'name': 'text',
+                          'name': 'heading',
                           'design': {
                             'typography': {
                               'fontSize': '48',
@@ -9126,7 +9126,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -11226,7 +11226,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       'classes': 'flex flex-col gap-[16px] w-[100%] max-w-[640px]',
                       'children': [
                         {
-                          'name': 'text',
+                          'name': 'heading',
                           'design': {
                             'typography': {
                               'fontSize': '48',
@@ -12208,7 +12208,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -13097,7 +13097,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'classes': 'flex flex-col gap-[16px] w-[100%] items-center',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -13345,7 +13345,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -13650,7 +13650,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -13955,7 +13955,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -14260,7 +14260,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -14516,7 +14516,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'classes': 'flex flex-col gap-[16px] w-[100%] items-start',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -14760,7 +14760,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -15158,7 +15158,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -15515,7 +15515,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'customName': 'Rows',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -15692,7 +15692,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                               }
                             },
                             {
-                              'name': 'text',
+                              'name': 'heading',
                               'design': {
                                 'typography': {
                                   'fontSize': '18',
@@ -16018,7 +16018,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                               }
                             },
                             {
-                              'name': 'text',
+                              'name': 'heading',
                               'design': {
                                 'typography': {
                                   'fontSize': '18',
@@ -16345,7 +16345,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                               }
                             },
                             {
-                              'name': 'text',
+                              'name': 'heading',
                               'design': {
                                 'typography': {
                                   'fontSize': '18',
@@ -16695,7 +16695,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'customName': 'Rows',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -16944,7 +16944,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -17359,7 +17359,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -17774,7 +17774,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -18136,7 +18136,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'classes': 'flex flex-col gap-[16px] w-[100%] items-start',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -18380,7 +18380,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -18612,7 +18612,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -18844,7 +18844,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -19073,7 +19073,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -19407,7 +19407,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -19713,7 +19713,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -20019,7 +20019,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                                   }
                                 },
                                 {
-                                  'name': 'text',
+                                  'name': 'heading',
                                   'design': {
                                     'typography': {
                                       'fontSize': '18',
@@ -20309,7 +20309,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       'customName': 'Text'
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -20700,7 +20700,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -21051,7 +21051,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -21405,7 +21405,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'customName': 'Text'
                 },
                 {
-                  'name': 'text',
+                  'name': 'heading',
                   'design': {
                     'typography': {
                       'fontSize': '48',
@@ -21830,7 +21830,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'customName': 'Rows',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'isActive': true,
@@ -22532,7 +22532,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -23251,7 +23251,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -24031,7 +24031,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       }
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -25587,7 +25587,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'classes': 'flex flex-col gap-[16px] w-[100%] max-w-ė max-w-ė max-w-ė00 items-start max-lg:max-w-[100%] max-w-[460px]',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -26787,7 +26787,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'classes': 'flex flex-col gap-[16px] w-[100%] max-w-ė max-w-ė max-w-ė00 max-lg:max-w-[100%] max-w-[460px] items-center',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -27930,7 +27930,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       'customName': 'Text'
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'isActive': true,
@@ -28799,7 +28799,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'customName': 'Rows',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -30641,7 +30641,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                       'customName': 'Text'
                     },
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'fontSize': '48',
@@ -33240,7 +33240,7 @@ export const layoutTemplates: Record<string, LayoutTemplate> = {
                   'classes': 'flex flex-col gap-[16px] w-[100%] items-center',
                   'children': [
                     {
-                      'name': 'text',
+                      'name': 'heading',
                       'design': {
                         'typography': {
                           'isActive': true,

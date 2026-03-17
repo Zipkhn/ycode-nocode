@@ -351,6 +351,7 @@ export interface Layer {
   componentId?: string; // Reference to applied Component
   componentOverrides?: {
     text?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (text)
+    rich_text?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (rich text)
     image?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (image)
     link?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (link)
     audio?: Record<string, ComponentVariableValue>; // ComponentVariable.id → override value (audio)
@@ -541,7 +542,7 @@ export interface BlockTemplate {
 export interface ComponentVariable {
   id: string;        // Unique variable ID
   name: string;      // Display name (e.g., "Button title")
-  type?: 'text' | 'image' | 'link' | 'audio' | 'video' | 'icon'; // Variable type (defaults to 'text' for backwards compatibility)
+  type?: 'text' | 'rich_text' | 'image' | 'link' | 'audio' | 'video' | 'icon'; // Variable type (defaults to 'text' for backwards compatibility)
   placeholder?: string; // Placeholder text shown in text override inputs
   default_value?: ComponentVariableValue; // Default value
 }

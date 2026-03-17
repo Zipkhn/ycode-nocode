@@ -8,7 +8,7 @@ import { getCollectionVariable, resolveFieldValue, evaluateVisibility, getLayerH
 import { isFieldVariable, isAssetVariable, createDynamicTextVariable, createDynamicRichTextVariable, createAssetVariable, getDynamicTextContent, getVariableStringValue, getAssetId, resolveDesignStyles } from '@/lib/variable-utils';
 import { generateImageSrcset, getImageSizes, getOptimizedImageUrl, getAssetProxyUrl, DEFAULT_ASSETS, collectLayerAssetIds } from '@/lib/asset-utils';
 import { resolveComponents, applyComponentOverrides } from '@/lib/resolve-components';
-import { extractInlineNodesFromRichText, isTiptapDoc, hasBlockElementsWithResolver } from '@/lib/tiptap-utils';
+import { isTiptapDoc, hasBlockElementsWithResolver } from '@/lib/tiptap-utils';
 import { DEFAULT_TEXT_STYLES } from '@/lib/text-format-utils';
 
 // Pagination context passed through to resolveCollectionLayers
@@ -1287,11 +1287,12 @@ function resolveRichTextVariables(
         value = itemValues[fullPath];
       }
 
-      // Handle rich_text fields - inline the nested Tiptap content
+      // Handle rich_text fields - preserve block structure for proper rendering
       if (fieldType === 'rich_text' && isTiptapDoc(value)) {
-        const inlineNodes = extractInlineNodesFromRichText(value.content, content.marks || []);
-        // Recursively resolve any nested dynamic variables
-        return inlineNodes.map(node => resolveRichTextVariables(node, itemValues, layerDataMap));
+        const resolvedBlocks = value.content.map((block: any) =>
+          resolveRichTextVariables(block, itemValues, layerDataMap)
+        );
+        return resolvedBlocks.flat();
       }
 
       // Fallback for rich_text that's not a valid doc structure
@@ -1338,6 +1339,37 @@ function resolveRichTextVariables(
       result[key] = resolveRichTextVariables(content[key], itemValues, layerDataMap);
     } else {
       result[key] = content[key];
+    }
+  }
+
+  // When a rich_text variable expands inside a paragraph, the expansion
+  // produces block-level nodes (paragraphs, headings, components) inside
+  // the paragraph — lift them out so the parent doc gets proper blocks.
+  // Any surrounding inline nodes are grouped into new paragraphs.
+  if (result.type === 'paragraph' && Array.isArray(result.content)) {
+    const isBlockNode = (n: any) =>
+      n?.type === 'paragraph' || n?.type === 'heading' ||
+      n?.type === 'bulletList' || n?.type === 'orderedList' ||
+      n?.type === 'richTextComponent';
+    const hasBlockChildren = result.content.some(isBlockNode);
+    if (hasBlockChildren) {
+      const lifted: any[] = [];
+      let currentInline: any[] = [];
+      for (const node of result.content) {
+        if (isBlockNode(node)) {
+          if (currentInline.length > 0) {
+            lifted.push({ type: 'paragraph', content: currentInline });
+            currentInline = [];
+          }
+          lifted.push(node);
+        } else {
+          currentInline.push(node);
+        }
+      }
+      if (currentInline.length > 0) {
+        lifted.push({ type: 'paragraph', content: currentInline });
+      }
+      return lifted;
     }
   }
 
