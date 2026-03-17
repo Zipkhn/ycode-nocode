@@ -774,21 +774,32 @@ export default function LeftSidebarPages({
                 <Icon name="plus" className={`${isMenuOpen ? 'rotate-45' : 'rotate-0'} transition-transform duration-100`} />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="bottom" onCloseAutoFocus={(e) => e.preventDefault()}>
+            <DropdownMenuContent
+              align="start"
+              side="bottom"
+              onCloseAutoFocus={(e) => e.preventDefault()}
+              className="max-h-125 overflow-y-auto"
+            >
               <DropdownMenuItem onClick={() => handleAddPage()}>
+                <Icon name="page" className="size-3 opacity-60" />
                 Regular
               </DropdownMenuItem>
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger>CMS</DropdownMenuSubTrigger>
+                <DropdownMenuSubTrigger>
+                  <Icon name="dynamicPage" className="size-3 opacity-60" />
+                  CMS
+                </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
                   {collections.length > 0 ? (
                     collections.map(collection => (
                       <DropdownMenuItem key={collection.id} onClick={() => handleAddPage(collection.id)}>
+                        <Icon name="database" className="size-3 opacity-60" />
                         {collection.name}
                       </DropdownMenuItem>
                     ))
                   ) : (
                     <DropdownMenuItem key={null} onClick={() => navigateToCollections()}>
+                      <Icon name="database" className="size-3 opacity-60" />
                       Add a collection
                     </DropdownMenuItem>
                   )}
@@ -796,6 +807,7 @@ export default function LeftSidebarPages({
               </DropdownMenuSub>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleAddFolder}>
+                <Icon name="folder" className="size-3 opacity-60" />
                 Folder
               </DropdownMenuItem>
             </DropdownMenuContent>

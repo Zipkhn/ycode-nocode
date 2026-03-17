@@ -488,10 +488,8 @@ export default function PagesTree({
     },
 
     canDrop: (activeNode, overNode, position, targetParentId) => {
-      if (!overNode) return false;
-
       // Prevent dropping into self or descendant
-      if (checkIsDescendant(activeNode, overNode, flattenedNodes)) {
+      if (overNode && checkIsDescendant(activeNode, overNode, flattenedNodes)) {
         return false;
       }
 
