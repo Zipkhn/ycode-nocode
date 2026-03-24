@@ -845,7 +845,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
     <div className={cn('flex-1 rich-text-editor relative', isFullVariant && 'flex flex-col gap-2', fullHeight && 'min-h-0')}>
       {/* Formatting toolbar - Full variant (CMS style like original TiptapEditor) */}
       {withFormatting && showFormattingToolbar && isFullVariant && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 sticky top-8 bg-background z-10 py-2 -my-2">
           <Select
             value={
               editor.isActive('heading', { level: 1 }) ? 'h1' :
