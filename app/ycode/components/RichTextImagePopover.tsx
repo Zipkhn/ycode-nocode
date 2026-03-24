@@ -29,17 +29,28 @@ export default function RichTextImagePopover({
   const [savedPos, setSavedPos] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const saveAlt = useCallback(() => {
-    if (savedPos === null) return;
-    const node = editor.state.doc.nodeAt(savedPos);
-    if (node?.type.name === 'richTextImage' && node.attrs.alt !== altText) {
-      const tr = editor.state.tr.setNodeMarkup(savedPos, undefined, {
+  // Refs for mutable values needed in the selectionUpdate listener
+  const altTextRef = useRef(altText);
+  const savedPosRef = useRef(savedPos);
+  altTextRef.current = altText;
+  savedPosRef.current = savedPos;
+
+  const saveAltAtPos = useCallback((pos: number, alt: string) => {
+    const node = editor.state.doc.nodeAt(pos);
+    if (node?.type.name === 'richTextImage' && node.attrs.alt !== alt) {
+      const tr = editor.state.tr.setNodeMarkup(pos, undefined, {
         ...node.attrs,
-        alt: altText,
+        alt,
       });
       editor.view.dispatch(tr);
     }
-  }, [editor, altText, savedPos]);
+  }, [editor]);
+
+  const saveAlt = useCallback(() => {
+    if (savedPosRef.current !== null) {
+      saveAltAtPos(savedPosRef.current, altTextRef.current);
+    }
+  }, [saveAltAtPos]);
 
   const handleOpenChange = useCallback((newOpen: boolean) => {
     if (newOpen && disabled) return;
@@ -57,6 +68,30 @@ export default function RichTextImagePopover({
 
     onOpenChange(newOpen);
   }, [editor, onOpenChange, disabled, saveAlt]);
+
+  // When the popover is open, listen for selection changes to switch between images
+  useEffect(() => {
+    if (!open) return;
+
+    const handleSelectionUpdate = () => {
+      const { selection } = editor.state;
+      const node = editor.state.doc.nodeAt(selection.from);
+      if (node?.type.name !== 'richTextImage') return;
+      if (selection.from === savedPosRef.current) return;
+
+      // Save the current image's alt before switching
+      if (savedPosRef.current !== null) {
+        saveAltAtPos(savedPosRef.current, altTextRef.current);
+      }
+
+      // Load the newly selected image
+      setAltText(node.attrs.alt || '');
+      setSavedPos(selection.from);
+    };
+
+    editor.on('selectionUpdate', handleSelectionUpdate);
+    return () => { editor.off('selectionUpdate', handleSelectionUpdate); };
+  }, [open, editor, saveAltAtPos]);
 
   useEffect(() => {
     if (open) {
