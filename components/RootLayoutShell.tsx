@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import '@/app/globals.css';
 import DarkModeProvider from '@/components/DarkModeProvider';
 
 const inter = Inter({

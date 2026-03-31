@@ -5,9 +5,9 @@ import CustomCodeInjector from '@/components/CustomCodeInjector';
 import LayerRenderer from '@/components/LayerRenderer';
 import SliderInitializer from '@/components/SliderInitializer';
 import LightboxInitializer from '@/components/LightboxInitializer';
-import HeadCodeInjector from '@/components/HeadCodeInjector';
 import PasswordForm from '@/components/PasswordForm';
 import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables';
+import { renderRootLayoutHeadCode } from '@/lib/parse-head-html';
 import { generateInitialAnimationCSS, type HiddenLayerInfo } from '@/lib/animation-utils';
 import { buildCustomFontsCss, buildFontClassesCss, getGoogleFontLinks } from '@/lib/font-utils';
 import { collectLayerAssetIds, getAssetProxyUrl } from '@/lib/asset-utils';
@@ -337,13 +337,13 @@ export default async function PageRenderer({
 
   return (
     <>
-      {/* In cloud mode, layout skips global head code (ISR compat) — inject it here instead */}
+      {/* Global head code fallback when layout skips it (SKIP_SETUP mode) */}
       {process.env.SKIP_SETUP === 'true' && globalCustomCodeHead && (
-        <HeadCodeInjector html={globalCustomCodeHead} id="global-head" />
+        renderRootLayoutHeadCode(globalCustomCodeHead, 'global-head')
       )}
 
-      {/* Inject page-specific custom head code (client-side via useEffect) */}
-      {pageCustomCodeHead && <HeadCodeInjector html={pageCustomCodeHead} id="page-head" />}
+      {/* Page-specific custom head code — React 19 hoists meta/link/style/title to <head> */}
+      {pageCustomCodeHead && renderRootLayoutHeadCode(pageCustomCodeHead, 'page-head')}
 
       {/* Strip native browser appearance from form elements so Tailwind classes apply */}
       <style
@@ -413,7 +413,12 @@ export default async function PageRenderer({
         </>
       )}
 
-      {/* Apply body layer classes */}
+      {/* Apply body layer classes immediately to prevent FOUC */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `document.body.className=document.body.className.replace(/\\bycode-body-applied\\b/g,'')+' ${(bodyClasses || 'bg-white').replace(/'/g, "\\'")} ycode-body-applied'`,
+        }}
+      />
       <BodyClassApplier classes={bodyClasses || 'bg-white'} />
 
       <main

@@ -1,3 +1,4 @@
+import '@/app/globals.css';
 import RootLayoutShell, { defaultMetadata } from '@/components/RootLayoutShell';
 
 export const metadata = defaultMetadata;
