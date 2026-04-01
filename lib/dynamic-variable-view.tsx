@@ -18,7 +18,7 @@ import Icon from '@/components/ui/icon';
 
 import { DynamicVariable, getDynamicVariableLabel } from '@/lib/tiptap-extensions/dynamic-variable';
 import { isFormattableFieldType } from '@/lib/variable-format-utils';
-import VariableFormatSelector from '@/app/ycode/components/VariableFormatSelector';
+import VariableFormatSelector from '@/app/(builder)/ycode/components/VariableFormatSelector';
 
 type VariableViewVariant = 'sidebar' | 'canvas';
 

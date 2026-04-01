@@ -2589,7 +2589,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
               transition: 'none',
             }}
           >
-            {layers.length > 0 ? (
+            {layers.length > 0 && isPreviewMode ? (
               <iframe
                 ref={iframeRef}
                 src={previewUrl}
@@ -2598,7 +2598,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                 tabIndex={-1}
                 onLoad={handlePreviewLoad}
               />
-            ) : (
+            ) : layers.length === 0 && isPreviewMode ? (
               <div className="w-full h-full flex items-center justify-center p-12">
                 <div className="text-center max-w-md">
                   <div className="w-20 h-20 bg-linear-to-br from-blue-100 to-blue-50 rounded-2xl mx-auto mb-6 flex items-center justify-center">
@@ -2612,7 +2612,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                   </p>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

@@ -6,8 +6,8 @@ import LayerRenderer from '@/components/LayerRenderer';
 import SliderInitializer from '@/components/SliderInitializer';
 import LightboxInitializer from '@/components/LightboxInitializer';
 import PasswordForm from '@/components/PasswordForm';
-import { renderHeadCode } from '@/lib/parse-head-html';
 import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables';
+import { renderRootLayoutHeadCode } from '@/lib/parse-head-html';
 import { generateInitialAnimationCSS, type HiddenLayerInfo } from '@/lib/animation-utils';
 import { buildCustomFontsCss, buildFontClassesCss, getGoogleFontLinks } from '@/lib/font-utils';
 import { collectLayerAssetIds, getAssetProxyUrl } from '@/lib/asset-utils';
@@ -337,11 +337,13 @@ export default async function PageRenderer({
 
   return (
     <>
-      {/* Inject global custom head code — rendered via next/script + React 19 hoisting */}
-      {globalCustomCodeHead && renderHeadCode(globalCustomCodeHead, 'global-head')}
+      {/* Global head code fallback when layout skips it (SKIP_SETUP mode) */}
+      {process.env.SKIP_SETUP === 'true' && globalCustomCodeHead && (
+        renderRootLayoutHeadCode(globalCustomCodeHead, 'global-head')
+      )}
 
-      {/* Inject page-specific custom head code */}
-      {pageCustomCodeHead && renderHeadCode(pageCustomCodeHead, 'page-head')}
+      {/* Page-specific custom head code — React 19 hoists meta/link/style/title to <head> */}
+      {pageCustomCodeHead && renderRootLayoutHeadCode(pageCustomCodeHead, 'page-head')}
 
       {/* Strip native browser appearance from form elements so Tailwind classes apply */}
       <style
@@ -411,7 +413,12 @@ export default async function PageRenderer({
         </>
       )}
 
-      {/* Apply body layer classes */}
+      {/* Apply body layer classes immediately to prevent FOUC */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `document.body.className=document.body.className.replace(/\\bycode-body-applied\\b/g,'')+' ${(bodyClasses || 'bg-white').replace(/'/g, "\\'")} ycode-body-applied'`,
+        }}
+      />
       <BodyClassApplier classes={bodyClasses || 'bg-white'} />
 
       <main

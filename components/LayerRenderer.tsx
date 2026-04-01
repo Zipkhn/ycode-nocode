@@ -29,8 +29,8 @@ import { toast } from 'sonner';
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
 import { renderRichText, hasBlockElementsWithInlineVariables, getTextStyleClasses, flattenTiptapParagraphs, type RichTextLinkContext, type RenderComponentBlockFn } from '@/lib/text-format-utils';
 import { hasComponentOrVariable } from '@/lib/tiptap-utils';
-import LayerContextMenu from '@/app/ycode/components/LayerContextMenu';
-import CanvasTextEditor from '@/app/ycode/components/CanvasTextEditor';
+import LayerContextMenu from '@/app/(builder)/ycode/components/LayerContextMenu';
+import CanvasTextEditor from '@/app/(builder)/ycode/components/CanvasTextEditor';
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { useCollectionLayerStore } from '@/stores/useCollectionLayerStore';
 import { useFilterStore } from '@/stores/useFilterStore';
@@ -543,7 +543,10 @@ const LayerItem: React.FC<{
               parentComponentLayerId={layer.id}
               ancestorComponentIds={innerAncestorIds}
             />
-            <AnimationInitializer layers={uniqueLayers} />
+            <AnimationInitializer
+              layers={uniqueLayers}
+              injectInitialCSS
+            />
           </>
         )}
       </React.Fragment>
@@ -615,6 +618,20 @@ const LayerItem: React.FC<{
     && !isInsideForm
     && isValidLinkSettings(layer.variables?.link);
   if (isButtonWithLink) {
+    htmlTag = 'a';
+  }
+
+  // Divs with link settings render as <a> directly instead of being
+  // wrapped in <a class="contents"><div>…</div></a>.
+  // Only match actual div layers (layer.name === 'div'), not other layers
+  // whose tag was forced to 'div' by earlier overrides (e.g. headings with lists).
+  const isDivWithLink = !isButtonWithLink
+    && layer.name === 'div'
+    && htmlTag === 'div'
+    && layer.id !== 'body'
+    && !(isEditing && textEditable)
+    && isValidLinkSettings(layer.variables?.link);
+  if (isDivWithLink) {
     htmlTag = 'a';
   }
 
@@ -2999,10 +3016,11 @@ const LayerItem: React.FC<{
   let content = renderContent();
 
   // Wrap with link if layer has link settings
-  // Skip for buttons — they render as <a> directly (see isButtonWithLink)
+  // Skip for buttons/divs — they render as <a> directly (see isButtonWithLink, isDivWithLink)
   // Skip for <a> layers — they already render as <a> and nesting <a> inside <a> is invalid HTML
   const linkSettings = layer.variables?.link;
   const shouldWrapWithLink = !isButtonWithLink
+    && !isDivWithLink
     && htmlTag !== 'a'
     && !subtreeHasInteractiveDescendants
     && isValidLinkSettings(linkSettings);

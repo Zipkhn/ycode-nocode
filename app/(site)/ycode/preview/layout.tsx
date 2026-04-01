@@ -1,6 +1,7 @@
 import { getSettingsByKeys } from '@/lib/repositories/settingsRepository';
+import CustomCodeInjector from '@/components/CustomCodeInjector';
 
-/** Preview layout — injects global custom body code. */
+/** Preview layout — injects global custom body code. Head code is handled by root layout. */
 export default async function PreviewLayout({
   children,
 }: {
@@ -13,7 +14,7 @@ export default async function PreviewLayout({
     <>
       {children}
       {globalCustomCodeBody && (
-        <div dangerouslySetInnerHTML={{ __html: globalCustomCodeBody }} />
+        <CustomCodeInjector html={globalCustomCodeBody} />
       )}
     </>
   );

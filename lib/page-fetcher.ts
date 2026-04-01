@@ -31,6 +31,7 @@ import { getSettingByKey } from '@/lib/repositories/settingsRepository';
 import { parseMultiAssetFieldValue, buildAssetVirtualValues } from '@/lib/multi-asset-utils';
 import { parseMultiReferenceValue } from '@/lib/collection-utils';
 import { combineBgValues, mergeStaticBgVars } from '@/lib/tailwind-class-mapper';
+import { generateInitialAnimationCSS } from '@/lib/animation-utils';
 import { getMapIframeProps, DEFAULT_MAP_SETTINGS } from '@/lib/map-utils';
 import { getMapboxAccessToken, getGoogleMapsEmbedApiKey } from '@/lib/map-server';
 import { getAssetsByIds } from '@/lib/repositories/assetRepository';
@@ -1714,10 +1715,17 @@ export async function resolveCollectionLayers(
             offset = collectionVariable.offset;
           }
 
+          // When field-based sorting is active, fetch ALL items so we sort the
+          // full set before applying limit/offset. DB-level pagination uses
+          // manual_order which would give us the wrong subset.
+          const isFieldSort = sortBy && sortBy !== 'none' && sortBy !== 'manual' && sortBy !== 'random';
+
           // Build filters for the query
           const filters: any = {};
-          if (limit) filters.limit = limit;
-          if (offset) filters.offset = offset;
+          if (!isFieldSort) {
+            if (limit) filters.limit = limit;
+            if (offset) filters.offset = offset;
+          }
 
           // For reference/multi-reference fields, get allowed item IDs BEFORE fetching
           // This ensures pagination counts and offsets are correct for the filtered set
@@ -1809,6 +1817,13 @@ export async function resolveCollectionLayers(
                 const comparison = aStr.localeCompare(bStr);
                 return sortOrder === 'desc' ? -comparison : comparison;
               });
+
+              // For field-based sorts we fetched all items to sort correctly,
+              // now apply limit/offset to get the right page
+              if (limit || offset) {
+                const start = offset || 0;
+                sortedItems = sortedItems.slice(start, limit ? start + limit : undefined);
+              }
             }
           }
 
@@ -3289,6 +3304,19 @@ function layerToHtml(
     tag = 'a';
   }
 
+  // Divs with link settings render as <a> directly instead of being
+  // wrapped in <a class="contents"><div>…</div></a>.
+  // Only match actual div layers (layer.name === 'div'), not other layers
+  // whose tag was forced to 'div' by earlier overrides (e.g. headings with lists).
+  const isDivWithLink = !isButtonWithLink
+    && layer.name === 'div'
+    && tag === 'div'
+    && layer.id !== 'body'
+    && buttonLinkSettings && buttonLinkSettings.type;
+  if (isDivWithLink) {
+    tag = 'a';
+  }
+
   // Build classes string
   let classesStr = '';
   if (Array.isArray(layer.classes)) {
@@ -3768,8 +3796,8 @@ function layerToHtml(
   };
   if (layer.attributes) {
     for (const [key, value] of Object.entries(layer.attributes)) {
-      // Skip type attribute for buttons converted to <a>
-      if (isButtonWithLink && key === 'type') continue;
+      // Skip type attribute for elements converted to <a>
+      if ((isButtonWithLink || isDivWithLink) && key === 'type') continue;
       if (value !== undefined && value !== null) {
         const htmlKey = jsxToHtmlAttrMap[key] || key;
         // Boolean HTML attributes should be rendered without a value
@@ -3786,8 +3814,8 @@ function layerToHtml(
     attrs.push('selected');
   }
 
-  // For buttons rendered as <a>, resolve link href and add attributes directly
-  if (isButtonWithLink && buttonLinkSettings) {
+  // For buttons/divs rendered as <a>, resolve link href and add attributes directly
+  if ((isButtonWithLink || isDivWithLink) && buttonLinkSettings) {
     let btnLinkHref = '';
 
     switch (buttonLinkSettings.type) {
@@ -3856,7 +3884,9 @@ function layerToHtml(
         attrs.push('download');
       }
     }
-    attrs.push('role="button"');
+    if (isButtonWithLink) {
+      attrs.push('role="button"');
+    }
   }
 
   // For slider layers, strip inactive pagination/navigation children from the tree
@@ -3899,7 +3929,10 @@ function layerToHtml(
           const withAssets = assetMap
             ? resolved.map(l => resolveLayerAssets(l, assetMap))
             : resolved;
-          return withAssets
+          // Generate initial animation CSS for embedded component layers
+          const { css: rtcAnimCSS } = generateInitialAnimationCSS(withAssets);
+          const rtcStyleTag = rtcAnimCSS ? `<style>${rtcAnimCSS}</style>` : '';
+          return rtcStyleTag + withAssets
             .map(l => layerToHtml(l, effectiveCollectionItemId, pages, folders, collectionItemSlugs, locale, translations, anchorMap, effectiveCollectionItemData, pageCollectionItemData, assetMap, effectiveLayerDataMap, components, childAncestors, layer.name === 'slides'))
             .join('');
         }

@@ -23,7 +23,7 @@ import { useEditorStore } from '@/stores/useEditorStore';
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
 import { extractMeasurementValue } from '@/lib/measurement-utils';
 import { cn, removeSpaces } from '@/lib/utils';
-import ColorPropertyField from '@/app/ycode/components/ColorPropertyField';
+import ColorPropertyField from './ColorPropertyField';
 import type { Collection, CollectionField, Layer } from '@/types';
 import type { FieldGroup } from '@/lib/collection-field-utils';
 

@@ -8,11 +8,11 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import Image from 'next/image';
-import { useCollaborationPresenceStore } from '../../../stores/useCollaborationPresenceStore';
-import { getUserInitials, getUserStatus } from '../../../lib/collaboration-utils';
+import { useCollaborationPresenceStore } from '@/stores/useCollaborationPresenceStore';
+import { getUserInitials, getUserStatus } from '@/lib/collaboration-utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import type { CollaborationUser } from '../../../types';
+import type { CollaborationUser } from '@/types';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 

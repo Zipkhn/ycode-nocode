@@ -1,4 +1,4 @@
-import packageJson from '../../../../../package.json';
+import packageJson from '../../../../../../package.json';
 import { noCache } from '@/lib/api-response';
 
 const UPSTREAM_REPO = 'ycode/ycode'; // Official Ycode repo

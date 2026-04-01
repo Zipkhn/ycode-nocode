@@ -580,6 +580,22 @@ export function resolveComponents(
           ? transformLayerIdsForInstance(taggedChildren, layer.id)
           : [];
 
+        // Remap root layer interactions to reference transformed child IDs
+        // Without this, tween.layer_id still points to original IDs that no longer exist in the DOM
+        let resolvedInteractions = overriddenRoot.interactions;
+        if (resolvedInteractions?.length) {
+          resolvedInteractions = resolvedInteractions.map(interaction => ({
+            ...interaction,
+            id: `${layer.id}-${interaction.id}`,
+            tweens: interaction.tweens.map(tween => ({
+              ...tween,
+              layer_id: tween.layer_id === componentContent.id
+                ? layer.id
+                : `${layer.id}-${tween.layer_id}`,
+            })),
+          }));
+        }
+
         // Merge component content with instance layer, keeping instance ID
         // IMPORTANT: Keep componentId so LayerRenderer knows this is a component instance
         return {
@@ -589,6 +605,7 @@ export function resolveComponents(
           componentId: layer.componentId, // Keep the original componentId
           _masterComponentId: component.id,
           children: resolvedChildren,
+          interactions: resolvedInteractions,
         };
       }
 

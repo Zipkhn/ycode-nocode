@@ -1,4 +1,4 @@
-import packageJson from '../../../../../package.json';
+import packageJson from '../../../../../../package.json';
 import { noCache } from '@/lib/api-response';
 import { checkForUpdates } from '@/lib/updates/check-updates';
 

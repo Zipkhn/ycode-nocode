@@ -14,7 +14,7 @@ import { removeSpaces } from '@/lib/utils';
 import type { Layer } from '@/types';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import ColorPicker from '@/app/ycode/components/ColorPicker';
+import ColorPicker from './ColorPicker';
 import {
   DropdownMenu,
   DropdownMenuContent,

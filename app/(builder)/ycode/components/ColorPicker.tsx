@@ -28,7 +28,7 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
-import SettingsPanel from '@/app/ycode/components/SettingsPanel';
+import SettingsPanel from './SettingsPanel';
 
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
 

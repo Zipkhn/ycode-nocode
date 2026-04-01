@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 
+import { recreateScript } from '@/lib/script-utils';
+
 interface CustomCodeInjectorProps {
   html: string;
 }
@@ -22,14 +24,7 @@ export default function CustomCodeInjector({ html }: CustomCodeInjectorProps) {
 
     const scripts = container.querySelectorAll('script');
     scripts.forEach((original) => {
-      const script = document.createElement('script');
-      Array.from(original.attributes).forEach((attr) => {
-        script.setAttribute(attr.name, attr.value);
-      });
-      if (original.textContent) {
-        script.textContent = original.textContent;
-      }
-      original.replaceWith(script);
+      original.replaceWith(recreateScript(original));
     });
   }, [html]);
 
