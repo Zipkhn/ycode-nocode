@@ -1795,9 +1795,10 @@ const RightSidebar = React.memo(function RightSidebar({
                   {layerOnlyClasses.map((cls, index) => (
                     <Badge
                       variant="secondary"
+                      className="truncate max-w-50"
                       key={`layer-${index}`}
                     >
-                      <span>{cls}</span>
+                      <span className="truncate">{cls}</span>
                       <Button
                         onClick={() => removeClass(cls)}
                         className="size-4! p-0! -mr-1"
@@ -1829,9 +1830,9 @@ const RightSidebar = React.memo(function RightSidebar({
                         <Badge
                           variant="secondary"
                           key={`style-${index}`}
-                          className="opacity-60"
+                          className="opacity-60 truncate max-w-50"
                         >
-                          <span className={isOverridden ? 'line-through' : ''}>
+                          <span className={isOverridden ? 'line-through truncate' : 'truncate'}>
                             {cls}
                           </span>
                         </Badge>
