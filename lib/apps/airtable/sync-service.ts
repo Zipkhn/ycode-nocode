@@ -9,7 +9,7 @@
  * Dirty checking skips records whose mapped values haven't changed.
  */
 
-import { randomUUID, createHash } from 'crypto';
+import { randomUUID } from 'crypto';
 
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { getAppSettingValue, setAppSetting } from '@/lib/repositories/appSettingsRepository';
@@ -39,14 +39,6 @@ const SLUG_FIELD_KEY = 'slug';
 const BULK_CHUNK_SIZE = 500;
 const ATTACHMENT_CONCURRENCY = 5;
 const INCREMENTAL_SYNC_THRESHOLD = 100;
-
-/** Deterministic UUID from collection + Airtable record ID (SHA-256 based). */
-function deterministicItemId(collectionId: string, airtableRecordId: string): string {
-  const hex = createHash('sha256')
-    .update(`airtable:${collectionId}:${airtableRecordId}`)
-    .digest('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
-}
 
 // =============================================================================
 // Connection Helpers
@@ -299,6 +291,10 @@ async function incrementalSync(
  * Process an Airtable webhook notification.
  * Extracts per-record changes and runs incremental sync when practical,
  * falling back to full sync for large changesets.
+ *
+ * Concurrency guard: claims `syncStatus: 'syncing'` before fetching
+ * payloads and advances the cursor before processing, so concurrent
+ * serverless invocations skip or see an empty payload.
  */
 export async function processWebhookNotification(
   baseId: string,
@@ -313,33 +309,43 @@ export async function processWebhookNotification(
 
   if (affectedConnections.length === 0) return [];
 
-  const cursor = affectedConnections[0].webhookCursor || undefined;
-  const payloadResponse = await getWebhookPayloads(token, baseId, webhookId, cursor);
-
-  if (!payloadResponse.payloads?.length) {
-    if (payloadResponse.cursor) {
-      for (const conn of affectedConnections) {
-        await updateConnection(conn.id, { webhookCursor: payloadResponse.cursor });
-      }
-    }
-    return [];
-  }
-
   const results: SyncResult[] = [];
   for (const conn of affectedConnections) {
-    const changes = extractTableChanges(payloadResponse.payloads, conn.tableId);
-    const totalChanges = changes.createdRecordIds.length
-      + changes.changedRecordIds.length
-      + changes.destroyedRecordIds.length;
+    const freshConn = await getConnectionById(conn.id);
+    if (!freshConn || freshConn.syncStatus === 'syncing') continue;
 
-    if (totalChanges > 0) {
-      const result = totalChanges > INCREMENTAL_SYNC_THRESHOLD
-        ? await fullSync(conn)
-        : await incrementalSync(conn, changes);
-      results.push(result);
+    await updateConnection(conn.id, { syncStatus: 'syncing', syncError: null });
+
+    try {
+      const cursor = freshConn.webhookCursor || undefined;
+      const payloadResponse = await getWebhookPayloads(token, baseId, webhookId, cursor);
+
+      if (payloadResponse.cursor) {
+        await updateConnection(conn.id, { webhookCursor: payloadResponse.cursor });
+      }
+
+      if (!payloadResponse.payloads?.length) {
+        await updateConnection(conn.id, { syncStatus: 'idle' });
+        continue;
+      }
+
+      const changes = extractTableChanges(payloadResponse.payloads, conn.tableId);
+      const totalChanges = changes.createdRecordIds.length
+        + changes.changedRecordIds.length
+        + changes.destroyedRecordIds.length;
+
+      if (totalChanges > 0) {
+        const result = totalChanges > INCREMENTAL_SYNC_THRESHOLD
+          ? await fullSync(freshConn)
+          : await incrementalSync(freshConn, changes);
+        results.push(result);
+      } else {
+        await updateConnection(conn.id, { syncStatus: 'idle' });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown sync error';
+      await updateConnection(conn.id, { syncStatus: 'error', syncError: message });
     }
-
-    await updateConnection(conn.id, { webhookCursor: payloadResponse.cursor });
   }
 
   return results;
@@ -788,7 +794,7 @@ async function executeBatchOperations(
 
   if (toCreate.length > 0) {
     try {
-      const newItemIds = toCreate.map((r) => deterministicItemId(collectionId, r.id));
+      const newItemIds = toCreate.map(() => randomUUID());
       const newItems = newItemIds.map((id) => ({
         id,
         collection_id: collectionId,
@@ -797,26 +803,21 @@ async function executeBatchOperations(
         is_publishable: true,
       }));
 
-      const createdItems = await createItemsBulk(newItems, { ignoreDuplicates: true });
-      const createdIdSet = new Set(createdItems.map((i) => i.id));
-
-      if (createdItems.length > 0) {
-        let nextAutoId = 1;
-        if (ctx.autoFields.idFieldId) {
-          for (const item of existingItems) {
-            const val = existingValues[item.id]?.[ctx.autoFields.idFieldId];
-            if (val) {
-              const num = parseInt(String(val), 10);
-              if (!isNaN(num) && num >= nextAutoId) nextAutoId = num + 1;
-            }
+      let nextAutoId = 1;
+      if (ctx.autoFields.idFieldId) {
+        for (const item of existingItems) {
+          const val = existingValues[item.id]?.[ctx.autoFields.idFieldId];
+          if (val) {
+            const num = parseInt(String(val), 10);
+            if (!isNaN(num) && num >= nextAutoId) nextAutoId = num + 1;
           }
         }
+      }
 
+      const buildValues = async () => {
         const now = new Date().toISOString();
         const valuesToInsert: Array<{ item_id: string; field_id: string; value: string | null }> = [];
         for (let i = 0; i < toCreate.length; i++) {
-          if (!createdIdSet.has(newItemIds[i])) continue;
-
           const vals = await buildRecordValues(toCreate[i], ctx);
 
           if (ctx.autoFields.idFieldId) {
@@ -833,13 +834,19 @@ async function executeBatchOperations(
             valuesToInsert.push({ item_id: newItemIds[i], field_id: fieldId, value });
           }
         }
+        return valuesToInsert;
+      };
 
-        for (let i = 0; i < valuesToInsert.length; i += BULK_CHUNK_SIZE) {
-          await insertValuesBulk(valuesToInsert.slice(i, i + BULK_CHUNK_SIZE));
-        }
+      const [, valuesToInsert] = await Promise.all([
+        createItemsBulk(newItems),
+        buildValues(),
+      ]);
+
+      for (let i = 0; i < valuesToInsert.length; i += BULK_CHUNK_SIZE) {
+        await insertValuesBulk(valuesToInsert.slice(i, i + BULK_CHUNK_SIZE));
       }
 
-      result.created = createdItems.length;
+      result.created = toCreate.length;
     } catch (error) {
       result.errors.push(`Create failed: ${error instanceof Error ? error.message : 'Unknown'}`);
     }

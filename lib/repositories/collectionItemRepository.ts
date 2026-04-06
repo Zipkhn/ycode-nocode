@@ -731,8 +731,7 @@ export async function getMaxIdValue(
  * @param items - Array of items to create (id is auto-generated if not provided)
  */
 export async function createItemsBulk(
-  items: Array<CreateCollectionItemData & { id?: string }>,
-  options?: { ignoreDuplicates?: boolean }
+  items: Array<CreateCollectionItemData & { id?: string }>
 ): Promise<CollectionItem[]> {
   const client = await getSupabaseAdmin();
 
@@ -753,19 +752,6 @@ export async function createItemsBulk(
     created_at: now,
     updated_at: now,
   }));
-
-  if (options?.ignoreDuplicates) {
-    const { data, error } = await client
-      .from('collection_items')
-      .upsert(itemsToInsert, { onConflict: 'id', ignoreDuplicates: true })
-      .select();
-
-    if (error) {
-      throw new Error(`Failed to bulk create items: ${error.message}`);
-    }
-
-    return data || [];
-  }
 
   const { data, error } = await client
     .from('collection_items')
