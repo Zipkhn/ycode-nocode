@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -30,11 +31,21 @@ import { getDefaultSitemapSettings } from '@/lib/sitemap-utils';
 import { getTimezoneOptions } from '@/lib/setting-utils';
 import { getDetectedTimezone, isCloudVersion } from '@/lib/utils';
 import { Icon } from '@/components/ui/icon';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 import FileManagerDialog from '../../components/FileManagerDialog';
 import { toast } from 'sonner';
 import { ASSET_CATEGORIES } from '@/lib/asset-constants';
 
 export default function GeneralSettingsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('website');
   const { getSettingByKey, saveSettings } = useSettingsStore();
 
@@ -234,6 +245,33 @@ export default function GeneralSettingsPage() {
     }
   }, []);
 
+  // Reset project state
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleResetProject = useCallback(async () => {
+    try {
+      setIsResetting(true);
+
+      const response = await fetch('/ycode/api/devtools/reset-db', {
+        method: 'POST',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to reset project');
+      }
+
+      router.push('/ycode');
+    } catch (err) {
+      console.error('Error resetting project:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to reset project');
+      setIsResetting(false);
+      setShowResetDialog(false);
+    }
+  }, [router]);
+
   return (
     <div className="p-8">
       <div className="max-w-3xl mx-auto">
@@ -248,7 +286,8 @@ export default function GeneralSettingsPage() {
             <TabsTrigger value="custom-code">Custom code</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="website" className="mt-2">
+          <TabsContent value="website" className="mt-2 flex flex-col gap-4">
+
             <div className="grid grid-cols-3 gap-10 bg-secondary/20 p-8 rounded-lg">
               <div>
                 <FieldLegend>Main details</FieldLegend>
@@ -455,6 +494,38 @@ export default function GeneralSettingsPage() {
                 </div>
               </div>
             </div>
+
+            <div className="grid grid-cols-3 gap-10 bg-secondary/20 p-8 rounded-lg">
+              <div>
+                <FieldLegend>Danger zone</FieldLegend>
+              </div>
+
+              <div className="col-span-2 grid grid-cols-2 gap-5">
+
+                <div className="col-span-2 flex items-center gap-6">
+
+                  <div className="flex flex-col gap-2">
+                    <FieldLabel>
+                      Reset project
+                    </FieldLabel>
+                    <FieldDescription>
+                      Reset your project to a blank canvas. This will permanently delete all pages, CMS collections, assets, and settings.
+                    </FieldDescription>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setShowResetDialog(true)}
+                      >
+                        Reset project
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
           </TabsContent>
 
           <TabsContent value="seo" className="mt-2">
@@ -702,6 +773,43 @@ export default function GeneralSettingsPage() {
         assetId={fileManagerMode === 'favicon' ? faviconAssetId || null : webClipAssetId || null}
         category={ASSET_CATEGORIES.IMAGES}
       />
+
+      {/* Reset Project Confirmation Dialog */}
+      <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <DialogContent showCloseButton={false} className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Reset project</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all project data including pages, CMS collections, assets, and settings. Your project will be reset to a blank canvas. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setShowResetDialog(false)}
+              disabled={isResetting}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleResetProject}
+              disabled={isResetting}
+            >
+              {isResetting ? (
+                <>
+                  <Spinner />
+                  Resetting...
+                </>
+              ) : (
+                'Reset project'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
