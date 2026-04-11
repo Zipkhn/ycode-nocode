@@ -163,6 +163,7 @@ export function getCanvasIframeHtml(mountId: string = 'canvas-mount'): string {
     }
   </style>
   <link rel="stylesheet" href="/canvas.css?v=0.2.1.1">
+  <link rel="stylesheet" href="/global-theme.css">
   <style id="ycode-viewport-overrides">
     /* Dynamically populated: overrides vh/svh/dvh/lvh with fixed px values */
   </style>
