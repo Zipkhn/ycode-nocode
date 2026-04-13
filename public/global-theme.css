@@ -1,18 +1,23 @@
 /* LUMOS_CORE_START */
 
 :root {
-  /* --- 1. CONFIGURATION (Viewport en REM) --- */
-  /* 1440px = 90rem | 320px = 20rem */
-  --site--viewport-max: 90; 
-  --site--viewport-min: 20;
+  /* --- 1. CONFIGURATION --- */
+  --site--viewport-max: 90; /* 1440px */
+  --site--viewport-min: 20; /* 320px */
   --site--column-count: 12;
   --site--gutter: 1rem;
-  
-  /* Marges Container : 1.25rem (20px) à 7.5rem (120px) */
-  --site--margin-min: 1.25; 
-  --site--margin-max: 7.5;
 
-  /* --- 2. TYPO SIZES (Min/Max en REM) --- */
+  /* --- 2. SITE MARGIN (Fluid Variable) --- */
+  --site--margin-min: 1.25; /* 20px */
+  --site--margin-max: 7.5;  /* 120px */
+  
+  --site--margin-fluid: clamp(
+    var(--site--margin-min) * 1rem,
+    var(--site--margin-min) * 1rem + (var(--site--margin-max) - var(--site--margin-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)),
+    var(--site--margin-max) * 1rem
+  );
+
+  /* --- 3. TYPO SIZES (REM) --- */
   --_typography---font-size--display-min: 3;    --_typography---font-size--display-max: 7.5;
   --_typography---font-size--h1-min: 2;         --_typography---font-size--h1-max: 5;
   --_typography---font-size--h2-min: 1.75;      --_typography---font-size--h2-max: 3.5;
@@ -20,97 +25,100 @@
   --_typography---font-size--h4-min: 1.25;      --_typography---font-size--h4-max: 2;
   --_typography---font-size--h5-min: 1.125;     --_typography---font-size--h5-max: 1.5;
   --_typography---font-size--h6-min: 1;         --_typography---font-size--h6-max: 1.25;
-  --_typography---font-size--text-large-min: 1.125; --_typography---font-size--text-large-max: 1.375;
   --_typography---font-size--text-main-min: 1;  --_typography---font-size--text-main-max: 1.125;
-  --_typography---font-size--text-small-min: 0.75; --_typography---font-size--text-small-max: 0.875;
 
-  /* --- 3. SPACING TOKENS (Min/Max en REM) --- */
-  --_spacing---section-space--main-min: 3.75;  --_spacing---section-space--main-max: 6.25;
-  --_spacing---space--1-min: 0.25;  --_spacing---space--1-max: 0.5;
-  --_spacing---space--2-min: 0.5;   --_spacing---space--2-max: 0.75;
-  --_spacing---space--3-min: 0.75;  --_spacing---space--3-max: 1;
-  --_spacing---space--4-min: 1;     --_spacing---space--4-max: 1.5;
-  --_spacing---space--5-min: 1.5;   --_spacing---space--5-max: 2;
-  --_spacing---space--6-min: 2;     --_spacing---space--6-max: 3;
-  --_spacing---space--7-min: 3;     --_spacing---space--7-max: 4;
-  --_spacing---space--8-min: 4;     --_spacing---space--8-max: 6;
+  /* --- 4. SPACING TOKENS (REM) --- */
+  --_spacing---section-space--main-min: 3.75; --_spacing---section-space--main-max: 6.25;
+  --_spacing---space--1-min: 0.25; --_spacing---space--1-max: 0.5;
+  --_spacing---space--2-min: 0.5;  --_spacing---space--2-max: 0.75;
+  --_spacing---space--3-min: 0.75; --_spacing---space--3-max: 1;
+  --_spacing---space--4-min: 1;    --_spacing---space--4-max: 1.5;
+  --_spacing---space--5-min: 1.5;  --_spacing---space--5-max: 2;
+  --_spacing---space--6-min: 2;    --_spacing---space--6-max: 3;
+  --_spacing---space--7-min: 3;    --_spacing---space--7-max: 4;
+  --_spacing---space--8-min: 4;    --_spacing---space--8-max: 6;
 
-  /* --- 4. TEXT STYLE (Options) --- */
+  /* --- 5. TEXT STYLE OPTIONS --- */
   --_text-style---font-family: inherit;
   --_text-style---font-weight: 400;
   --_text-style---line-height: 1.5;
-  --_text-style---letter-spacing: normal;
-  --_text-style---text-transform: none;
-  --_text-style---text-wrap: balance;
-  --_text-style---margin-top: 0rem;
   --_text-style---margin-bottom: 0rem;
-  --_text-style---trim-top: 0rem;
-  --_text-style---trim-bottom: 0rem;
 }
 
-/* --- 5. AUTOMATIC TEXT INHERITANCE --- */
-h1, h2, h3, h4, h5, h6, p, .u-text-display, .u-text-large, .u-text-main, .u-text-small {
+/* --- 6. TEXT RESET --- */
+h1, h2, h3, h4, h5, h6, p, .u-text-display, .u-text-main {
   font-family: var(--_text-style---font-family) !important;
   font-weight: var(--_text-style---font-weight) !important;
-  letter-spacing: var(--_text-style---letter-spacing) !important;
-  text-transform: var(--_text-style---text-transform) !important;
-  text-wrap: var(--_text-style---text-wrap) !important;
-  margin-top: var(--_text-style---margin-top) !important;
+  line-height: var(--_text-style---line-height) !important;
   margin-bottom: var(--_text-style---margin-bottom) !important;
-  padding-top: var(--_text-style---trim-top) !important;
-  padding-bottom: var(--_text-style---trim-bottom) !important;
+}
+/* --- 6.1 TEXT TRIM (Le moteur de précision) --- */
+
+/* On cible les titres, paragraphes et classes de style, 
+   SAUF si on a désactivé le trim avec la classe .u-text-trim-off */
+
+:is(h1, h2, h3, h4, h5, h6, p, [class*="u-text-style-"]):not(.w-richtext, .u-text-trim-off)::before {
+  content: "";
+  display: table;
+  margin-bottom: calc(-0.5lh + var(--_text-style---trim-top, 0rem));
 }
 
-/* --- 6. FLUID CLASSES (REMs Logic) --- */
-/* La formule calcule maintenant la pente entre deux valeurs en REM */
-
-.u-text-display { font-size: clamp(var(--_typography---font-size--display-min) * 1rem, var(--_typography---font-size--display-min) * 1rem + (var(--_typography---font-size--display-max) - var(--_typography---font-size--display-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--display-max) * 1rem) !important; line-height: 1.1 !important; font-weight: 900 !important; }
-.u-text-h1, h1 { font-size: clamp(var(--_typography---font-size--h1-min) * 1rem, var(--_typography---font-size--h1-min) * 1rem + (var(--_typography---font-size--h1-max) - var(--_typography---font-size--h1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h1-max) * 1rem) !important; line-height: 1.1 !important; font-weight: 700 !important; }
-.u-text-h2, h2 { font-size: clamp(var(--_typography---font-size--h2-min) * 1rem, var(--_typography---font-size--h2-min) * 1rem + (var(--_typography---font-size--h2-max) - var(--_typography---font-size--h2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h2-max) * 1rem) !important; line-height: 1.2 !important; }
+:is(h1, h2, h3, h4, h5, h6, p, [class*="u-text-style-"]):not(.w-richtext, .u-text-trim-off)::after {
+  content: "";
+  display: table;
+  margin-top: calc(-0.5lh + var(--_text-style---trim-bottom, 0rem));
+}
+/* --- 7. TYPOGRAPHY CLASSES --- */
+.u-text-display { font-size: clamp(var(--_typography---font-size--display-min) * 1rem, var(--_typography---font-size--display-min) * 1rem + (var(--_typography---font-size--display-max) - var(--_typography---font-size--display-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--display-max) * 1rem) !important; }
+.u-text-h1, h1 { font-size: clamp(var(--_typography---font-size--h1-min) * 1rem, var(--_typography---font-size--h1-min) * 1rem + (var(--_typography---font-size--h1-max) - var(--_typography---font-size--h1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h1-max) * 1rem) !important; }
 .u-text-main, p { font-size: clamp(var(--_typography---font-size--text-main-min) * 1rem, var(--_typography---font-size--text-main-min) * 1rem + (var(--_typography---font-size--text-main-max) - var(--_typography---font-size--text-main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--text-main-max) * 1rem) !important; }
 
-/* --- 7. SPACING UTILITIES (Padding & Sections) --- */
+/* --- 8. MAST STRUCTURE --- */
+.u-row { display: flex !important; flex-wrap: wrap !important; margin-inline: calc(var(--site--gutter) * -1) !important; }
+.u-col { flex: 1 1 0% !important; padding-inline: var(--site--gutter) !important; }
+.u-col-6 { flex: 0 0 50% !important; max-width: 50% !important; padding-inline: var(--site--gutter) !important; }
+.u-stack { display: flex !important; flex-direction: column !important; }
+.u-stack-gap-main { gap: clamp(var(--_spacing---space--4-min) * 1rem, var(--_spacing---space--4-min) * 1rem + (var(--_spacing---space--4-max) - var(--_spacing---space--4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--4-max) * 1rem) !important; }
 
-.u-padding-vertical-main {
-  padding-top: clamp(var(--_spacing---section-space--main-min) * 1rem, var(--_spacing---section-space--main-min) * 1rem + (var(--_spacing---section-space--main-max) - var(--_spacing---section-space--main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---section-space--main-max) * 1rem) !important;
-  padding-bottom: clamp(var(--_spacing---section-space--main-min) * 1rem, var(--_spacing---section-space--main-min) * 1rem + (var(--_spacing---section-space--main-max) - var(--_spacing---section-space--main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---section-space--main-max) * 1rem) !important;
-}
+/* --- 9. FLUID SPACING (Margins 1-8) --- */
+.u-margin-bottom-1 { margin-bottom: clamp(var(--_spacing---space--1-min) * 1rem, var(--_spacing---space--1-min) * 1rem + (var(--_spacing---space--1-max) - var(--_spacing---space--1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--1-max) * 1rem) !important; }
+.u-margin-bottom-2 { margin-bottom: clamp(var(--_spacing---space--2-min) * 1rem, var(--_spacing---space--2-min) * 1rem + (var(--_spacing---space--2-max) - var(--_spacing---space--2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--2-max) * 1rem) !important; }
+.u-margin-bottom-3 { margin-bottom: clamp(var(--_spacing---space--3-min) * 1rem, var(--_spacing---space--3-min) * 1rem + (var(--_spacing---space--3-max) - var(--_spacing---space--3-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--3-max) * 1rem) !important; }
+.u-margin-bottom-4 { margin-bottom: clamp(var(--_spacing---space--4-min) * 1rem, var(--_spacing---space--4-min) * 1rem + (var(--_spacing---space--4-max) - var(--_spacing---space--4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--4-max) * 1rem) !important; }
+.u-margin-bottom-5 { margin-bottom: clamp(var(--_spacing---space--5-min) * 1rem, var(--_spacing---space--5-min) * 1rem + (var(--_spacing---space--5-max) - var(--_spacing---space--5-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--5-max) * 1rem) !important; }
+.u-margin-bottom-6 { margin-bottom: clamp(var(--_spacing---space--6-min) * 1rem, var(--_spacing---space--6-min) * 1rem + (var(--_spacing---space--6-max) - var(--_spacing---space--6-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--6-max) * 1rem) !important; }
+.u-margin-bottom-7 { margin-bottom: clamp(var(--_spacing---space--7-min) * 1rem, var(--_spacing---space--7-min) * 1rem + (var(--_spacing---space--7-max) - var(--_spacing---space--7-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--7-max) * 1rem) !important; }
+.u-margin-bottom-8 { margin-bottom: clamp(var(--_spacing---space--8-min) * 1rem, var(--_spacing---space--8-min) * 1rem + (var(--_spacing---space--8-max) - var(--_spacing---space--8-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--8-max) * 1rem) !important; }
 
-.u-margin-bottom-8 {
-  margin-bottom: clamp(var(--_spacing---space--8-min) * 1rem, var(--_spacing---space--8-min) * 1rem + (var(--_spacing---space--8-max) - var(--_spacing---space--8-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--8-max) * 1rem) !important;
-}
+/* --- 10. FLUID SPACING (Paddings 1-8 - All Sides) --- */
+.u-padding-1 { padding: clamp(var(--_spacing---space--1-min) * 1rem, var(--_spacing---space--1-min) * 1rem + (var(--_spacing---space--1-max) - var(--_spacing---space--1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--1-max) * 1rem) !important; }
+.u-padding-2 { padding: clamp(var(--_spacing---space--2-min) * 1rem, var(--_spacing---space--2-min) * 1rem + (var(--_spacing---space--2-max) - var(--_spacing---space--2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--2-max) * 1rem) !important; }
+.u-padding-3 { padding: clamp(var(--_spacing---space--3-min) * 1rem, var(--_spacing---space--3-min) * 1rem + (var(--_spacing---space--3-max) - var(--_spacing---space--3-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--3-max) * 1rem) !important; }
+.u-padding-4 { padding: clamp(var(--_spacing---space--4-min) * 1rem, var(--_spacing---space--4-min) * 1rem + (var(--_spacing---space--4-max) - var(--_spacing---space--4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--4-max) * 1rem) !important; }
+.u-padding-5 { padding: clamp(var(--_spacing---space--5-min) * 1rem, var(--_spacing---space--5-min) * 1rem + (var(--_spacing---space--5-max) - var(--_spacing---space--5-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--5-max) * 1rem) !important; }
+.u-padding-6 { padding: clamp(var(--_spacing---space--6-min) * 1rem, var(--_spacing---space--6-min) * 1rem + (var(--_spacing---space--6-max) - var(--_spacing---space--6-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--6-max) * 1rem) !important; }
+.u-padding-7 { padding: clamp(var(--_spacing---space--7-min) * 1rem, var(--_spacing---space--7-min) * 1rem + (var(--_spacing---space--7-max) - var(--_spacing---space--7-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--7-max) * 1rem) !important; }
+.u-padding-8 { padding: clamp(var(--_spacing---space--8-min) * 1rem, var(--_spacing---space--8-min) * 1rem + (var(--_spacing---space--8-max) - var(--_spacing---space--8-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--8-max) * 1rem) !important; }
 
-/* --- 8. CONTAINER & GRID (REM based) --- */
+/* Paddings Spécifiques (Sections) */
+.u-padding-vertical-main { padding-block: clamp(var(--_spacing---section-space--main-min) * 1rem, var(--_spacing---section-space--main-min) * 1rem + (var(--_spacing---section-space--main-max) - var(--_spacing---section-space--main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---section-space--main-max) * 1rem) !important; }
 
-.u-container {
-  width: 100% !important;
-  max-width: calc(var(--site--viewport-max) * 1rem) !important;
-  margin-inline: auto !important;
-  padding-inline: clamp(var(--site--margin-min) * 1rem, var(--site--margin-min) * 1rem + (var(--site--margin-max) - var(--site--margin-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--site--margin-max) * 1rem) !important;
-}
+/* --- 11. CONTAINERS & BREAKOUTS --- */
+.u-container { width: 100% !important; max-width: calc(var(--site--viewport-max) * 1rem) !important; margin-inline: auto !important; padding-inline: var(--site--margin-fluid) !important; }
+.u-container-full { width: 100% !important; max-width: none !important; padding-inline: 0 !important; }
+.u-padding-left-site { padding-left: var(--site--margin-fluid) !important; }
+.u-padding-right-site { padding-right: var(--site--margin-fluid) !important; }
+.u-grid { display: grid !important; grid-template-columns: repeat(var(--site--column-count, 12), minmax(0, 1fr)) !important; gap: var(--site--gutter) !important; }
 
-.u-grid {
-  display: grid !important;
-  grid-template-columns: repeat(var(--site--column-count, 12), minmax(0, 1fr)) !important;
-  gap: var(--site--gutter) !important;
-}
-
-/* --- 9. RESPONSIVE --- */
+/* --- 12. RESPONSIVE & VISUALIZER --- */
 @media screen and (max-width: 991px) { :root { --site--column-count: 8; } }
-@media screen and (max-width: 479px) { 
-  :root { --site--column-count: 4; } 
-  .u-col-span-12, .u-col-span-6 { grid-column: span var(--site--column-count) !important; }
-}
+@media screen and (max-width: 479px) { :root { --site--column-count: 4; } .u-col-6 { flex: 0 0 100% !important; max-width: 100% !important; } }
 
-/* --- 10. VISUALISEUR --- */
 html, body { height: 100%; margin: 0; }
 .dev-grid_wrapper { position: fixed !important; inset: 0 !important; z-index: 999999; pointer-events: none; }
 .dev-grid_wrapper .u-container, .dev-grid_wrapper .u-grid { height: 100% !important; }
-body.is-dev-mode .dev-grid_wrapper .u-grid > div {
-  height: 100% !important; background-color: rgba(255, 0, 0, 0.05) !important;
-  border-left: 1px solid rgba(255, 0, 0, 0.1) !important; border-right: 1px solid rgba(255, 0, 0, 0.1) !important;
-}
-@media screen and (max-width: 991px) { .dev-grid_wrapper .u-grid > div:nth-child(n+9) { display: none !important; } }
-@media screen and (max-width: 479px) { .dev-grid_wrapper .u-grid > div:nth-child(n+5) { display: none !important; } }
+body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; background-color: rgba(255, 0, 0, 0.05) !important; border-inline: 1px solid rgba(255, 0, 0, 0.1) !important; }
+@media (max-width: 991px) { .dev-grid_wrapper .u-grid > div:nth-child(n+9) { display: none !important; } }
+@media (max-width: 479px) { .dev-grid_wrapper .u-grid > div:nth-child(n+5) { display: none !important; } }
 
 /* LUMOS_CORE_END */
