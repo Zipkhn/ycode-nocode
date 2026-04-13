@@ -1,6 +1,14 @@
 /* LUMOS_CORE_START */
 
-:root {
+:root, html, body, #ybody, [data-layer-id="body"], [data-ycode-canvas], .ycode-canvas {
+  /* --- 0. FORCE BRUTE TEST --- */
+  /* Remove this once confirmed working! */
+  --test-active: 1;
+}
+
+
+
+:root, html, body, #ybody, [data-layer-id="body"], [data-ycode-canvas], .ycode-canvas {
   /* --- 1. CONFIGURATION --- */
   --site--viewport-max: 90; /* 1440px */
   --site--viewport-min: 20; /* 320px */
@@ -18,14 +26,16 @@
   );
 
   /* --- 3. TYPO SIZES (REM) --- */
-  --_typography---font-size--display-min: 3;    --_typography---font-size--display-max: 7.5;
-  --_typography---font-size--h1-min: 2;         --_typography---font-size--h1-max: 5;
-  --_typography---font-size--h2-min: 1.75;      --_typography---font-size--h2-max: 3.5;
+  --_typography---font-size--display-min: 5;    --_typography---font-size--display-max: 12;
+  --_typography---font-size--h1-min: 2;         --_typography---font-size--h1-max: 5.7;
+  --_typography---font-size--h2-min: 1.75;      --_typography---font-size--h2-max: 4.4;
   --_typography---font-size--h3-min: 1.5;       --_typography---font-size--h3-max: 2.5;
   --_typography---font-size--h4-min: 1.25;      --_typography---font-size--h4-max: 2;
   --_typography---font-size--h5-min: 1.125;     --_typography---font-size--h5-max: 1.5;
   --_typography---font-size--h6-min: 1;         --_typography---font-size--h6-max: 1.25;
+  --_typography---font-size--text-large-min: 1.125; --_typography---font-size--text-large-max: 1.375;
   --_typography---font-size--text-main-min: 1;  --_typography---font-size--text-main-max: 1.125;
+  --_typography---font-size--text-small-min: 0.75;  --_typography---font-size--text-small-max: 0.875;
 
   /* --- 4. SPACING TOKENS (REM) --- */
   --_spacing---section-space--main-min: 3.75; --_spacing---section-space--main-max: 6.25;
@@ -43,10 +53,60 @@
   --_text-style---font-weight: 400;
   --_text-style---line-height: 1.5;
   --_text-style---margin-bottom: 0rem;
+  --_text-style---trim-top: 0.39em;
+  --_text-style---trim-bottom: 0.37em;
+  
+  /* --- 6. CORE COLORS --- */
+  --color--primary: #5465FF;
+  --color--primary-dark: #788BFF;
+  --color--secondary: #9DB4FF;
+  
+  --color--grey-900: #1A1A1A;
+  --color--grey-800: #333333;
+  --color--grey-700: #4D4D4D;
+  --color--grey-600: #666666;
+  --color--grey-500: #808080;
+  --color--grey-400: #999999;
+  --color--grey-300: #B3B3B3;
+  --color--grey-200: #CCCCCC;
+  --color--grey-100: #E6E6E6;
+  --color--grey-50:  #F7F7F7;
+
+  /* --- 7. THEME VARIABLES (Light UI) --- */
+  --theme-light--background: #FFFFFF;
+  --theme-light--text-main: #1A1A1A;
+  --theme-light--text-muted: #666666;
+  --theme-light--border: #E6E6E6;
+  --theme-light--accent: var(--color--primary);
+  
+  /* --- 8. THEME VARIABLES (Dark UI) --- */
+  --theme-dark--background: #1A1A1A;
+  --theme-dark--text-main: #FFFFFF;
+  --theme-dark--text-muted: #B3B3B3;
+  --theme-dark--border: #333333;
+  --theme-dark--accent: var(--color--primary-dark);
+  
+  /* --- APPLIED THEME MACROS (Default) --- */
+  --theme--background: var(--theme-light--background);
+  --theme--text-main: var(--theme-light--text-main);
+  --theme--text-muted: var(--theme-light--text-muted);
+  --theme--border: var(--theme-light--border);
+  --theme--accent: var(--theme-light--accent);
+}
+
+.dark {
+  --theme--background: var(--theme-dark--background);
+  --theme--text-main: var(--theme-dark--text-main);
+  --theme--text-muted: var(--theme-dark--text-muted);
+  --theme--border: var(--theme-dark--border);
+  --theme--accent: var(--theme-dark--accent);
 }
 
 /* --- 6. TEXT RESET --- */
-h1, h2, h3, h4, h5, h6, p, .u-text-display, .u-text-main {
+#ybody h1, #ybody h2, #ybody h3, #ybody h4, #ybody h5, #ybody h6, #ybody p, #ybody#ybody .u-text-display, #ybody#ybody .u-text-main,
+[data-layer-id="body"] h1, [data-layer-id="body"] h2, [data-layer-id="body"] h3, [data-layer-id="body"] h4, [data-layer-id="body"] h5, [data-layer-id="body"] h6, [data-layer-id="body"] p,
+[data-ycode-canvas] h1, [data-ycode-canvas] h2, [data-ycode-canvas] h3, [data-ycode-canvas] h4, [data-ycode-canvas] h5, [data-ycode-canvas] h6, [data-ycode-canvas] p,
+.ycode-canvas h1, .ycode-canvas h2, .ycode-canvas h3, .ycode-canvas h4, .ycode-canvas h5, .ycode-canvas h6, .ycode-canvas p {
   font-family: var(--_text-style---font-family) !important;
   font-weight: var(--_text-style---font-weight) !important;
   line-height: var(--_text-style---line-height) !important;
@@ -57,68 +117,223 @@ h1, h2, h3, h4, h5, h6, p, .u-text-display, .u-text-main {
 /* On cible les titres, paragraphes et classes de style, 
    SAUF si on a désactivé le trim avec la classe .u-text-trim-off */
 
-:is(h1, h2, h3, h4, h5, h6, p, [class*="u-text-style-"]):not(.w-richtext, .u-text-trim-off)::before {
-  content: "";
-  display: table;
-  margin-bottom: calc(-0.5lh + var(--_text-style---trim-top, 0rem));
+#ybody :is([class*="u-text-style-"], h1, h2, h3, h4, h5, h6, p, blockquote),
+[data-ycode-canvas] :is([class*="u-text-style-"], h1, h2, h3, h4, h5, h6, p, blockquote),
+.ycode-canvas :is([class*="u-text-style-"], h1, h2, h3, h4, h5, h6, p, blockquote) {
+	display: flow-root !important;
 }
-
-:is(h1, h2, h3, h4, h5, h6, p, [class*="u-text-style-"]):not(.w-richtext, .u-text-trim-off)::after {
-  content: "";
-  display: table;
-  margin-top: calc(-0.5lh + var(--_text-style---trim-bottom, 0rem));
+#ybody :is([class*="u-text-style-"], h1, h2, h3, h4, h5, h6, p, blockquote)::before,
+[data-ycode-canvas] :is([class*="u-text-style-"], h1, h2, h3, h4, h5, h6, p, blockquote)::before,
+.ycode-canvas :is([class*="u-text-style-"], h1, h2, h3, h4, h5, h6, p, blockquote)::before {
+	content: "" !important;
+	display: table !important;
+	margin-bottom: calc(-0.5lh + var(--_text-style---trim-top)) !important;
+}
+#ybody :is([class*="u-text-style-"], h1, h2, h3, h4, h5, h6, p, blockquote)::after,
+[data-ycode-canvas] :is([class*="u-text-style-"], h1, h2, h3, h4, h5, h6, p, blockquote)::after,
+.ycode-canvas :is([class*="u-text-style-"], h1, h2, h3, h4, h5, h6, p, blockquote)::after {
+	content: "" !important;
+	display: table !important;
+	margin-bottom: calc(-0.5lh + var(--_text-style---trim-bottom)) !important;
 }
 /* --- 7. TYPOGRAPHY CLASSES --- */
-.u-text-display { font-size: clamp(var(--_typography---font-size--display-min) * 1rem, var(--_typography---font-size--display-min) * 1rem + (var(--_typography---font-size--display-max) - var(--_typography---font-size--display-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--display-max) * 1rem) !important; }
-.u-text-h1, h1 { font-size: clamp(var(--_typography---font-size--h1-min) * 1rem, var(--_typography---font-size--h1-min) * 1rem + (var(--_typography---font-size--h1-max) - var(--_typography---font-size--h1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h1-max) * 1rem) !important; }
-.u-text-main, p { font-size: clamp(var(--_typography---font-size--text-main-min) * 1rem, var(--_typography---font-size--text-main-min) * 1rem + (var(--_typography---font-size--text-main-max) - var(--_typography---font-size--text-main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--text-main-max) * 1rem) !important; }
+/* Écrasement du Reset Tailwind */
+[data-ycode-canvas] h1, [data-ycode-canvas] h2, [data-ycode-canvas] h3,
+[data-ycode-canvas] h4, [data-ycode-canvas] h5, [data-ycode-canvas] h6,
+[data-ycode-canvas] p, [data-ycode-canvas] div {
+   font-size: inherit;
+}
 
-/* --- 8. MAST STRUCTURE --- */
-.u-row { display: flex !important; flex-wrap: wrap !important; margin-inline: calc(var(--site--gutter) * -1) !important; }
-.u-col { flex: 1 1 0% !important; padding-inline: var(--site--gutter) !important; }
-.u-col-6 { flex: 0 0 50% !important; max-width: 50% !important; padding-inline: var(--site--gutter) !important; }
-.u-stack { display: flex !important; flex-direction: column !important; }
-.u-stack-gap-main { gap: clamp(var(--_spacing---space--4-min) * 1rem, var(--_spacing---space--4-min) * 1rem + (var(--_spacing---space--4-max) - var(--_spacing---space--4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--4-max) * 1rem) !important; }
+/* Reset font-sizes natively for tags first to establish baseline (neutralized if Lumos classes are present) */
+:is(#ybody, [data-layer-id="body"], [data-ycode-canvas], .ycode-canvas) h1:not([class*="u-text-"]) { font-size: clamp(var(--_typography---font-size--h1-min) * 1rem, var(--_typography---font-size--h1-min) * 1rem + (var(--_typography---font-size--h1-max) - var(--_typography---font-size--h1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h1-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
+:is(#ybody, [data-layer-id="body"], [data-ycode-canvas], .ycode-canvas) h2:not([class*="u-text-"]) { font-size: clamp(var(--_typography---font-size--h2-min) * 1rem, var(--_typography---font-size--h2-min) * 1rem + (var(--_typography---font-size--h2-max) - var(--_typography---font-size--h2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h2-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
+:is(#ybody, [data-layer-id="body"], [data-ycode-canvas], .ycode-canvas) h3:not([class*="u-text-"]) { font-size: clamp(var(--_typography---font-size--h3-min) * 1rem, var(--_typography---font-size--h3-min) * 1rem + (var(--_typography---font-size--h3-max) - var(--_typography---font-size--h3-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h3-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
+:is(#ybody, [data-layer-id="body"], [data-ycode-canvas], .ycode-canvas) h4:not([class*="u-text-"]) { font-size: clamp(var(--_typography---font-size--h4-min) * 1rem, var(--_typography---font-size--h4-min) * 1rem + (var(--_typography---font-size--h4-max) - var(--_typography---font-size--h4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h4-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
+:is(#ybody, [data-layer-id="body"], [data-ycode-canvas], .ycode-canvas) h5:not([class*="u-text-"]) { font-size: clamp(var(--_typography---font-size--h5-min) * 1rem, var(--_typography---font-size--h5-min) * 1rem + (var(--_typography---font-size--h5-max) - var(--_typography---font-size--h5-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h5-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
+:is(#ybody, [data-layer-id="body"], [data-ycode-canvas], .ycode-canvas) h6:not([class*="u-text-"]) { font-size: clamp(var(--_typography---font-size--h6-min) * 1rem, var(--_typography---font-size--h6-min) * 1rem + (var(--_typography---font-size--h6-max) - var(--_typography---font-size--h6-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h6-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
+:is(#ybody, [data-layer-id="body"], [data-ycode-canvas], .ycode-canvas) p:not([class*="u-text-"]) { font-size: clamp(var(--_typography---font-size--text-main-min) * 1rem, var(--_typography---font-size--text-main-min) * 1rem + (var(--_typography---font-size--text-main-max) - var(--_typography---font-size--text-main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--text-main-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
 
+
+/* --- 8. MAST STRUCTURE (Super Specific) --- */
+#ybody#ybody .u-row, [data-layer-id].u-row { display: flex !important; flex-wrap: wrap !important; margin-inline: calc(var(--site--gutter) * -1) !important; }
+#ybody#ybody .u-col, [data-layer-id].u-col { flex: 1 1 0% !important; padding-inline: var(--site--gutter) !important; }
+
+/* Grid Parent */
+#ybody#ybody .u-grid, [data-layer-id].u-grid {
+  display: grid !important;
+  width: 100% !important;
+  grid-template-columns: repeat(var(--site--column-count, 12), minmax(0, 1fr)) !important;
+  column-gap: var(--site--gutter, 1rem) !important;
+  row-gap: var(--site--gutter, 1rem) !important;
+}
+
+/* Grid Spans 1-12 with ID Stacking */
+#ybody#ybody .u-col-span-1, [data-layer-id].u-col-span-1 { grid-column: span 1 / span 1 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-2, [data-layer-id].u-col-span-2 { grid-column: span 2 / span 2 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-3, [data-layer-id].u-col-span-3 { grid-column: span 3 / span 3 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-4, [data-layer-id].u-col-span-4 { grid-column: span 4 / span 4 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-5, [data-layer-id].u-col-span-5 { grid-column: span 5 / span 5 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-6, [data-layer-id].u-col-span-6 { grid-column: span 6 / span 6 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-7, [data-layer-id].u-col-span-7 { grid-column: span 7 / span 7 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-8, [data-layer-id].u-col-span-8 { grid-column: span 8 / span 8 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-9, [data-layer-id].u-col-span-9 { grid-column: span 9 / span 9 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-10, [data-layer-id].u-col-span-10 { grid-column: span 10 / span 10 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-11, [data-layer-id].u-col-span-11 { grid-column: span 11 / span 11 !important; width: 100% !important; }
+#ybody#ybody .u-col-span-12, [data-layer-id].u-col-span-12 { grid-column: span 12 / span 12 !important; width: 100% !important; }
+
+/* Grid Helpers & Stack */
+#ybody#ybody .u-stack, [data-layer-id].u-stack { display: flex !important; flex-direction: column !important; }
+#ybody#ybody .u-stack-gap-main, [data-layer-id].u-stack-gap-main { gap: clamp(var(--_spacing---space--4-min) * 1rem, var(--_spacing---space--4-min) * 1rem + (var(--_spacing---space--4-max) - var(--_spacing---space--4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--4-max) * 1rem) !important; }
 /* --- 9. FLUID SPACING (Margins 1-8) --- */
-.u-margin-bottom-1 { margin-bottom: clamp(var(--_spacing---space--1-min) * 1rem, var(--_spacing---space--1-min) * 1rem + (var(--_spacing---space--1-max) - var(--_spacing---space--1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--1-max) * 1rem) !important; }
-.u-margin-bottom-2 { margin-bottom: clamp(var(--_spacing---space--2-min) * 1rem, var(--_spacing---space--2-min) * 1rem + (var(--_spacing---space--2-max) - var(--_spacing---space--2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--2-max) * 1rem) !important; }
-.u-margin-bottom-3 { margin-bottom: clamp(var(--_spacing---space--3-min) * 1rem, var(--_spacing---space--3-min) * 1rem + (var(--_spacing---space--3-max) - var(--_spacing---space--3-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--3-max) * 1rem) !important; }
-.u-margin-bottom-4 { margin-bottom: clamp(var(--_spacing---space--4-min) * 1rem, var(--_spacing---space--4-min) * 1rem + (var(--_spacing---space--4-max) - var(--_spacing---space--4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--4-max) * 1rem) !important; }
-.u-margin-bottom-5 { margin-bottom: clamp(var(--_spacing---space--5-min) * 1rem, var(--_spacing---space--5-min) * 1rem + (var(--_spacing---space--5-max) - var(--_spacing---space--5-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--5-max) * 1rem) !important; }
-.u-margin-bottom-6 { margin-bottom: clamp(var(--_spacing---space--6-min) * 1rem, var(--_spacing---space--6-min) * 1rem + (var(--_spacing---space--6-max) - var(--_spacing---space--6-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--6-max) * 1rem) !important; }
-.u-margin-bottom-7 { margin-bottom: clamp(var(--_spacing---space--7-min) * 1rem, var(--_spacing---space--7-min) * 1rem + (var(--_spacing---space--7-max) - var(--_spacing---space--7-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--7-max) * 1rem) !important; }
-.u-margin-bottom-8 { margin-bottom: clamp(var(--_spacing---space--8-min) * 1rem, var(--_spacing---space--8-min) * 1rem + (var(--_spacing---space--8-max) - var(--_spacing---space--8-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--8-max) * 1rem) !important; }
-
+.u-margin-bottom-1, [data-layer-id].u-margin-bottom-1, #ybody#ybody .u-margin-bottom-1, [data-ycode-canvas][data-ycode-canvas] .u-margin-bottom-1, .ycode-canvas .u-margin-bottom-1 { margin-bottom: clamp(var(--_spacing---space--1-min) * 1rem, var(--_spacing---space--1-min) * 1rem + (var(--_spacing---space--1-max) - var(--_spacing---space--1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--1-max) * 1rem) !important; }
+.u-margin-bottom-2, [data-layer-id].u-margin-bottom-2, #ybody#ybody .u-margin-bottom-2, [data-ycode-canvas][data-ycode-canvas] .u-margin-bottom-2, .ycode-canvas .u-margin-bottom-2 { margin-bottom: clamp(var(--_spacing---space--2-min) * 1rem, var(--_spacing---space--2-min) * 1rem + (var(--_spacing---space--2-max) - var(--_spacing---space--2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--2-max) * 1rem) !important; }
+.u-margin-bottom-3, [data-layer-id].u-margin-bottom-3, #ybody#ybody .u-margin-bottom-3, [data-ycode-canvas][data-ycode-canvas] .u-margin-bottom-3, .ycode-canvas .u-margin-bottom-3 { margin-bottom: clamp(var(--_spacing---space--3-min) * 1rem, var(--_spacing---space--3-min) * 1rem + (var(--_spacing---space--3-max) - var(--_spacing---space--3-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--3-max) * 1rem) !important; }
+.u-margin-bottom-4, [data-layer-id].u-margin-bottom-4, #ybody#ybody .u-margin-bottom-4, [data-ycode-canvas][data-ycode-canvas] .u-margin-bottom-4, .ycode-canvas .u-margin-bottom-4 { margin-bottom: clamp(var(--_spacing---space--4-min) * 1rem, var(--_spacing---space--4-min) * 1rem + (var(--_spacing---space--4-max) - var(--_spacing---space--4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--4-max) * 1rem) !important; }
+.u-margin-bottom-5, [data-layer-id].u-margin-bottom-5, #ybody#ybody .u-margin-bottom-5, [data-ycode-canvas][data-ycode-canvas] .u-margin-bottom-5, .ycode-canvas .u-margin-bottom-5 { margin-bottom: clamp(var(--_spacing---space--5-min) * 1rem, var(--_spacing---space--5-min) * 1rem + (var(--_spacing---space--5-max) - var(--_spacing---space--5-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--5-max) * 1rem) !important; }
+.u-margin-bottom-6, [data-layer-id].u-margin-bottom-6, #ybody#ybody .u-margin-bottom-6, [data-ycode-canvas][data-ycode-canvas] .u-margin-bottom-6, .ycode-canvas .u-margin-bottom-6 { margin-bottom: clamp(var(--_spacing---space--6-min) * 1rem, var(--_spacing---space--6-min) * 1rem + (var(--_spacing---space--6-max) - var(--_spacing---space--6-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--6-max) * 1rem) !important; }
+.u-margin-bottom-7, [data-layer-id].u-margin-bottom-7, #ybody#ybody .u-margin-bottom-7, [data-ycode-canvas][data-ycode-canvas] .u-margin-bottom-7, .ycode-canvas .u-margin-bottom-7 { margin-bottom: clamp(var(--_spacing---space--7-min) * 1rem, var(--_spacing---space--7-min) * 1rem + (var(--_spacing---space--7-max) - var(--_spacing---space--7-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--7-max) * 1rem) !important; }
+.u-margin-bottom-8, [data-layer-id].u-margin-bottom-8, #ybody#ybody .u-margin-bottom-8, [data-ycode-canvas][data-ycode-canvas] .u-margin-bottom-8, .ycode-canvas .u-margin-bottom-8 { margin-bottom: clamp(var(--_spacing---space--8-min) * 1rem, var(--_spacing---space--8-min) * 1rem + (var(--_spacing---space--8-max) - var(--_spacing---space--8-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--8-max) * 1rem) !important; }
+ 
 /* --- 10. FLUID SPACING (Paddings 1-8 - All Sides) --- */
-.u-padding-1 { padding: clamp(var(--_spacing---space--1-min) * 1rem, var(--_spacing---space--1-min) * 1rem + (var(--_spacing---space--1-max) - var(--_spacing---space--1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--1-max) * 1rem) !important; }
-.u-padding-2 { padding: clamp(var(--_spacing---space--2-min) * 1rem, var(--_spacing---space--2-min) * 1rem + (var(--_spacing---space--2-max) - var(--_spacing---space--2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--2-max) * 1rem) !important; }
-.u-padding-3 { padding: clamp(var(--_spacing---space--3-min) * 1rem, var(--_spacing---space--3-min) * 1rem + (var(--_spacing---space--3-max) - var(--_spacing---space--3-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--3-max) * 1rem) !important; }
-.u-padding-4 { padding: clamp(var(--_spacing---space--4-min) * 1rem, var(--_spacing---space--4-min) * 1rem + (var(--_spacing---space--4-max) - var(--_spacing---space--4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--4-max) * 1rem) !important; }
-.u-padding-5 { padding: clamp(var(--_spacing---space--5-min) * 1rem, var(--_spacing---space--5-min) * 1rem + (var(--_spacing---space--5-max) - var(--_spacing---space--5-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--5-max) * 1rem) !important; }
-.u-padding-6 { padding: clamp(var(--_spacing---space--6-min) * 1rem, var(--_spacing---space--6-min) * 1rem + (var(--_spacing---space--6-max) - var(--_spacing---space--6-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--6-max) * 1rem) !important; }
-.u-padding-7 { padding: clamp(var(--_spacing---space--7-min) * 1rem, var(--_spacing---space--7-min) * 1rem + (var(--_spacing---space--7-max) - var(--_spacing---space--7-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--7-max) * 1rem) !important; }
-.u-padding-8 { padding: clamp(var(--_spacing---space--8-min) * 1rem, var(--_spacing---space--8-min) * 1rem + (var(--_spacing---space--8-max) - var(--_spacing---space--8-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--8-max) * 1rem) !important; }
+.u-padding-1, [data-layer-id].u-padding-1, #ybody#ybody .u-padding-1, [data-ycode-canvas][data-ycode-canvas] .u-padding-1, .ycode-canvas .u-padding-1 { padding: clamp(var(--_spacing---space--1-min) * 1rem, var(--_spacing---space--1-min) * 1rem + (var(--_spacing---space--1-max) - var(--_spacing---space--1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--1-max) * 1rem) !important; }
+.u-padding-2, [data-layer-id].u-padding-2, #ybody#ybody .u-padding-2, [data-ycode-canvas][data-ycode-canvas] .u-padding-2, .ycode-canvas .u-padding-2 { padding: clamp(var(--_spacing---space--2-min) * 1rem, var(--_spacing---space--2-min) * 1rem + (var(--_spacing---space--2-max) - var(--_spacing---space--2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--2-max) * 1rem) !important; }
+.u-padding-3, [data-layer-id].u-padding-3, #ybody#ybody .u-padding-3, [data-ycode-canvas][data-ycode-canvas] .u-padding-3, .ycode-canvas .u-padding-3 { padding: clamp(var(--_spacing---space--3-min) * 1rem, var(--_spacing---space--3-min) * 1rem + (var(--_spacing---space--3-max) - var(--_spacing---space--3-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--3-max) * 1rem) !important; }
+.u-padding-4, [data-layer-id].u-padding-4, #ybody#ybody .u-padding-4, [data-ycode-canvas][data-ycode-canvas] .u-padding-4, .ycode-canvas .u-padding-4 { padding: clamp(var(--_spacing---space--4-min) * 1rem, var(--_spacing---space--4-min) * 1rem + (var(--_spacing---space--4-max) - var(--_spacing---space--4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--4-max) * 1rem) !important; }
+.u-padding-5, [data-layer-id].u-padding-5, #ybody#ybody .u-padding-5, [data-ycode-canvas][data-ycode-canvas] .u-padding-5, .ycode-canvas .u-padding-5 { padding: clamp(var(--_spacing---space--5-min) * 1rem, var(--_spacing---space--5-min) * 1rem + (var(--_spacing---space--5-max) - var(--_spacing---space--5-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--5-max) * 1rem) !important; }
+.u-padding-6, [data-layer-id].u-padding-6, #ybody#ybody .u-padding-6, [data-ycode-canvas][data-ycode-canvas] .u-padding-6, .ycode-canvas .u-padding-6 { padding: clamp(var(--_spacing---space--6-min) * 1rem, var(--_spacing---space--6-min) * 1rem + (var(--_spacing---space--6-max) - var(--_spacing---space--6-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--6-max) * 1rem) !important; }
+.u-padding-7, [data-layer-id].u-padding-7, #ybody#ybody .u-padding-7, [data-ycode-canvas][data-ycode-canvas] .u-padding-7, .ycode-canvas .u-padding-7 { padding: clamp(var(--_spacing---space--7-min) * 1rem, var(--_spacing---space--7-min) * 1rem + (var(--_spacing---space--7-max) - var(--_spacing---space--7-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--7-max) * 1rem) !important; }
+.u-padding-8, [data-layer-id].u-padding-8, #ybody#ybody .u-padding-8, [data-ycode-canvas][data-ycode-canvas] .u-padding-8, .ycode-canvas .u-padding-8 { padding: clamp(var(--_spacing---space--8-min) * 1rem, var(--_spacing---space--8-min) * 1rem + (var(--_spacing---space--8-max) - var(--_spacing---space--8-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--8-max) * 1rem) !important; }
 
 /* Paddings Spécifiques (Sections) */
-.u-padding-vertical-main { padding-block: clamp(var(--_spacing---section-space--main-min) * 1rem, var(--_spacing---section-space--main-min) * 1rem + (var(--_spacing---section-space--main-max) - var(--_spacing---section-space--main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---section-space--main-max) * 1rem) !important; }
+.u-padding-vertical-main, [data-layer-id].u-padding-vertical-main, #ybody#ybody .u-padding-vertical-main, [data-ycode-canvas][data-ycode-canvas] .u-padding-vertical-main, .ycode-canvas .u-padding-vertical-main { padding-block: clamp(var(--_spacing---section-space--main-min) * 1rem, var(--_spacing---section-space--main-min) * 1rem + (var(--_spacing---section-space--main-max) - var(--_spacing---section-space--main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---section-space--main-max) * 1rem) !important; }
 
 /* --- 11. CONTAINERS & BREAKOUTS --- */
-.u-container { width: 100% !important; max-width: calc(var(--site--viewport-max) * 1rem) !important; margin-inline: auto !important; padding-inline: var(--site--margin-fluid) !important; }
-.u-container-full { width: 100% !important; max-width: none !important; padding-inline: 0 !important; }
-.u-padding-left-site { padding-left: var(--site--margin-fluid) !important; }
-.u-padding-right-site { padding-right: var(--site--margin-fluid) !important; }
-.u-grid { display: grid !important; grid-template-columns: repeat(var(--site--column-count, 12), minmax(0, 1fr)) !important; gap: var(--site--gutter) !important; }
+#ybody#ybody .u-container, [data-layer-id].u-container {
+  width: 100% !important;
+  max-width: var(--site--viewport-max, 1440px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-left: var(--site--margin-fluid) !important;
+  padding-right: var(--site--margin-fluid) !important;
+}
+
+#ybody#ybody .u-container-full, [data-layer-id].u-container-full { width: 100% !important; max-width: none !important; padding-inline: 0 !important; }
+#ybody#ybody .u-padding-left-site, [data-layer-id].u-padding-left-site { padding-left: var(--site--margin-fluid) !important; }
+#ybody#ybody .u-padding-right-site, [data-layer-id].u-padding-right-site { padding-right: var(--site--margin-fluid) !important; }
 
 /* --- 12. RESPONSIVE & VISUALIZER --- */
-@media screen and (max-width: 991px) { :root { --site--column-count: 8; } }
-@media screen and (max-width: 479px) { :root { --site--column-count: 4; } .u-col-6 { flex: 0 0 100% !important; max-width: 100% !important; } }
+@media screen and (max-width: 991px) { :root { --site--column-count: 12; } }
+@media screen and (max-width: 767px) { 
+  #ybody#ybody .u-grid { grid-template-columns: 1fr !important; }
+  #ybody [class*="u-col-span-"] { grid-column: span 1 / span 1 !important; }
+}
+@media screen and (max-width: 479px) { :root { --site--column-count: 12; } }
 
-html, body { height: 100%; margin: 0; }
-.dev-grid_wrapper { position: fixed !important; inset: 0 !important; z-index: 999999; pointer-events: none; }
+html:has(#ybody), body:has(#ybody) { height: 100% !important; margin: 0 !important; }
+.dev-grid_wrapper { position: fixed !important; inset: 0 !important; z-index: 999999 !important; pointer-events: none !important; }
 .dev-grid_wrapper .u-container, .dev-grid_wrapper .u-grid { height: 100% !important; }
 body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; background-color: rgba(255, 0, 0, 0.05) !important; border-inline: 1px solid rgba(255, 0, 0, 0.1) !important; }
+
+/* Hauteur Canva Fix */
+.ycode-canvas, #ybody {
+  min-height: 100vh !important;
+  padding-bottom: 30vh !important;
+}
 @media (max-width: 991px) { .dev-grid_wrapper .u-grid > div:nth-child(n+9) { display: none !important; } }
 @media (max-width: 479px) { .dev-grid_wrapper .u-grid > div:nth-child(n+5) { display: none !important; } }
+
+
+/* --- 14. SUR-SPÉCIFICITÉ : TYPOGRAPHY UTILITIES --- */
+/* Placed at the very bottom to ensure they override everything else */
+
+#ybody#ybody .u-text-display, [data-ycode-canvas][data-ycode-canvas] .u-text-display, [data-layer-id].u-text-display, .ycode-canvas .u-text-display { 
+  --min: var(--_typography---font-size--display-min, 5);
+  --max: var(--_typography---font-size--display-max, 12);
+  --v-min: var(--site--viewport-min, 20);
+  --v-max: var(--site--viewport-max, 90);
+  font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
+  line-height: var(--_text-style---line-height, 1.2) !important; 
+}
+
+#ybody#ybody .u-text-h1, [data-ycode-canvas][data-ycode-canvas] .u-text-h1, [data-layer-id].u-text-h1, .ycode-canvas .u-text-h1 { 
+  --min: var(--_typography---font-size--h1-min, 2);
+  --max: var(--_typography---font-size--h1-max, 5.7);
+  --v-min: var(--site--viewport-min, 20);
+  --v-max: var(--site--viewport-max, 90);
+  font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
+  line-height: var(--_text-style---line-height, 1.2) !important; 
+}
+
+#ybody#ybody .u-text-h2, [data-ycode-canvas][data-ycode-canvas] .u-text-h2, [data-layer-id].u-text-h2, .ycode-canvas .u-text-h2 { 
+  --min: var(--_typography---font-size--h2-min, 1.75);
+  --max: var(--_typography---font-size--h2-max, 4.4);
+  --v-min: var(--site--viewport-min, 20);
+  --v-max: var(--site--viewport-max, 90);
+  font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
+  line-height: var(--_text-style---line-height, 1.2) !important; 
+}
+
+#ybody#ybody .u-text-h3, [data-ycode-canvas][data-ycode-canvas] .u-text-h3, [data-layer-id].u-text-h3, .ycode-canvas .u-text-h3 { 
+  --min: var(--_typography---font-size--h3-min, 1.5);
+  --max: var(--_typography---font-size--h3-max, 2.5);
+  --v-min: var(--site--viewport-min, 20);
+  --v-max: var(--site--viewport-max, 90);
+  font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
+  line-height: var(--_text-style---line-height, 1.2) !important; 
+}
+
+#ybody#ybody .u-text-h4, [data-ycode-canvas][data-ycode-canvas] .u-text-h4, [data-layer-id].u-text-h4, .ycode-canvas .u-text-h4 { 
+  --min: var(--_typography---font-size--h4-min, 1.25);
+  --max: var(--_typography---font-size--h4-max, 2);
+  --v-min: var(--site--viewport-min, 20);
+  --v-max: var(--site--viewport-max, 90);
+  font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
+  line-height: var(--_text-style---line-height, 1.2) !important; 
+}
+
+#ybody#ybody .u-text-h5, [data-ycode-canvas][data-ycode-canvas] .u-text-h5, [data-layer-id].u-text-h5, .ycode-canvas .u-text-h5 { 
+  --min: var(--_typography---font-size--h5-min, 1.125);
+  --max: var(--_typography---font-size--h5-max, 1.5);
+  --v-min: var(--site--viewport-min, 20);
+  --v-max: var(--site--viewport-max, 90);
+  font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
+  line-height: var(--_text-style---line-height, 1.2) !important; 
+}
+
+#ybody#ybody .u-text-h6, [data-ycode-canvas][data-ycode-canvas] .u-text-h6, [data-layer-id].u-text-h6, .ycode-canvas .u-text-h6 { 
+  --min: var(--_typography---font-size--h6-min, 1);
+  --max: var(--_typography---font-size--h6-max, 1.25);
+  --v-min: var(--site--viewport-min, 20);
+  --v-max: var(--site--viewport-max, 90);
+  font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
+  line-height: var(--_text-style---line-height, 1.2) !important; 
+}
+
+#ybody#ybody .u-text-large, [data-ycode-canvas][data-ycode-canvas] .u-text-large, [data-layer-id].u-text-large, .ycode-canvas .u-text-large { 
+  --min: var(--_typography---font-size--text-large-min, 1.125);
+  --max: var(--_typography---font-size--text-large-max, 1.375);
+  --v-min: var(--site--viewport-min, 20);
+  --v-max: var(--site--viewport-max, 90);
+  font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
+  line-height: var(--_text-style---line-height, 1.2) !important; 
+}
+
+#ybody#ybody .u-text-main, [data-ycode-canvas][data-ycode-canvas] .u-text-main, [data-layer-id].u-text-main, .ycode-canvas .u-text-main { 
+  --min: var(--_typography---font-size--text-main-min, 1);
+  --max: var(--_typography---font-size--text-main-max, 1.125);
+  --v-min: var(--site--viewport-min, 20);
+  --v-max: var(--site--viewport-max, 90);
+  font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
+  line-height: var(--_text-style---line-height, 1.2) !important; 
+}
+
+#ybody#ybody .u-text-small, [data-ycode-canvas][data-ycode-canvas] .u-text-small, [data-layer-id].u-text-small, .ycode-canvas .u-text-small { 
+  --min: var(--_typography---font-size--text-small-min, 0.75);
+  --max: var(--_typography---font-size--text-small-max, 0.875);
+  --v-min: var(--site--viewport-min, 20);
+  --v-max: var(--site--viewport-max, 90);
+  font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
+  line-height: var(--_text-style---line-height, 1.2) !important; 
+}
 
 /* LUMOS_CORE_END */

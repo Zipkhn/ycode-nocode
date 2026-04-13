@@ -163,13 +163,33 @@ export function getCanvasIframeHtml(mountId: string = 'canvas-mount'): string {
     }
   </style>
   <link rel="stylesheet" href="/canvas.css?v=0.2.1.1">
-  <link rel="stylesheet" href="/global-theme.css">
   <style id="ycode-viewport-overrides">
     /* Dynamically populated: overrides vh/svh/dvh/lvh with fixed px values */
+  </style>
+  <style id="lumos-runtime-css">
+    /* Injected at runtime by Canvas.tsx to ensure priority and bypass caching */
   </style>
 </head>
 <body class="h-full">
   <div id="${mountId}" class="contents"></div>
 </body>
 </html>`;
+}
+
+/**
+ * Injects or updates the Lumos theme CSS directly into the canvas document
+ * as a raw <style> block. This provides higher priority than external links
+ * and avoids all cache-related issues.
+ */
+export function injectLumosTheme(doc: Document, css: string): void {
+  let styleEl = doc.getElementById('lumos-runtime-css') as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = doc.createElement('style');
+    styleEl.id = 'lumos-runtime-css';
+    doc.head.appendChild(styleEl);
+  }
+  
+  if (styleEl.textContent !== css) {
+    styleEl.textContent = css;
+  }
 }

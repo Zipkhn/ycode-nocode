@@ -18,7 +18,7 @@ import { createRoot, Root } from 'react-dom/client';
 import LayerRenderer from '@/components/LayerRenderer';
 import { serializeLayers, getClassesString } from '@/lib/layer-utils';
 import { collectEditorHiddenLayerIds } from '@/lib/animation-utils';
-import { getCanvasIframeHtml, updateViewportOverrides, measureContentExtent } from '@/lib/canvas-utils';
+import { getCanvasIframeHtml, updateViewportOverrides, measureContentExtent, injectLumosTheme } from '@/lib/canvas-utils';
 import { CanvasPortalProvider } from '@/lib/canvas-portal-context';
 import { cn } from '@/lib/utils';
 import { loadSwiperCss } from '@/lib/slider-utils';
@@ -477,6 +477,29 @@ export default function Canvas({
     }
     styleEl.textContent = colorVarCss;
   }, [iframeReady, colorVarCss]);
+
+  // Inject Lumos theme CSS directly as a style block (bypass caching and ensure priority)
+  useEffect(() => {
+    if (!iframeReady || !iframeRef.current) return;
+    const iframeDoc = iframeRef.current.contentDocument;
+    if (!iframeDoc) return;
+
+    const syncTheme = async () => {
+      try {
+        const response = await fetch(`/global-theme.css?v=${Date.now()}`);
+        if (!response.ok) return;
+        const css = await response.text();
+        injectLumosTheme(iframeDoc, css);
+      } catch (error) {
+        console.warn('Failed to sync Lumos theme to canvas:', error);
+      }
+    };
+
+    syncTheme();
+
+    // Re-sync on certain editor events if needed, but for now, the effect handles initial state.
+    // In the future, we could trigger this on a global "theme-updated" event.
+  }, [iframeReady]);
 
   // Render content into iframe
   useEffect(() => {

@@ -1,4 +1,4 @@
-@import "./global-theme.css";
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -277,3 +277,5 @@
 [data-sonner-toast][data-styled='true'] [data-content] {
   gap: 0;
 }
+
+@import "./global-theme.css";
