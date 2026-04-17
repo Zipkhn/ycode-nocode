@@ -56,6 +56,12 @@
   --_text-style---trim-top: 0.39em;
   --_text-style---trim-bottom: 0.37em;
   --_text-style---optical-offset: -0.08em;
+
+  /* --- 5b. FONT ROLE VARIABLES --- */
+  /* Assign font roles to each part of the typography system.
+     Default: inherit (no change). Set via the Lumos panel. */
+  --_typography---font-family-headings: 'Poppins', sans-serif;
+  --_typography---font-family-body: 'Poppins', sans-serif;
   
   /* --- 6. CORE COLORS --- */
   --color--primary: #5465FF;
@@ -110,6 +116,48 @@
   line-height: var(--_text-style---line-height) !important;
   margin-bottom: var(--_text-style---margin-bottom) !important;
 }
+
+/* --- 6.2 FONT ROLES (Headings vs Body) --- */
+
+/* Variables déclarées DANS l'iframe (sur #ybody) pour qu'elles soient
+   accessibles aux enfants — pas sur :root (page principale de l'éditeur) */
+#ybody {
+  --_typography---font-family-headings: 'Poppins', sans-serif;
+  --_typography---font-family-body: 'Poppins', sans-serif;
+}
+
+/* 1. ROLE PRIMAIRE : Titres et Grands textes
+   On utilise :where() pour la spécificité de base + un sélecteur de classe wildcard
+   pour attraper les classes dynamiques de Ycode (ex: .u-text-h1, .u-text-style-h2…) */
+:is(#ybody, .y-canvas, [data-ycode-canvas]) :is(
+  h1, h2, h3, h4, h5, h6,
+  [class*="u-text-h"], [class*="u-text-display"],
+  .u-text-style-display, .u-text-style-h1, .u-text-style-h2, .u-text-style-h3
+),
+:is(#ybody, .y-canvas, [data-ycode-canvas]) h1,
+:is(#ybody, .y-canvas, [data-ycode-canvas]) h2,
+:is(#ybody, .y-canvas, [data-ycode-canvas]) h3,
+:is(#ybody, .y-canvas, [data-ycode-canvas]) h4,
+:is(#ybody, .y-canvas, [data-ycode-canvas]) h5,
+:is(#ybody, .y-canvas, [data-ycode-canvas]) h6 {
+  font-family: var(--_typography---font-family-headings, inherit) !important;
+}
+
+/* 2. ROLE SECONDAIRE : Corps de texte */
+:is(#ybody, .y-canvas, [data-ycode-canvas]) :is(
+  p, li, span, a, label,
+  [class*="u-text-body"], [class*="u-text-style-p"],
+  .u-text-style-main, .u-text-style-small, .u-text-style-large
+),
+:is(#ybody, .y-canvas, [data-ycode-canvas]) p {
+  font-family: var(--_typography---font-family-body, inherit) !important;
+}
+
+/* Exception : code/pre — toujours monospace */
+:is(#ybody, .y-canvas, [data-ycode-canvas]) :is(code, pre) {
+  font-family: monospace !important;
+}
+
 /* --- 6.1 TEXT TRIM (Le moteur de précision) --- */
 
 /* On cible les titres, paragraphes et classes de style, 
@@ -128,6 +176,89 @@
 	display: table !important;
 	margin-bottom: calc(-0.5lh + var(--_text-style---trim-bottom)) !important;
 }
+
+/* ============================================================
+   6.3  BASELINE-LOCK v6.7 — CORRECTIF BULLETPROOF ÉDITION
+   ============================================================
+   DIAGNOSTIC: Toutes les tentatives précédentes avaient un vice
+   fondamental : on désactivait le Trim sur l'élément PARENT
+   (h1, .u-text-display…), ce qui CHANGEAIT ses dimensions et
+   provoquait le "saut" lors du double-clic.
+
+   STRATÉGIE CORRECTE :
+   • Laisser le Trim du PARENT intact → ses dimensions ne bougent pas.
+   • Tuer uniquement le Trim sur le <p> INTERNE injecté par ProseMirror
+     (ce <p> héritait les sélecteurs Capsize → "double trim" fatal).
+   • Le wrapper .y-text-editor remplit le parent exactement.
+   ============================================================ */
+
+/* 1. Wrapper .y-text-editor / ProseMirror — remplit le parent exactement.
+      PAS de flex, PAS de dimensions modifiées. Héritage total. */
+#ybody .y-text-editor,
+#ybody .ProseMirror {
+  display: block !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  /* Héritage typographique complet */
+  font-size: inherit !important;
+  font-family: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+  letter-spacing: inherit !important;
+  text-transform: inherit !important;
+  color: inherit !important;
+  caret-color: currentColor;
+}
+
+/* 2. Le <p> interne NE DOIT PAS hériter les sélecteurs de Trim du parent.
+      On neutralise les variables à la source → calc(-0.5lh + 0em) = -0.5lh
+      → compensé par le display: table lui-même → résultat net = 0 espace */
+#ybody .y-text-editor p,
+#ybody .ProseMirror p,
+#ybody [contenteditable="true"] p {
+  --_text-style---trim-top: 0em !important;
+  --_text-style---trim-bottom: 0em !important;
+  font-size: inherit !important;
+  font-family: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+  letter-spacing: inherit !important;
+  text-transform: inherit !important;
+  color: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 3. Supprimer les pseudo-éléments Capsize sur le <p> INTERNE uniquement.
+      On cible p::before et p::after — PAS l'élément parent —
+      pour préserver les dimensions du conteneur. */
+#ybody .y-text-editor p::before,
+#ybody .y-text-editor p::after,
+#ybody .ProseMirror p::before,
+#ybody .ProseMirror p::after,
+#ybody [contenteditable="true"] p::before,
+#ybody [contenteditable="true"] p::after {
+  content: none !important;
+  display: none !important;
+  margin: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+
+/* 4. Spans / em / strong injectés par Tiptap — aussi sans Trim */
+#ybody .y-text-editor :is(span, em, strong, s, u, a, code),
+#ybody .ProseMirror :is(span, em, strong, s, u, a, code) {
+  --_text-style---trim-top: 0em !important;
+  --_text-style---trim-bottom: 0em !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
 /* --- 7. TYPOGRAPHY CLASSES --- */
 /* Écrasement du Reset Tailwind */
 #ybody h1 h2 h3 h4 h5 h6 p div {
