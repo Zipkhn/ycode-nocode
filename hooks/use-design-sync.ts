@@ -603,8 +603,8 @@ function mapClassToDesignValue(className: string, property: string): string | un
     minWidth: 'min-w-',
     maxHeight: 'max-h-',
     minHeight: 'min-h-',
-    gridColumnSpan: 'col-span-',
-    gridRowSpan: 'row-span-',
+    gridColumnSpan: 'u-col-span-',
+    gridRowSpan: 'u-row-span-',
   };
 
   const knownPrefix = multiSegmentPrefixes[property];

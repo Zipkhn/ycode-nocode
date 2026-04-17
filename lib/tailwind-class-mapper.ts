@@ -205,7 +205,7 @@ function formatMeasurementClass(
  */
 const CLASS_PROPERTY_MAP: Record<string, RegExp> = {
   // Display & Layout
-  display: /^(block|inline-block|inline|flex|inline-flex|grid|inline-grid|hidden)$/,
+  display: /^(block|inline-block|inline|flex|inline-flex|grid|u-grid|inline-grid|hidden)$/,
   flexDirection: /^flex-(row|row-reverse|col|col-reverse)$/,
   flexWrap: /^flex-(wrap|wrap-reverse|nowrap)$/,
   justifyContent: /^justify-(start|end|center|between|around|evenly|stretch)$/,
@@ -239,8 +239,8 @@ const CLASS_PROPERTY_MAP: Record<string, RegExp> = {
   overflow: /^overflow-(visible|hidden|clip|scroll|auto|x-visible|x-hidden|x-clip|x-scroll|x-auto|y-visible|y-hidden|y-clip|y-scroll|y-auto)$/,
   aspectRatio: /^aspect-(\[.+\]|auto|square|video)$/,
   objectFit: /^object-(contain|cover|fill|none|scale-down)$/,
-  gridColumnSpan: /^col-span-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/,
-  gridRowSpan: /^row-span-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/,
+  gridColumnSpan: /^(?:col-span|u-col-span)-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/,
+  gridRowSpan: /^(?:row-span|u-row-span)-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/,
 
   // Typography
   fontFamily: /^font-(sans|serif|mono|\[.+\])$/,
@@ -502,6 +502,8 @@ export function propertyToClass(
   if (category === 'layout') {
     switch (property) {
       case 'display':
+        // Lumos native: emit u-grid instead of grid
+        if (value.toLowerCase() === 'grid') return 'u-grid';
         return value.toLowerCase();
       case 'flexDirection':
         if (value === 'row') return 'flex-row';
@@ -706,14 +708,14 @@ export function propertyToClass(
       return `object-${value}`;
     }
 
-    // Grid Column Span
+    // Grid Column Span (Lumos native)
     if (property === 'gridColumnSpan') {
-      return value === 'full' ? 'col-span-full' : `col-span-${value}`;
+      return value === 'full' ? 'u-col-span-full' : `u-col-span-${value}`;
     }
 
-    // Grid Row Span
+    // Grid Row Span (Lumos native)
     if (property === 'gridRowSpan') {
-      return value === 'full' ? 'row-span-full' : `row-span-${value}`;
+      return value === 'full' ? 'u-row-span-full' : `u-row-span-${value}`;
     }
   }
 

@@ -30,15 +30,13 @@ function healGlobalTheme() {
 
   console.log('🛡️  Running Lumos CSS Guardian...');
 
-  // 1. Ensure Doubled IDs for Utilitates
-  // First, collapse any multiple occurrences back to single
-  content = content.replace(/(#ybody){2,}/g, '#ybody');
-  content = content.replace(/(\[data-ycode-canvas\]){2,}/g, '[data-ycode-canvas]');
-  
-  // Then apply doubling for the specific classes we want to boost
-  // We only boost classes starting with .u-
-  content = content.replace(/#ybody\s+\.u-/g, '#ybody#ybody .u-');
-  content = content.replace(/\[data-ycode-canvas\]\s+\.u-/g, '[data-ycode-canvas][data-ycode-canvas] .u-');
+  // 1. Collapse any leftover doubled IDs from previous versions
+  content = content.replace(/#ybody#ybody/g, '#ybody');
+
+  // Clean up ghost selectors from legacy patches
+  content = content.replace(/\[data-ycode-canvas\]/g, '#ybody');
+  content = content.replace(/,\s*\[data-layer-id\]\.u-[-a-zA-Z0-9]+/g, '');
+  content = content.replace(/,\s*\.ycode-canvas\s+\.u-[-a-zA-Z0-9]+/g, '');
 
   // 2. Ensure Base Tag Neutralization
   // First, remove any existing :not() selectors to avoid doubling up
@@ -64,15 +62,23 @@ function healGlobalTheme() {
       }
   }
 
-  // 4. Mobile Stacking Check (767px)
-  if (!content.includes('max-width: 767px')) {
-      const mobileStacking = `
-@media (max-width: 767px) {
-  #ybody#ybody .u-grid { grid-template-columns: 1fr !important; }
-  #ybody#ybody [class*="u-col-span-"] { grid-column: span 1 / span 1 !important; }
-}`;
-      content = content.replace('/* LUMOS_CORE_END */', `${mobileStacking}\n\n/* LUMOS_CORE_END */`);
+  // 4. Generate & Lock Grid Spans 1-12 (simple #ybody, no doubling needed)
+  let spansCSS = '/* Grid Spans 1-12 (Lumos Native) */\n';
+  for (let i = 1; i <= 12; i++) {
+    spansCSS += `#ybody .u-col-span-${i} { grid-column: span ${i} / span ${i} !important; width: 100% !important; box-sizing: border-box !important; }\n`;
   }
+  spansCSS += `#ybody .u-col-span-full { grid-column: 1 / -1 !important; width: 100% !important; }\n`;
+  
+  // Strip out old span definitions
+  content = content.replace(/\/\*\s*Grid Spans 1-12.*?\*\/\s*(#ybody\s*\.u-col-span-\d+.*?\}\s*)+/gs, '');
+  content = content.replace(/#ybody\s+\.u-col-span-\d+\s*\{[^}]*\}\s*/g, '');
+  content = content.replace(/#ybody\s+\.u-col-span-full\s*\{[^}]*\}\s*/g, '');
+  
+  // Insert spans right after .u-grid definition
+  content = content.replace(/(\.u-grid\s*\{[^}]*\}\s*)/, `$1\n${spansCSS}\n`);
+
+  // 5. Mobile Stacking Cleanup — remove any rogue mobile overrides
+  content = content.replace(/@media\s*\([^)]*\)\s*\{\s*#ybody\s*\.u-grid\s*\{\s*grid-template-columns[^}]*\}\s*#ybody\s*\[class\*="u-col-span-"\][^}]*\}\s*\}/g, '');
 
   if (content !== originalContent) {
     fs.writeFileSync(publicThemePath, content, 'utf8');
