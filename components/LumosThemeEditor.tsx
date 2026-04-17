@@ -241,6 +241,7 @@ export default function LumosThemeEditor() {
             <h4 className="text-xs font-semibold mb-2">Text Trim (Capsize)</h4>
             {renderTextInput('Trim Top (em)', '_text-style---trim-top')}
             {renderTextInput('Trim Bottom (em)', '_text-style---trim-bottom')}
+            {renderTextInput('Optical Offset (em)', '_text-style---optical-offset')}
           </div>
         </>
       ))}

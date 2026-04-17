@@ -239,8 +239,9 @@ const CLASS_PROPERTY_MAP: Record<string, RegExp> = {
   overflow: /^overflow-(visible|hidden|clip|scroll|auto|x-visible|x-hidden|x-clip|x-scroll|x-auto|y-visible|y-hidden|y-clip|y-scroll|y-auto)$/,
   aspectRatio: /^aspect-(\[.+\]|auto|square|video)$/,
   objectFit: /^object-(contain|cover|fill|none|scale-down)$/,
-  gridColumnSpan: /^(?:col-span|u-col-span)-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/,
-  gridRowSpan: /^(?:row-span|u-row-span)-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/,
+  // Lumos-only: only detect u-col-span-/u-row-span- as conflicts (native Tailwind col-span-/row-span- is never emitted)
+  gridColumnSpan: /^u-col-span-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/,
+  gridRowSpan: /^u-row-span-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/,
 
   // Typography
   fontFamily: /^font-(sans|serif|mono|\[.+\])$/,
@@ -555,6 +556,14 @@ export function propertyToClass(
       case 'gridTemplateRows':
         // Replace spaces with underscores for Tailwind arbitrary value syntax
         return `grid-rows-[${value.replace(/\s+/g, '_')}]`;
+      case 'gridColumnSpan':
+        // Lumos native: always emit u-col-span-{N}. "full" collapses to the 12-column max.
+        if (value === 'full') return 'u-col-span-12';
+        return `u-col-span-${value}`;
+      case 'gridRowSpan':
+        // Lumos native: always emit u-row-span-{N}. "full" collapses to the 12-row max.
+        if (value === 'full') return 'u-row-span-12';
+        return `u-row-span-${value}`;
     }
   }
 

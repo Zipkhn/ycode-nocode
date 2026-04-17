@@ -55,6 +55,7 @@
   --_text-style---margin-bottom: 0rem;
   --_text-style---trim-top: 0.39em;
   --_text-style---trim-bottom: 0.37em;
+  --_text-style---optical-offset: -0.08em;
   
   /* --- 6. CORE COLORS --- */
   --color--primary: #5465FF;
@@ -140,6 +141,29 @@
 #ybody h4 { font-size: clamp(var(--_typography---font-size--h4-min) * 1rem, var(--_typography---font-size--h4-min) * 1rem + (var(--_typography---font-size--h4-max) - var(--_typography---font-size--h4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h4-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
 #ybody h5 { font-size: clamp(var(--_typography---font-size--h5-min) * 1rem, var(--_typography---font-size--h5-min) * 1rem + (var(--_typography---font-size--h5-max) - var(--_typography---font-size--h5-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h5-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
 #ybody h6 { font-size: clamp(var(--_typography---font-size--h6-min) * 1rem, var(--_typography---font-size--h6-min) * 1rem + (var(--_typography---font-size--h6-max) - var(--_typography---font-size--h6-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h6-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
+
+/* --- 7.1 OPTICAL ALIGNMENT (POLISH) --- */
+
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-text-display,
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-full h1,
+:is(#ybody, .y-canvas, [data-ycode-canvas]) h1.u-text-display {
+  /* Offset optique par défaut — Connecté au panel Lumos */
+  margin-left: var(--_text-style---optical-offset, 0em) !important;
+}
+
+/* --- 7.2 CONFIGURATION PAR FAMILLE DE TYPO --- */
+
+/* Sans-Serif (Inter) : Souvent besoin d'un décalage plus fort */
+:is(#ybody, .y-canvas, [data-ycode-canvas]) :is([style*="font-family: 'Inter'"], [style*="font-family: Inter"], [style*="font-family: 'Inter var'"], [style*="font-family: Inter var"]) {
+  /* On surcharge la variable pour cette police spécifique */
+  --_text-style---optical-offset: -0.08em;
+}
+
+/* Serif (Playfair Display) : Décalage plus subtil */
+:is(#ybody, .y-canvas, [data-ycode-canvas]) :is([style*="font-family: 'Playfair Display'"], [style*="font-family: Playfair Display"]) {
+  /* On surcharge la variable pour cette police spécifique */
+  --_text-style---optical-offset: -0.08em;
+}
 #ybody p { font-size: clamp(var(--_typography---font-size--text-main-min) * 1rem, var(--_typography---font-size--text-main-min) * 1rem + (var(--_typography---font-size--text-main-max) - var(--_typography---font-size--text-main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--text-main-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
 
 
@@ -147,11 +171,13 @@
 #ybody .u-row { display: flex !important; flex-wrap: wrap !important; margin-inline: calc(var(--site--gutter) * -1) !important; }
 #ybody .u-col { flex: 1 1 0% !important; padding-inline: var(--site--gutter) !important; }
 
-/* Grid Parent */
-#ybody .u-grid {
+/* Grid Parent — BRIDGE LUMOS ↔ NOTRE VARIABLE */
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-grid {
+  /* Pont : force la variable interne Lumos à lire la nôtre (Nombre de colonnes) */
+  --_column-count---value: var(--site--column-count, 12) !important;
   display: grid !important;
   width: 100% !important;
-  grid-template-columns: repeat(var(--site--column-count, 12), minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(var(--_column-count---value), minmax(0, 1fr)) !important;
   column-gap: var(--site--gutter, 1rem) !important;
   row-gap: var(--site--gutter, 1rem) !important;
 }
@@ -163,20 +189,35 @@
 
 
 
-/* Grid Spans 1-12 (Lumos Native) */
-#ybody .u-col-span-1 { grid-column: span 1 / span 1 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-2 { grid-column: span 2 / span 2 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-3 { grid-column: span 3 / span 3 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-4 { grid-column: span 4 / span 4 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-5 { grid-column: span 5 / span 5 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-6 { grid-column: span 6 / span 6 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-7 { grid-column: span 7 / span 7 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-8 { grid-column: span 8 / span 8 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-9 { grid-column: span 9 / span 9 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-10 { grid-column: span 10 / span 10 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-11 { grid-column: span 11 / span 11 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-12 { grid-column: span 12 / span 12 !important; width: 100% !important; box-sizing: border-box !important; }
-#ybody .u-col-span-full { grid-column: 1 / -1 !important; width: 100% !important; }
+
+
+
+
+
+
+
+
+
+
+
+
+/* LUMOS_SPANS_START */
+/* Grid Spans 1-12 (Lumos Native — generated) */
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-1 { grid-column: span 1 / span 1 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-2 { grid-column: span 2 / span 2 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-3 { grid-column: span 3 / span 3 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-4 { grid-column: span 4 / span 4 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-5 { grid-column: span 5 / span 5 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-6 { grid-column: span 6 / span 6 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-7 { grid-column: span 7 / span 7 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-8 { grid-column: span 8 / span 8 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-9 { grid-column: span 9 / span 9 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-10 { grid-column: span 10 / span 10 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-11 { grid-column: span 11 / span 11 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-12 { grid-column: span 12 / span 12 !important; box-sizing: border-box !important; }
+:is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-full { grid-column: 1 / -1 !important; }
+/* LUMOS_SPANS_END */
+
 
 /* Grid Row Spans 1-12 */
 #ybody .u-row-span-1 { grid-row: span 1 / span 1 !important; }
@@ -240,14 +281,15 @@
 #ybody .u-padding-right-site { padding-right: var(--site--margin-fluid) !important; }
 
 /* --- 12. RESPONSIVE & VISUALIZER --- */
-@media screen and (max-width: 991px) { :root { --site--column-count: 12; } }
-
-@media screen and (max-width: 479px) { :root { --site--column-count: 12; } }
 
 html:has(#ybody), body:has(#ybody) { height: 100% !important; margin: 0 !important; }
 .dev-grid_wrapper { position: fixed !important; inset: 0 !important; z-index: 999999 !important; pointer-events: none !important; }
 .dev-grid_wrapper .u-container, .dev-grid_wrapper .u-grid { height: 100% !important; }
 body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; background-color: rgba(255, 0, 0, 0.05) !important; border-inline: 1px solid rgba(255, 0, 0, 0.1) !important; }
+/* Supprime ou commente ces blocs qui forcent 12 colonnes sur petit écran */
+
+
+
 
 /* Hauteur Canva Fix */
 #ybody {
@@ -349,6 +391,57 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   --v-max: var(--site--viewport-max, 90);
   font-size: clamp(calc(var(--min) * 1rem), calc(var(--min) * 1rem + (var(--max) - var(--min)) * (100vw - var(--v-min) * 1rem) / (var(--v-max) - var(--v-min))), calc(var(--max) * 1rem)) !important; 
   line-height: var(--_text-style---line-height, 1.2) !important; 
+}
+
+
+/* --- Responsive Breakpoints (Lumos) --- */
+
+/* Tablette (768px - 991px) : 6 colonnes */
+@media screen and (max-width: 991px) {
+  :is(#ybody, .y-canvas, [data-ycode-canvas]) { --site--column-count: 6 !important; }
+  
+  :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+
+  :is(#ybody, .y-canvas, [data-ycode-canvas]) :is(
+    .u-col-span-6, 
+    .u-col-span-7, 
+    .u-col-span-8, 
+    .u-col-span-9, 
+    .u-col-span-10, 
+    .u-col-span-11, 
+    .u-col-span-12, 
+    .u-col-span-full
+  ) {
+    grid-column: span 6 / span 6 !important;
+  }
+}
+
+/* Mobile (< 768px) : 4 colonnes */
+@media screen and (max-width: 767px) {
+  :is(#ybody, .y-canvas, [data-ycode-canvas]) { --site--column-count: 4 !important; }
+
+  :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  /* Spans larges repliés sur 4/4 */
+  :is(#ybody, .y-canvas, [data-ycode-canvas]) :is(
+    .u-col-span-4, 
+    .u-col-span-5, 
+    .u-col-span-6, 
+    .u-col-span-7, 
+    .u-col-span-8, 
+    .u-col-span-9, 
+    .u-col-span-10, 
+    .u-col-span-11, 
+    .u-col-span-12, 
+    .u-col-span-full
+  ) {
+    grid-column: span 4 / span 4 !important;
+    width: 100% !important;
+  }
 }
 
 /* LUMOS_CORE_END */

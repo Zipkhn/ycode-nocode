@@ -6,125 +6,165 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const globalsCssPath = path.join(rootDir, 'app', 'globals.css');
-const canvasUtilsPath = path.join(rootDir, 'lib', 'canvas-utils.ts');
 const publicThemePath = path.join(rootDir, 'public', 'global-theme.css');
-const appThemePath = path.join(rootDir, 'app', 'global-theme.css');
+const appThemePath    = path.join(rootDir, 'app',    'global-theme.css');
+const canvasUtilsPath = path.join(rootDir, 'lib',    'canvas-utils.ts');
 
-const globalsImportStatement = '@import "./global-theme.css";';
 const canvasStylePlaceholder = `  <style id="lumos-runtime-css">
     /* Injected at runtime by Canvas.tsx to ensure priority and bypass caching */
   </style>`;
 
 /**
- * GUARDIAN LOGIC: Heal public/global-theme.css to ensure Sur-Spécificité
+ * Generate the u-col-span-* CSS and write it directly into public/global-theme.css
+ * between the LUMOS_CORE_START and LUMOS_CORE_END markers.
+ * No destructive regex — we simply replace the generated block each time.
  */
-function healGlobalTheme() {
+function generateAndInjectSpans() {
   if (!fs.existsSync(publicThemePath)) {
     console.error('❌ Could not find public/global-theme.css');
     return;
   }
 
-  let content = fs.readFileSync(publicThemePath, 'utf8');
-  let originalContent = content;
-
   console.log('🛡️  Running Lumos CSS Guardian...');
 
-  // 1. Collapse any leftover doubled IDs from previous versions
-  content = content.replace(/#ybody#ybody/g, '#ybody');
+  let content = fs.readFileSync(publicThemePath, 'utf8');
 
-  // Clean up ghost selectors from legacy patches
-  content = content.replace(/\[data-ycode-canvas\]/g, '#ybody');
-  content = content.replace(/,\s*\[data-layer-id\]\.u-[-a-zA-Z0-9]+/g, '');
-  content = content.replace(/,\s*\.ycode-canvas\s+\.u-[-a-zA-Z0-9]+/g, '');
-
-  // 2. Ensure Base Tag Neutralization
-  // First, remove any existing :not() selectors to avoid doubling up
-  content = content.replace(/:not\(\[class\*="u-text-"\]\)/g, '');
-  
-  // Then re-apply to heading/paragraph resets in the transition section
-  const tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p'];
-  tags.forEach(tag => {
-    const tagRegex = new RegExp(`(?<=:is\\(#ybody,.*\\)\\s+)${tag}`, 'g');
-    content = content.replace(tagRegex, `${tag}:not([class*="u-text-"])`);
-  });
-
-  // 3. Ensure Grid Stabilization
-  if (!content.includes('.u-grid')) {
-      console.warn('⚠️  .u-grid not found in CSS, skipping grid healing');
-  } else {
-      // Ensure width: 100% !important and gaps are present
-      if (!content.includes('width: 100% !important')) {
-          content = content.replace(/\.u-grid\s*\{([^}]*)\}/, (match, p1) => {
-              if (p1.includes('width: 100% !important')) return match;
-              return `.u-grid {${p1.trim()}\n  width: 100% !important;\n}`;
-          });
-      }
-  }
-
-  // 4. Generate & Lock Grid Spans 1-12 (simple #ybody, no doubling needed)
-  let spansCSS = '/* Grid Spans 1-12 (Lumos Native) */\n';
+  /* ── 1. Build generated spans block ── */
+  let spansBlock = '\n/* Grid Spans 1-12 (Lumos Native — generated) */\n';
+  const ROOT_SELECTOR = ':is(#ybody, .y-canvas, [data-ycode-canvas])';
   for (let i = 1; i <= 12; i++) {
-    spansCSS += `#ybody .u-col-span-${i} { grid-column: span ${i} / span ${i} !important; width: 100% !important; box-sizing: border-box !important; }\n`;
+    spansBlock += `${ROOT_SELECTOR} .u-col-span-${i} { grid-column: span ${i} / span ${i} !important; box-sizing: border-box !important; }\n`;
   }
-  spansCSS += `#ybody .u-col-span-full { grid-column: 1 / -1 !important; width: 100% !important; }\n`;
-  
-  // Strip out old span definitions
-  content = content.replace(/\/\*\s*Grid Spans 1-12.*?\*\/\s*(#ybody\s*\.u-col-span-\d+.*?\}\s*)+/gs, '');
-  content = content.replace(/#ybody\s+\.u-col-span-\d+\s*\{[^}]*\}\s*/g, '');
-  content = content.replace(/#ybody\s+\.u-col-span-full\s*\{[^}]*\}\s*/g, '');
-  
-  // Insert spans right after .u-grid definition
-  content = content.replace(/(\.u-grid\s*\{[^}]*\}\s*)/, `$1\n${spansCSS}\n`);
+  spansBlock += `${ROOT_SELECTOR} .u-col-span-full { grid-column: 1 / -1 !important; }\n`;
 
-  // 5. Mobile Stacking Cleanup — remove any rogue mobile overrides
-  content = content.replace(/@media\s*\([^)]*\)\s*\{\s*#ybody\s*\.u-grid\s*\{\s*grid-template-columns[^}]*\}\s*#ybody\s*\[class\*="u-col-span-"\][^}]*\}\s*\}/g, '');
+  /* ── 2. Replace the generated block between sentinel comments ── */
+  const START_MARKER = '/* LUMOS_SPANS_START */';
+  const END_MARKER   = '/* LUMOS_SPANS_END */';
 
-  if (content !== originalContent) {
-    fs.writeFileSync(publicThemePath, content, 'utf8');
-    console.log('✅ Healed public/global-theme.css with Sur-Spécificité rules');
-  } else {
-    console.log('✅ public/global-theme.css is already healthy');
-  }
+  const newBlock = `${START_MARKER}${spansBlock}${END_MARKER}`;
 
-  // Sync to app
-  fs.copyFileSync(publicThemePath, appThemePath);
-  console.log('✅ Synchronized healed theme to app/global-theme.css');
-}
-
-// 1. Run CSS Guardian
-healGlobalTheme();
-
-// 2. Patch app/globals.css
-if (fs.existsSync(globalsCssPath)) {
-  let content = fs.readFileSync(globalsCssPath, 'utf8');
-  if (!content.includes(globalsImportStatement)) {
-    content = `${content.trim()}\n\n${globalsImportStatement}\n`;
-    fs.writeFileSync(globalsCssPath, content, 'utf8');
-    console.log('✅ Patched app/globals.css for Lumos Integration');
-  }
-}
-
-// 3. Patch lib/canvas-utils.ts (placeholder guard)
-if (fs.existsSync(canvasUtilsPath)) {
-  let content = fs.readFileSync(canvasUtilsPath, 'utf8');
-  
-  // Clean up any old link tags if they exist
-  const oldLinkRegex = /<link rel="stylesheet" href="\/global-theme\.css\?v=\$\{Date\.now\(\)\}">/g;
-  if (oldLinkRegex.test(content)) {
-    content = content.replace(oldLinkRegex, '');
-    console.log('🚮 Removed legacy global-theme link from canvas-utils.ts');
-  }
-
-  // Ensure placeholder exists
-  if (!content.includes('id="lumos-runtime-css"')) {
+  if (content.includes(START_MARKER) && content.includes(END_MARKER)) {
+    // Replace the existing block cleanly
     content = content.replace(
-      '</head>',
-      `${canvasStylePlaceholder}\n</head>`
+      new RegExp(`${escapeRegex(START_MARKER)}[\\s\\S]*?${escapeRegex(END_MARKER)}`),
+      newBlock
     );
-    fs.writeFileSync(canvasUtilsPath, content, 'utf8');
-    console.log('✅ Patched lib/canvas-utils.ts with Lumos style placeholder');
   } else {
-    console.log('✅ lib/canvas-utils.ts already has Lumos placeholder');
+    // First run: insert after the .u-grid rule
+    content = content.replace(
+      /(:is\(#ybody, .y-canvas, \[data-ycode-canvas\]\)\s+\.u-grid\s*\{[^}]*\}\s*)/,
+      `$1\n${newBlock}\n`
+    );
+  }
+
+  /* ── 3. Fix media queries — align breakpoints ── */
+  // Remove any legacy one-liner @media column-count overrides (old format)
+  content = content.replace(
+    /@media\s+screen\s+and\s+\(max-width:\s*479px\)\s*\{\s*:root\s*\{[^}]*\}\s*\}/g,
+    ''
+  );
+
+  // Always regenerate the responsive block between sentinel comments
+  const RESP_START = '/* --- Responsive Breakpoints (Lumos) --- */';
+  const RESP_END   = '/* LUMOS_CORE_END */';
+
+  const responsiveBlock = `${RESP_START}
+
+/* Tablette (768px - 991px) : 6 colonnes */
+@media screen and (max-width: 991px) {
+  ${ROOT_SELECTOR} { --site--column-count: 6 !important; }
+  
+  ${ROOT_SELECTOR} .u-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+
+  ${ROOT_SELECTOR} :is(
+    .u-col-span-6, 
+    .u-col-span-7, 
+    .u-col-span-8, 
+    .u-col-span-9, 
+    .u-col-span-10, 
+    .u-col-span-11, 
+    .u-col-span-12, 
+    .u-col-span-full
+  ) {
+    grid-column: span 6 / span 6 !important;
   }
 }
+
+/* Mobile (< 768px) : 4 colonnes */
+@media screen and (max-width: 767px) {
+  ${ROOT_SELECTOR} { --site--column-count: 4 !important; }
+
+  ${ROOT_SELECTOR} .u-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  /* Spans larges repliés sur 4/4 */
+  ${ROOT_SELECTOR} :is(
+    .u-col-span-4, 
+    .u-col-span-5, 
+    .u-col-span-6, 
+    .u-col-span-7, 
+    .u-col-span-8, 
+    .u-col-span-9, 
+    .u-col-span-10, 
+    .u-col-span-11, 
+    .u-col-span-12, 
+    .u-col-span-full
+  ) {
+    grid-column: span 4 / span 4 !important;
+    width: 100% !important;
+  }
+}
+
+`;
+
+  if (content.includes(RESP_START)) {
+    // Replace everything from RESP_START up to (but not including) RESP_END
+    content = content.replace(
+      new RegExp(`${escapeRegex(RESP_START)}[\\s\\S]*?(?=${escapeRegex(RESP_END)})`),
+      responsiveBlock
+    );
+  } else {
+    content = content.replace(RESP_END, `${responsiveBlock}${RESP_END}`);
+  }
+
+  /* ── 4. Write public + sync to app ── */
+  fs.writeFileSync(publicThemePath, content, 'utf8');
+  console.log('✅ public/global-theme.css updated');
+
+  fs.copyFileSync(publicThemePath, appThemePath);
+  console.log('✅ Synced → app/global-theme.css');
+}
+
+/* ── Utility ── */
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/* ── Canvas placeholder guard ── */
+function guardCanvasPlaceholder() {
+  if (!fs.existsSync(canvasUtilsPath)) return;
+
+  let content = fs.readFileSync(canvasUtilsPath, 'utf8');
+
+  // Remove old link tags if still present
+  const oldLinkRe = /<link rel="stylesheet" href="\/global-theme\.css\?v=\$\{Date\.now\(\)\}">/g;
+  if (oldLinkRe.test(content)) {
+    content = content.replace(oldLinkRe, '');
+    console.log('🚮 Removed legacy link tag from canvas-utils.ts');
+  }
+
+  if (!content.includes('id="lumos-runtime-css"')) {
+    content = content.replace('</head>', `${canvasStylePlaceholder}\n</head>`);
+    fs.writeFileSync(canvasUtilsPath, content, 'utf8');
+    console.log('✅ Patched canvas-utils.ts with Lumos style placeholder');
+  } else {
+    console.log('✅ canvas-utils.ts already has Lumos placeholder');
+  }
+}
+
+/* ── Run ── */
+generateAndInjectSpans();
+guardCanvasPlaceholder();

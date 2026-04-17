@@ -1,11 +1,21 @@
-
+/* ============================================================
+   1. IMPORTS (doivent être en haut, jamais dans un @layer)
+   ============================================================ */
 @import "tailwindcss";
 @import "tw-animate-css";
+/* Lumos — importé au niveau racine pour éviter CssSyntaxError */
+@import "./global-theme.css";
 
+/* ============================================================
+   2. CUSTOM VARIANTS
+   ============================================================ */
 @custom-variant dark (&:is(.dark *));
 @custom-variant current (&[aria-current]);
 @custom-variant disabled (&:is(:disabled, [aria-disabled]));
 
+/* ============================================================
+   3. THÈME TAILWIND (variables de design de l'app)
+   ============================================================ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -44,29 +54,26 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-
   --animate-shimmer: shimmer 2s ease-in-out infinite;
   --animate-indeterminate: indeterminate 1.5s ease-in-out infinite;
 }
 
+/* ============================================================
+   4. KEYFRAMES
+   ============================================================ */
 @keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @keyframes indeterminate {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(400%);
-  }
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
 }
 
+/* ============================================================
+   5. VARIABLES OKLCH (thème Shadcn/ui)
+   ============================================================ */
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -136,23 +143,14 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ============================================================
+   6. COUCHES TAILWIND
+   ============================================================ */
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-
-  html {
-    @apply h-full;
-  }
-
-  body {
-    @apply bg-background text-foreground h-full;
-  }
-
-  /* Remove focus outline from iframes */
-  iframe:focus {
-    outline: none;
-  }
+  * { @apply border-border outline-ring/50; }
+  html { @apply h-full; }
+  body { @apply bg-background text-foreground h-full; }
+  iframe:focus { outline: none; }
 }
 
 @layer utilities {
@@ -160,112 +158,54 @@
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
   .bg-checkerboard {
-    background-image: repeating-linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc), repeating-linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc);
+    background-image:
+      repeating-linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc),
+      repeating-linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc);
     background-position: 0 0, 4px 4px;
     background-size: 8px 8px;
   }
+
 }
 
-/* Icon SVG styling */
-[data-icon] {
-  display: inline-block;
-}
+/* ============================================================
+   7. STYLES ÉDITEUR (hors @layer — styles globaux du builder)
+   ============================================================ */
 
-[data-icon] svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-  fill: currentColor;
-}
+/* Icon SVG */
+[data-icon] { display: inline-block; }
+[data-icon] svg { width: 100%; height: 100%; display: block; fill: currentColor; }
 
-/* RichTextEditor Styles */
-.rich-text-editor.ProseMirror {
-  @apply outline-none w-full min-h-full;
-}
-
-.rich-text-editor.ProseMirror p {
-  @apply block m-0 p-0;
-}
-
-.rich-text-editor.ProseMirror p.is-editor-empty:first-child {
-  @apply relative;
-}
-
+/* RichTextEditor — Base */
+.rich-text-editor.ProseMirror { @apply outline-none w-full min-h-full; }
+.rich-text-editor.ProseMirror p { @apply block m-0 p-0; }
+.rich-text-editor.ProseMirror p.is-editor-empty:first-child { @apply relative; }
 .rich-text-editor.ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   @apply absolute left-0 top-1/2 -translate-y-1/2 text-current/25 pointer-events-none text-xs leading-[1.375rem] whitespace-nowrap overflow-hidden text-ellipsis max-w-full;
 }
+.rich-text-editor.ProseMirror ul { @apply my-0 ml-[8px] pl-[16px] list-disc; }
+.rich-text-editor.ProseMirror ol { @apply my-0 ml-[8px] pl-[20px] list-decimal; }
+.rich-text-editor.ProseMirror li { @apply my-0 min-h-[1.375rem]; }
+.rich-text-editor.ProseMirror li p { @apply inline; }
+.rich-text-editor.ProseMirror strong { @apply font-bold; }
+.rich-text-editor.ProseMirror em { @apply italic; }
+.rich-text-editor.ProseMirror u { @apply underline; }
+.rich-text-editor.ProseMirror s { @apply line-through; }
 
-.rich-text-editor.ProseMirror ul {
-  @apply my-0 ml-[8px] pl-[16px] list-disc;
-}
-
-.rich-text-editor.ProseMirror ol {
-  @apply my-0 ml-[8px] pl-[20px] list-decimal;
-}
-
-.rich-text-editor.ProseMirror li {
-  @apply my-0 min-h-[1.375rem];
-}
-
-.rich-text-editor.ProseMirror li p {
-  @apply inline;
-}
-
-.rich-text-editor.ProseMirror strong {
-  @apply font-bold;
-}
-
-.rich-text-editor.ProseMirror em {
-  @apply italic;
-}
-
-.rich-text-editor.ProseMirror u {
-  @apply underline;
-}
-
-.rich-text-editor.ProseMirror s {
-  @apply line-through;
-}
-
-/* Full variant styles - matching DEFAULT_TEXT_STYLES */
-.rich-text-editor-full.ProseMirror h1 {
-  @apply text-[30px] font-semibold my-0;
-}
-
-.rich-text-editor-full.ProseMirror h2 {
-  @apply text-[24px] font-semibold my-0;
-}
-
-.rich-text-editor-full.ProseMirror h3 {
-  @apply text-[20px] font-semibold my-0;
-}
-
-.rich-text-editor-full.ProseMirror h4 {
-  @apply text-[18px] font-semibold my-0;
-}
-
-.rich-text-editor-full.ProseMirror h5 {
-  @apply text-[16px] font-semibold my-0;
-}
-
-.rich-text-editor-full.ProseMirror h6 {
-  @apply text-[14px] font-semibold my-0;
-}
-
+/* RichTextEditor — Full variant */
+.rich-text-editor-full.ProseMirror h1 { @apply text-[30px] font-semibold my-0; }
+.rich-text-editor-full.ProseMirror h2 { @apply text-[24px] font-semibold my-0; }
+.rich-text-editor-full.ProseMirror h3 { @apply text-[20px] font-semibold my-0; }
+.rich-text-editor-full.ProseMirror h4 { @apply text-[18px] font-semibold my-0; }
+.rich-text-editor-full.ProseMirror h5 { @apply text-[16px] font-semibold my-0; }
+.rich-text-editor-full.ProseMirror h6 { @apply text-[14px] font-semibold my-0; }
 .rich-text-editor-full.ProseMirror blockquote {
   @apply border-l-2 border-border pl-4 py-0.5 my-0 italic text-muted-foreground;
 }
+.rich-text-editor-full.ProseMirror code { @apply bg-input px-1.5 py-0.5 rounded-md font-mono; }
+.rich-text-editor-full.ProseMirror hr { @apply border-t border-border my-4; }
 
-.rich-text-editor-full.ProseMirror code {
-  @apply bg-input px-1.5 py-0.5 rounded-md font-mono;
-}
-
-.rich-text-editor-full.ProseMirror hr {
-  @apply border-t border-border my-4;
-}
-
-/* Custom dropdown chevron for select elements (native arrow removed by form reset) */
+/* Custom dropdown chevron for select */
 #ybody select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -274,8 +214,4 @@
 }
 
 /* Override Sonner toast content gap */
-[data-sonner-toast][data-styled='true'] [data-content] {
-  gap: 0;
-}
-
-@import "./global-theme.css";
+[data-sonner-toast][data-styled='true'] [data-content] { gap: 0; }
