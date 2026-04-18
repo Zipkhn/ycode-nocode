@@ -56,13 +56,14 @@
 
   --font-smoothing: antialiased;
 
-  --display-font-weight: 600; --display-line-height: 1.2; --display-letter-spacing: -0.02em; --display-margin-bottom: 0rem;
+  --display-font-weight: 400; --display-line-height: 1.2; --display-letter-spacing: -0.02em; --display-margin-bottom: 0rem;
   --h1-font-weight: 700; --h1-line-height: 1.2; --h1-letter-spacing: -0.02em; --h1-margin-bottom: 0rem;
   --h2-font-weight: 700; --h2-line-height: 1.2; --h2-letter-spacing: -0.02em; --h2-margin-bottom: 0rem;
   --h3-font-weight: 600; --h3-line-height: 1.3; --h3-letter-spacing: 0em; --h3-margin-bottom: 0rem;
   --h4-font-weight: 600; --h4-line-height: 1.4; --h4-letter-spacing: 0em; --h4-margin-bottom: 0rem;
   --h5-font-weight: 500; --h5-line-height: 1.4; --h5-letter-spacing: 0em; --h5-margin-bottom: 0rem;
   --h6-font-weight: 500; --h6-line-height: 1.5; --h6-letter-spacing: 0em; --h6-margin-bottom: 0rem;
+  --large-font-weight: 600; --large-line-height: 1.5; --large-letter-spacing: 0em; --large-margin-bottom: 0rem;
   --body-font-weight: 400; --body-line-height: 1.5; --body-letter-spacing: 0em; --body-margin-bottom: 0rem;
   --small-font-weight: 400; --small-line-height: 1.5; --small-letter-spacing: 0em; --small-margin-bottom: 0rem;
 
@@ -451,8 +452,9 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   min-height: 100vh !important;
   padding-bottom: 30vh !important;
 }
-@media (max-width: 991px) { .dev-grid_wrapper .u-grid > div:nth-child(n+9) { display: none !important; } }
-@media (max-width: 479px) { .dev-grid_wrapper .u-grid > div:nth-child(n+5) { display: none !important; } }
+/* Dev overlay : masquer les colonnes au-delà du breakpoint actif */
+@media (min-width: 768px) and (max-width: 1024px) { .dev-grid_wrapper .u-grid > div:nth-child(n+9) { display: none !important; } }
+@media (max-width: 767px) { .dev-grid_wrapper .u-grid > div:nth-child(n+5) { display: none !important; } }
 
 
 /* --- 14. SUR-SPÉCIFICITÉ : TYPOGRAPHY UTILITIES --- */
@@ -551,25 +553,22 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 
 /* --- Responsive Breakpoints (Lumos) --- */
 
-/* Tablette (768px - 991px) : 6 colonnes */
-@media screen and (max-width: 991px) {
-  :is(#ybody, .y-canvas, [data-ycode-canvas]) { --site--column-count: 6 !important; }
-  
+/* Tablette large (768px – 1024px) : 8 colonnes */
+@media screen and (min-width: 768px) and (max-width: 1024px) {
+  :is(#ybody, .y-canvas, [data-ycode-canvas]) { --site--column-count: 8 !important; }
+
   :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
   }
 
   :is(#ybody, .y-canvas, [data-ycode-canvas]) :is(
-    .u-col-span-6, 
-    .u-col-span-7, 
-    .u-col-span-8, 
-    .u-col-span-9, 
-    .u-col-span-10, 
-    .u-col-span-11, 
-    .u-col-span-12, 
+    .u-col-span-9,
+    .u-col-span-10,
+    .u-col-span-11,
+    .u-col-span-12,
     .u-col-span-full
   ) {
-    grid-column: span 6 / span 6 !important;
+    grid-column: span 8 / span 8 !important;
   }
 }
 
@@ -581,17 +580,16 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 
-  /* Spans larges repliés sur 4/4 */
   :is(#ybody, .y-canvas, [data-ycode-canvas]) :is(
-    .u-col-span-4, 
-    .u-col-span-5, 
-    .u-col-span-6, 
-    .u-col-span-7, 
-    .u-col-span-8, 
-    .u-col-span-9, 
-    .u-col-span-10, 
-    .u-col-span-11, 
-    .u-col-span-12, 
+    .u-col-span-4,
+    .u-col-span-5,
+    .u-col-span-6,
+    .u-col-span-7,
+    .u-col-span-8,
+    .u-col-span-9,
+    .u-col-span-10,
+    .u-col-span-11,
+    .u-col-span-12,
     .u-col-span-full
   ) {
     grid-column: span 4 / span 4 !important;
@@ -600,3 +598,206 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 }
 
 /* LUMOS_CORE_END */
+
+
+
+
+/* LUMOS_RUNTIME_BRIDGES_START */
+/* Lumos Runtime Bridge v8.0 — auto-generated, do not edit */
+/* Unique-token selectors: [class*="prop-space-X" i] — case-insensitive substring match */
+/* ── SPACE-3XS ── */
+:where(body) [class*="space-3xs" i]{--lumos-space-3xs:var(--space-3xs)!important}
+:where(body) [class*="pt-space-3xs" i]{padding-top:var(--space-3xs)!important}
+:where(body) [class*="pb-space-3xs" i]{padding-bottom:var(--space-3xs)!important}
+:where(body) [class*="pl-space-3xs" i]{padding-left:var(--space-3xs)!important}
+:where(body) [class*="pr-space-3xs" i]{padding-right:var(--space-3xs)!important}
+:where(body) [class*="px-space-3xs" i]{padding-left:var(--space-3xs)!important;padding-right:var(--space-3xs)!important}
+:where(body) [class*="py-space-3xs" i]{padding-top:var(--space-3xs)!important;padding-bottom:var(--space-3xs)!important}
+:where(body) [class*="mt-space-3xs" i]{margin-top:var(--space-3xs)!important}
+:where(body) [class*="mb-space-3xs" i]{margin-bottom:var(--space-3xs)!important}
+:where(body) [class*="ml-space-3xs" i]{margin-left:var(--space-3xs)!important}
+:where(body) [class*="mr-space-3xs" i]{margin-right:var(--space-3xs)!important}
+:where(body) [class*="mx-space-3xs" i]{margin-left:var(--space-3xs)!important;margin-right:var(--space-3xs)!important}
+:where(body) [class*="my-space-3xs" i]{margin-top:var(--space-3xs)!important;margin-bottom:var(--space-3xs)!important}
+:where(body) [class*="gap-space-3xs" i]{gap:var(--space-3xs)!important}
+/* ── SPACE-2XS ── */
+:where(body) [class*="space-2xs" i]{--lumos-space-2xs:var(--space-2xs)!important}
+:where(body) [class*="pt-space-2xs" i]{padding-top:var(--space-2xs)!important}
+:where(body) [class*="pb-space-2xs" i]{padding-bottom:var(--space-2xs)!important}
+:where(body) [class*="pl-space-2xs" i]{padding-left:var(--space-2xs)!important}
+:where(body) [class*="pr-space-2xs" i]{padding-right:var(--space-2xs)!important}
+:where(body) [class*="px-space-2xs" i]{padding-left:var(--space-2xs)!important;padding-right:var(--space-2xs)!important}
+:where(body) [class*="py-space-2xs" i]{padding-top:var(--space-2xs)!important;padding-bottom:var(--space-2xs)!important}
+:where(body) [class*="mt-space-2xs" i]{margin-top:var(--space-2xs)!important}
+:where(body) [class*="mb-space-2xs" i]{margin-bottom:var(--space-2xs)!important}
+:where(body) [class*="ml-space-2xs" i]{margin-left:var(--space-2xs)!important}
+:where(body) [class*="mr-space-2xs" i]{margin-right:var(--space-2xs)!important}
+:where(body) [class*="mx-space-2xs" i]{margin-left:var(--space-2xs)!important;margin-right:var(--space-2xs)!important}
+:where(body) [class*="my-space-2xs" i]{margin-top:var(--space-2xs)!important;margin-bottom:var(--space-2xs)!important}
+:where(body) [class*="gap-space-2xs" i]{gap:var(--space-2xs)!important}
+/* ── SPACE-XS ── */
+:where(body) [class*="space-xs" i]{--lumos-space-xs:var(--space-xs)!important}
+:where(body) [class*="pt-space-xs" i]{padding-top:var(--space-xs)!important}
+:where(body) [class*="pb-space-xs" i]{padding-bottom:var(--space-xs)!important}
+:where(body) [class*="pl-space-xs" i]{padding-left:var(--space-xs)!important}
+:where(body) [class*="pr-space-xs" i]{padding-right:var(--space-xs)!important}
+:where(body) [class*="px-space-xs" i]{padding-left:var(--space-xs)!important;padding-right:var(--space-xs)!important}
+:where(body) [class*="py-space-xs" i]{padding-top:var(--space-xs)!important;padding-bottom:var(--space-xs)!important}
+:where(body) [class*="mt-space-xs" i]{margin-top:var(--space-xs)!important}
+:where(body) [class*="mb-space-xs" i]{margin-bottom:var(--space-xs)!important}
+:where(body) [class*="ml-space-xs" i]{margin-left:var(--space-xs)!important}
+:where(body) [class*="mr-space-xs" i]{margin-right:var(--space-xs)!important}
+:where(body) [class*="mx-space-xs" i]{margin-left:var(--space-xs)!important;margin-right:var(--space-xs)!important}
+:where(body) [class*="my-space-xs" i]{margin-top:var(--space-xs)!important;margin-bottom:var(--space-xs)!important}
+:where(body) [class*="gap-space-xs" i]{gap:var(--space-xs)!important}
+/* ── SPACE-S ── */
+:where(body) [class*="space-s" i]{--lumos-space-s:var(--space-s)!important}
+:where(body) [class*="pt-space-s" i]{padding-top:var(--space-s)!important}
+:where(body) [class*="pb-space-s" i]{padding-bottom:var(--space-s)!important}
+:where(body) [class*="pl-space-s" i]{padding-left:var(--space-s)!important}
+:where(body) [class*="pr-space-s" i]{padding-right:var(--space-s)!important}
+:where(body) [class*="px-space-s" i]{padding-left:var(--space-s)!important;padding-right:var(--space-s)!important}
+:where(body) [class*="py-space-s" i]{padding-top:var(--space-s)!important;padding-bottom:var(--space-s)!important}
+:where(body) [class*="mt-space-s" i]{margin-top:var(--space-s)!important}
+:where(body) [class*="mb-space-s" i]{margin-bottom:var(--space-s)!important}
+:where(body) [class*="ml-space-s" i]{margin-left:var(--space-s)!important}
+:where(body) [class*="mr-space-s" i]{margin-right:var(--space-s)!important}
+:where(body) [class*="mx-space-s" i]{margin-left:var(--space-s)!important;margin-right:var(--space-s)!important}
+:where(body) [class*="my-space-s" i]{margin-top:var(--space-s)!important;margin-bottom:var(--space-s)!important}
+:where(body) [class*="gap-space-s" i]{gap:var(--space-s)!important}
+/* ── SPACE-M ── */
+:where(body) [class*="space-m" i]{--lumos-space-m:var(--space-m)!important}
+:where(body) [class*="pt-space-m" i]{padding-top:var(--space-m)!important}
+:where(body) [class*="pb-space-m" i]{padding-bottom:var(--space-m)!important}
+:where(body) [class*="pl-space-m" i]{padding-left:var(--space-m)!important}
+:where(body) [class*="pr-space-m" i]{padding-right:var(--space-m)!important}
+:where(body) [class*="px-space-m" i]{padding-left:var(--space-m)!important;padding-right:var(--space-m)!important}
+:where(body) [class*="py-space-m" i]{padding-top:var(--space-m)!important;padding-bottom:var(--space-m)!important}
+:where(body) [class*="mt-space-m" i]{margin-top:var(--space-m)!important}
+:where(body) [class*="mb-space-m" i]{margin-bottom:var(--space-m)!important}
+:where(body) [class*="ml-space-m" i]{margin-left:var(--space-m)!important}
+:where(body) [class*="mr-space-m" i]{margin-right:var(--space-m)!important}
+:where(body) [class*="mx-space-m" i]{margin-left:var(--space-m)!important;margin-right:var(--space-m)!important}
+:where(body) [class*="my-space-m" i]{margin-top:var(--space-m)!important;margin-bottom:var(--space-m)!important}
+:where(body) [class*="gap-space-m" i]{gap:var(--space-m)!important}
+/* ── SPACE-L ── */
+:where(body) [class*="space-l" i]{--lumos-space-l:var(--space-l)!important}
+:where(body) [class*="pt-space-l" i]{padding-top:var(--space-l)!important}
+:where(body) [class*="pb-space-l" i]{padding-bottom:var(--space-l)!important}
+:where(body) [class*="pl-space-l" i]{padding-left:var(--space-l)!important}
+:where(body) [class*="pr-space-l" i]{padding-right:var(--space-l)!important}
+:where(body) [class*="px-space-l" i]{padding-left:var(--space-l)!important;padding-right:var(--space-l)!important}
+:where(body) [class*="py-space-l" i]{padding-top:var(--space-l)!important;padding-bottom:var(--space-l)!important}
+:where(body) [class*="mt-space-l" i]{margin-top:var(--space-l)!important}
+:where(body) [class*="mb-space-l" i]{margin-bottom:var(--space-l)!important}
+:where(body) [class*="ml-space-l" i]{margin-left:var(--space-l)!important}
+:where(body) [class*="mr-space-l" i]{margin-right:var(--space-l)!important}
+:where(body) [class*="mx-space-l" i]{margin-left:var(--space-l)!important;margin-right:var(--space-l)!important}
+:where(body) [class*="my-space-l" i]{margin-top:var(--space-l)!important;margin-bottom:var(--space-l)!important}
+:where(body) [class*="gap-space-l" i]{gap:var(--space-l)!important}
+/* ── SPACE-XL ── */
+:where(body) [class*="space-xl" i]{--lumos-space-xl:var(--space-xl)!important}
+:where(body) [class*="pt-space-xl" i]{padding-top:var(--space-xl)!important}
+:where(body) [class*="pb-space-xl" i]{padding-bottom:var(--space-xl)!important}
+:where(body) [class*="pl-space-xl" i]{padding-left:var(--space-xl)!important}
+:where(body) [class*="pr-space-xl" i]{padding-right:var(--space-xl)!important}
+:where(body) [class*="px-space-xl" i]{padding-left:var(--space-xl)!important;padding-right:var(--space-xl)!important}
+:where(body) [class*="py-space-xl" i]{padding-top:var(--space-xl)!important;padding-bottom:var(--space-xl)!important}
+:where(body) [class*="mt-space-xl" i]{margin-top:var(--space-xl)!important}
+:where(body) [class*="mb-space-xl" i]{margin-bottom:var(--space-xl)!important}
+:where(body) [class*="ml-space-xl" i]{margin-left:var(--space-xl)!important}
+:where(body) [class*="mr-space-xl" i]{margin-right:var(--space-xl)!important}
+:where(body) [class*="mx-space-xl" i]{margin-left:var(--space-xl)!important;margin-right:var(--space-xl)!important}
+:where(body) [class*="my-space-xl" i]{margin-top:var(--space-xl)!important;margin-bottom:var(--space-xl)!important}
+:where(body) [class*="gap-space-xl" i]{gap:var(--space-xl)!important}
+/* ── SPACE-2XL ── */
+:where(body) [class*="space-2xl" i]{--lumos-space-2xl:var(--space-2xl)!important}
+:where(body) [class*="pt-space-2xl" i]{padding-top:var(--space-2xl)!important}
+:where(body) [class*="pb-space-2xl" i]{padding-bottom:var(--space-2xl)!important}
+:where(body) [class*="pl-space-2xl" i]{padding-left:var(--space-2xl)!important}
+:where(body) [class*="pr-space-2xl" i]{padding-right:var(--space-2xl)!important}
+:where(body) [class*="px-space-2xl" i]{padding-left:var(--space-2xl)!important;padding-right:var(--space-2xl)!important}
+:where(body) [class*="py-space-2xl" i]{padding-top:var(--space-2xl)!important;padding-bottom:var(--space-2xl)!important}
+:where(body) [class*="mt-space-2xl" i]{margin-top:var(--space-2xl)!important}
+:where(body) [class*="mb-space-2xl" i]{margin-bottom:var(--space-2xl)!important}
+:where(body) [class*="ml-space-2xl" i]{margin-left:var(--space-2xl)!important}
+:where(body) [class*="mr-space-2xl" i]{margin-right:var(--space-2xl)!important}
+:where(body) [class*="mx-space-2xl" i]{margin-left:var(--space-2xl)!important;margin-right:var(--space-2xl)!important}
+:where(body) [class*="my-space-2xl" i]{margin-top:var(--space-2xl)!important;margin-bottom:var(--space-2xl)!important}
+:where(body) [class*="gap-space-2xl" i]{gap:var(--space-2xl)!important}
+/* ── SPACE-3XL ── */
+:where(body) [class*="space-3xl" i]{--lumos-space-3xl:var(--space-3xl)!important}
+:where(body) [class*="pt-space-3xl" i]{padding-top:var(--space-3xl)!important}
+:where(body) [class*="pb-space-3xl" i]{padding-bottom:var(--space-3xl)!important}
+:where(body) [class*="pl-space-3xl" i]{padding-left:var(--space-3xl)!important}
+:where(body) [class*="pr-space-3xl" i]{padding-right:var(--space-3xl)!important}
+:where(body) [class*="px-space-3xl" i]{padding-left:var(--space-3xl)!important;padding-right:var(--space-3xl)!important}
+:where(body) [class*="py-space-3xl" i]{padding-top:var(--space-3xl)!important;padding-bottom:var(--space-3xl)!important}
+:where(body) [class*="mt-space-3xl" i]{margin-top:var(--space-3xl)!important}
+:where(body) [class*="mb-space-3xl" i]{margin-bottom:var(--space-3xl)!important}
+:where(body) [class*="ml-space-3xl" i]{margin-left:var(--space-3xl)!important}
+:where(body) [class*="mr-space-3xl" i]{margin-right:var(--space-3xl)!important}
+:where(body) [class*="mx-space-3xl" i]{margin-left:var(--space-3xl)!important;margin-right:var(--space-3xl)!important}
+:where(body) [class*="my-space-3xl" i]{margin-top:var(--space-3xl)!important;margin-bottom:var(--space-3xl)!important}
+:where(body) [class*="gap-space-3xl" i]{gap:var(--space-3xl)!important}
+
+/* Lumos Runtime Typography Bridge v9.0 */
+:where(body) { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+:where(body) .u-text-display {
+  font-weight: var(--display-font-weight) !important;
+  line-height: var(--display-line-height) !important;
+  letter-spacing: var(--display-letter-spacing) !important;
+  margin-bottom: var(--display-margin-bottom) !important;
+}
+:where(body) h1 {
+  font-weight: var(--h1-font-weight) !important;
+  line-height: var(--h1-line-height) !important;
+  letter-spacing: var(--h1-letter-spacing) !important;
+  margin-bottom: var(--h1-margin-bottom) !important;
+}
+:where(body) h2 {
+  font-weight: var(--h2-font-weight) !important;
+  line-height: var(--h2-line-height) !important;
+  letter-spacing: var(--h2-letter-spacing) !important;
+  margin-bottom: var(--h2-margin-bottom) !important;
+}
+:where(body) h3 {
+  font-weight: var(--h3-font-weight) !important;
+  line-height: var(--h3-line-height) !important;
+  letter-spacing: var(--h3-letter-spacing) !important;
+  margin-bottom: var(--h3-margin-bottom) !important;
+}
+:where(body) h4 {
+  font-weight: var(--h4-font-weight) !important;
+  line-height: var(--h4-line-height) !important;
+  letter-spacing: var(--h4-letter-spacing) !important;
+  margin-bottom: var(--h4-margin-bottom) !important;
+}
+:where(body) h5 {
+  font-weight: var(--h5-font-weight) !important;
+  line-height: var(--h5-line-height) !important;
+  letter-spacing: var(--h5-letter-spacing) !important;
+  margin-bottom: var(--h5-margin-bottom) !important;
+}
+:where(body) h6 {
+  font-weight: var(--h6-font-weight) !important;
+  line-height: var(--h6-line-height) !important;
+  letter-spacing: var(--h6-letter-spacing) !important;
+  margin-bottom: var(--h6-margin-bottom) !important;
+}
+:where(body) p {
+  font-weight: var(--body-font-weight) !important;
+  line-height: var(--body-line-height) !important;
+  letter-spacing: var(--body-letter-spacing) !important;
+  margin-bottom: var(--body-margin-bottom) !important;
+}
+:where(body) .u-text-small {
+  font-weight: var(--small-font-weight) !important;
+  line-height: var(--small-line-height) !important;
+  letter-spacing: var(--small-letter-spacing) !important;
+  margin-bottom: var(--small-margin-bottom) !important;
+}
+/* LUMOS_RUNTIME_BRIDGES_END */
+
+
+

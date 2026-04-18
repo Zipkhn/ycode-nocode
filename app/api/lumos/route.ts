@@ -32,18 +32,38 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { updates } = await request.json();
+    const { updates, bridges } = await request.json();
     if (!updates || typeof updates !== 'object') {
       return NextResponse.json({ error: 'Invalid updates payload' }, { status: 400 });
     }
 
     let css = await fs.readFile(THEME_PATH, 'utf-8');
     
+    // 1. Appliquer les mises à jour de variables
     for (const [key, value] of Object.entries(updates)) {
-      // Safely replace the variable value.
-      // E.g. --site--viewport-max: 90;
-      const regex = new RegExp(`(--${key}:\\s*)([^;]+)(;)`, 'g');
-      css = css.replace(regex, `$1${value}$3`);
+      if (value === '__remove__') {
+        css = css.replace(new RegExp(`\\s*--${key}:[^;]+;`, 'g'), '');
+      } else if (new RegExp(`--${key}:`).test(css)) {
+        css = css.replace(new RegExp(`(--${key}:\\s*)([^;]+)(;)`, 'g'), `$1${value}$3`);
+      } else {
+        css = css.replace('/* LUMOS_CORE_END */', `:root {\n  --${key}: ${value};\n}\n/* LUMOS_CORE_END */`);
+      }
+    }
+
+    // 2. Injecter les Bridges CSS de manière persistente pour la Production
+    if (bridges && typeof bridges === 'string') {
+      const bridgeStart = '/* LUMOS_RUNTIME_BRIDGES_START */';
+      const bridgeEnd = '/* LUMOS_RUNTIME_BRIDGES_END */';
+      const bridgeBlock = `\n${bridgeStart}\n${bridges}\n${bridgeEnd}\n`;
+
+      if (css.includes(bridgeStart) && css.includes(bridgeEnd)) {
+        const startIdx = css.indexOf(bridgeStart);
+        const endIdx = css.indexOf(bridgeEnd) + bridgeEnd.length;
+        css = css.substring(0, startIdx) + bridgeBlock + css.substring(endIdx);
+      } else {
+        // Appending exactly to the end of file
+        css = css.trimEnd() + '\n' + bridgeBlock;
+      }
     }
 
     await fs.writeFile(THEME_PATH, css, 'utf-8');

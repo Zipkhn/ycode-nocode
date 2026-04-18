@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useFontsStore } from '@/stores/useFontsStore';
 import { BUILT_IN_FONTS } from '@/lib/font-utils';
@@ -8,15 +8,14 @@ import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
 
 // Debounce helper
 function useDebounce<T extends (...args: any[]) => void>(callback: T, delay: number) {
-  const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   return useCallback((...args: Parameters<T>) => {
-    if (timer) clearTimeout(timer);
-    const newTimer = setTimeout(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
       callback(...args);
     }, delay);
-    setTimer(newTimer);
-  }, [callback, delay, timer]);
+  }, [callback, delay]);
 }
 
 export default function LumosThemeEditor() {
@@ -64,13 +63,13 @@ export default function LumosThemeEditor() {
         if (data.variables) {
           const vars = { ...data.variables };
           const missingUpdates: Record<string, string> = {};
-          
+
           // Inject Default Hardcoded Fallbacks for Typography if missing
-          ['display', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'body', 'small'].forEach(lvl => {
+          ['display', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'large', 'body', 'small'].forEach(lvl => {
             if (!vars[`${lvl}-font-weight`]) missingUpdates[`${lvl}-font-weight`] = '600';
             if (!vars[`${lvl}-letter-spacing`]) missingUpdates[`${lvl}-letter-spacing`] = '0em';
             if (!vars[`${lvl}-margin-bottom`]) missingUpdates[`${lvl}-margin-bottom`] = '0rem';
-            
+
             if (!vars[`${lvl}-line-height`]) {
               if (['display', 'h1', 'h2'].includes(lvl)) missingUpdates[`${lvl}-line-height`] = '1.2';
               else if (lvl === 'h3') missingUpdates[`${lvl}-line-height`] = '1.3';
@@ -78,21 +77,21 @@ export default function LumosThemeEditor() {
               else missingUpdates[`${lvl}-line-height`] = '1.5';
             }
           });
-          
+
           if (Object.keys(missingUpdates).length > 0) {
             Object.assign(vars, missingUpdates);
-            // Instantly auto-save defaults so we never see an empty inputs issue again
             fetch('/api/lumos', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ updates: missingUpdates })
             }).catch(console.error);
           }
-          
+
           setVariables(vars);
         }
-        setLoading(false);
-      });
+      })
+      .catch(err => console.error('Lumos: Failed to load theme', err))
+      .finally(() => setLoading(false));
   }, []);
 
   /**
@@ -189,6 +188,7 @@ export default function LumosThemeEditor() {
     { key: 'h4', label: 'H4' },
     { key: 'h5', label: 'H5' },
     { key: 'h6', label: 'H6' },
+    { key: 'large', label: 'Large' },
     { key: 'body', label: 'Body' },
     { key: 'small', label: 'Small' },
   ];
@@ -253,7 +253,7 @@ export default function LumosThemeEditor() {
    * Values are computed from the current scale state (not from the CSS file),
    * so the bridge is always in sync with the Lumos panel controls.
    */
-  const generateSpacingBridgeCSS = (): string => {
+  const generateSpacingBridgeCSS = useCallback((): string => {
     // Unique full-name tokens → CSS variable.
     // IMPORTANT: ordered most-specific → least-specific so that, if
     // rules ever tied, the longer token still wins.
@@ -287,7 +287,7 @@ export default function LumosThemeEditor() {
       { prefix: 'gap', property: 'gap' },
     ];
 
-    const scope = ':where(#ybody,.y-canvas,[data-ycode-canvas])';
+    const scope = ':where(body)';
     const lines: string[] = [
       '/* Lumos Runtime Bridge v8.0 — auto-generated, do not edit */',
       '/* Unique-token selectors: [class*="prop-space-X" i] — case-insensitive substring match */',
@@ -322,7 +322,43 @@ export default function LumosThemeEditor() {
     }
 
     return lines.join('\n');
-  };
+  }, [spaceBase, spaceRatio, spaceVpMin, spaceVpMax]);
+
+  // ─── TYPOGRAPHY RUNTIME BRIDGE (v9.0) ─────────────────────────────────────
+
+  const generateTypographyBridgeCSS = useCallback((): string => {
+    const scope = ':where(body)';
+    const lines: string[] = ['/* Lumos Runtime Typography Bridge v9.0 */'];
+
+    const smoothing = variables['font-smoothing'] === 'antialiased';
+    if (smoothing) {
+      lines.push(`${scope} { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }`);
+    }
+
+    TYPOGRAPHY_LEVELS.forEach(lvl => {
+      let selector = '';
+      if (lvl.key === 'body') {
+        selector = `${scope} p`;
+      } else if (lvl.key === 'display') {
+        selector = `${scope} .u-text-display`;
+      } else if (lvl.key === 'large') {
+        selector = `${scope} .u-text-large`;
+      } else if (lvl.key === 'small') {
+        selector = `${scope} .u-text-small`;
+      } else {
+        selector = `${scope} ${lvl.key}`;
+      }
+
+      lines.push(`${selector} {`);
+      lines.push(`  font-weight: var(--${lvl.key}-font-weight) !important;`);
+      lines.push(`  line-height: var(--${lvl.key}-line-height) !important;`);
+      lines.push(`  letter-spacing: var(--${lvl.key}-letter-spacing) !important;`);
+      lines.push(`  margin-bottom: var(--${lvl.key}-margin-bottom) !important;`);
+      lines.push(`}`);
+    });
+
+    return lines.join('\n');
+  }, [variables]);
 
   /**
    * Mount / update the runtime bridge in both the host document
@@ -408,43 +444,7 @@ export default function LumosThemeEditor() {
         if (h) iframe.removeEventListener('load', h);
       });
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spaceBase, spaceRatio, spaceVpMin, spaceVpMax]);
-
-  // ─── TYPOGRAPHY RUNTIME BRIDGE (v9.0) ─────────────────────────────────────
-  
-  const generateTypographyBridgeCSS = (): string => {
-    const scope = ':where(#ybody, .y-canvas, [data-ycode-canvas])';
-    const lines: string[] = ['/* Lumos Runtime Typography Bridge v9.0 */'];
-    
-    // Font Smoothing
-    const smoothing = variables['font-smoothing'] === 'antialiased';
-    if (smoothing) {
-      lines.push(`${scope} { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }`);
-    }
-
-    TYPOGRAPHY_LEVELS.forEach(lvl => {
-      let selector = '';
-      if (lvl.key === 'body') {
-        selector = `${scope} p`;
-      } else if (lvl.key === 'display') {
-        selector = `${scope} .u-text-display`;
-      } else if (lvl.key === 'small') {
-        selector = `${scope} .u-text-small`;
-      } else {
-        selector = `${scope} ${lvl.key}`; // h1-h6
-      }
-      
-      lines.push(`${selector} {`);
-      lines.push(`  font-weight: var(--${lvl.key}-font-weight) !important;`);
-      lines.push(`  line-height: var(--${lvl.key}-line-height) !important;`);
-      lines.push(`  letter-spacing: var(--${lvl.key}-letter-spacing) !important;`);
-      lines.push(`  margin-bottom: var(--${lvl.key}-margin-bottom) !important;`);
-      lines.push(`}`);
-    });
-
-    return lines.join('\n');
-  };
+  }, [generateSpacingBridgeCSS, generateTypographyBridgeCSS]);
 
   /**
    * Push spacing tokens into Ycode's color_variables store.
@@ -563,18 +563,14 @@ export default function LumosThemeEditor() {
     }
   };
 
-  /** Save spacing params to global-theme.css via /api/lumos */
+  /** Save spacing params to global-theme.css via saveUpdates (includes bridges + publish fix) */
   const saveSpacingToTheme = () => {
     const updates: Record<string, string> = {};
     SPACE_TOKENS.forEach(token => {
-      const px    = tokenPx(token.steps);
+      const px = tokenPx(token.steps);
       updates[token.key] = generateClamp(px);
     });
-    fetch('/api/lumos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ updates }),
-    }).then(() => triggerIframeCSSReload()).catch(() => {});
+    saveUpdates(updates);
   };
 
   const triggerIframeCSSReload = async () => {
@@ -636,18 +632,58 @@ export default function LumosThemeEditor() {
     }
   };
 
+  const getCompleteBridgeCSS = useCallback(() => {
+    return [
+      generateSpacingBridgeCSS(),
+      generateTypographyBridgeCSS()
+    ].join('\n\n');
+  }, [generateSpacingBridgeCSS, generateTypographyBridgeCSS]);
+
   const saveUpdates = useCallback(async (updates: Record<string, string>) => {
     try {
+      const combinedBridges = getCompleteBridgeCSS();
+
       await fetch('/api/lumos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates })
+        body: JSON.stringify({ updates, bridges: combinedBridges })
       });
       triggerIframeCSSReload();
+
+      // Safari sync block for Ycode DB
+      try {
+        const settingsRes = await fetch('/ycode/api/settings/custom_css');
+        if (settingsRes.ok) {
+          const json = await settingsRes.json();
+          const currentCustomCss = json.data || '';
+          
+          const startMarker = '/* LUMOS_RUNTIME_BRIDGES_START */';
+          const endMarker = '/* LUMOS_RUNTIME_BRIDGES_END */';
+          const varBlock = `:root {\n${Object.entries(variables).map(([k, v]) => `  --${k}: ${v};`).join('\n')}\n}`;
+          const bridgeBlock = `\n${startMarker}\n${varBlock}\n\n${combinedBridges}\n${endMarker}\n`;
+          
+          let newCss = currentCustomCss;
+          if (newCss.includes(startMarker) && newCss.includes(endMarker)) {
+            const startIdx = newCss.indexOf(startMarker);
+            const endIdx = newCss.indexOf(endMarker) + endMarker.length;
+            newCss = newCss.substring(0, startIdx) + bridgeBlock + newCss.substring(endIdx);
+          } else {
+            newCss = newCss.trimEnd() + bridgeBlock;
+          }
+          
+          await fetch('/ycode/api/settings/custom_css', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: newCss })
+          });
+        }
+      } catch (err) {
+        console.warn('Lumos: Failed to auto-sync with custom_css', err);
+      }
     } catch (e) {
       console.error('Failed to save Lumos variables', e);
     }
-  }, [triggerIframeCSSReload]);
+  }, [triggerIframeCSSReload, getCompleteBridgeCSS, variables]);
 
   const debouncedSave = useDebounce(saveUpdates, 300);
 
@@ -658,11 +694,11 @@ export default function LumosThemeEditor() {
 
   const resetTypographyToDefaults = () => {
     const updates: Record<string, string> = {};
-    ['display', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'body', 'small'].forEach(lvl => {
+    ['display', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'large', 'body', 'small'].forEach(lvl => {
       updates[`${lvl}-font-weight`] = '600';
       updates[`${lvl}-letter-spacing`] = '0em';
       updates[`${lvl}-margin-bottom`] = '0rem';
-      
+
       if (['display', 'h1', 'h2'].includes(lvl)) updates[`${lvl}-line-height`] = '1.2';
       else if (lvl === 'h3') updates[`${lvl}-line-height`] = '1.3';
       else if (['h4', 'h5'].includes(lvl)) updates[`${lvl}-line-height`] = '1.4';
@@ -780,9 +816,9 @@ export default function LumosThemeEditor() {
   };
 
   const renderAccordion = (title: string, id: string, children: React.ReactNode) => (
-    <div className="border border-border rounded-md mb-2 relative">
-      <button 
-        className="w-full flex items-center justify-between p-3 bg-muted/95 backdrop-blur-sm shadow-sm hover:bg-muted text-sm font-medium transition-colors sticky top-0 z-10 rounded-t-md"
+    <div className="border border-border rounded-md mb-2">
+      <button
+        className="w-full flex items-center justify-between px-3 py-3 bg-white dark:bg-zinc-900 border-b border-border hover:bg-zinc-50 dark:hover:bg-zinc-800 text-sm font-semibold transition-colors sticky top-0 z-[100] rounded-t-md shadow-sm"
         onClick={() => setOpenSection(openSection === id ? '' : id)}
       >
         {title}
@@ -795,7 +831,7 @@ export default function LumosThemeEditor() {
         ><path d="m6 9 6 6 6-6" /></svg>
       </button>
       {openSection === id && (
-        <div className="p-3 bg-background rounded-b-md">
+        <div className="p-4 bg-background rounded-b-md">
           {children}
         </div>
       )}
@@ -848,16 +884,20 @@ export default function LumosThemeEditor() {
   ];
 
   const content = (
-    <div className="flex flex-col w-full pb-8 pr-1">
+    <div className="flex flex-col w-full pb-8 pr-1 overflow-visible">
       {renderAccordion('General', 'general', (
         <>
           <div className="mb-4">
-            <h4 className="text-xs font-semibold mb-2">Viewport (Unitless)</h4>
+            <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-3">
+              <h4 className="text-xs font-semibold">Viewport (Unitless)</h4>
+            </div>
             {renderNumberInput('Max Width', 'site--viewport-max', '1')}
             {renderNumberInput('Min Width', 'site--viewport-min', '1')}
           </div>
           <div className="mb-4">
-            <h4 className="text-xs font-semibold mb-2">Grid & Layout</h4>
+            <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-3">
+              <h4 className="text-xs font-semibold">Grid & Layout</h4>
+            </div>
             {renderNumberInput('Columns', 'site--column-count', '1')}
             {renderTextInput('Gutter', 'site--gutter')}
           </div>
@@ -873,68 +913,72 @@ export default function LumosThemeEditor() {
         <>
           {/* Font Roles — primary controls */}
           <div className="mb-4">
-            <h4 className="text-xs font-semibold mb-3">Font Roles</h4>
+            <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-3">
+              <h4 className="text-xs font-semibold">Font Roles</h4>
+            </div>
             {renderRoleSelector('Primary (Headings & Display)', '_typography---font-family-headings')}
             {renderRoleSelector('Secondary (Body & Text)', '_typography---font-family-body')}
           </div>
 
           <div className="pt-4 border-t border-border">
-            <div className="flex items-center justify-between mb-4">
+            <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-3 flex items-center justify-between">
               <h4 className="text-xs font-semibold">Typography Levels</h4>
               <label className="flex items-center gap-2 text-[10px] cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={variables['font-smoothing'] === 'antialiased'}
                   onChange={(e) => handleChange('font-smoothing', e.target.checked ? 'antialiased' : 'auto')}
                 />
-                Enable Font Smoothing (Antialiased)
+                Font Smoothing
               </label>
             </div>
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] gap-4 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-                <div>Level</div>
-                <div>Weight</div>
-                <div>Line Height (%)</div>
-                <div>Letter Spacing (em)</div>
-                <div>Margin Bottom (rem)</div>
-              </div>
-              {TYPOGRAPHY_LEVELS.map(level => (
-                <div key={level.key} className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] gap-4 items-center">
-                  <div className="text-xs font-semibold">{level.label}</div>
-                  <input
-                    type="number" step="100"
-                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-ring"
-                    value={variables[`${level.key}-font-weight`] || ''}
-                    onChange={e => handleChange(`${level.key}-font-weight`, e.target.value)}
-                  />
-                  <input
-                    type="number" step="1"
-                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-ring"
-                    value={variables[`${level.key}-line-height`] ? Math.round(parseFloat(variables[`${level.key}-line-height`]) * 100) : ''}
-                    onChange={e => {
-                      const val = parseFloat(e.target.value);
-                      if (!isNaN(val)) {
-                        handleChange(`${level.key}-line-height`, (val / 100).toString());
-                      } else if (e.target.value === '') {
-                        handleChange(`${level.key}-line-height`, '');
-                      }
-                    }}
-                  />
-                  <input
-                    type="number" step="0.01"
-                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-ring"
-                    value={variables[`${level.key}-letter-spacing`] ? variables[`${level.key}-letter-spacing`].replace('em', '') : ''}
-                    onChange={e => handleChange(`${level.key}-letter-spacing`, e.target.value ? `${e.target.value}em` : '0em')}
-                  />
-                  <input
-                    type="number" step="0.1"
-                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-ring"
-                    value={variables[`${level.key}-margin-bottom`] ? variables[`${level.key}-margin-bottom`].replace(/em|rem/, '') : ''}
-                    onChange={e => handleChange(`${level.key}-margin-bottom`, e.target.value ? `${e.target.value}rem` : '0rem')}
-                  />
+
+            <div className="overflow-x-auto">
+              <div className="min-w-[580px] space-y-3">
+                <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] gap-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider pb-1 border-b border-border/50">
+                  <div>Level</div>
+                  <div>Weight</div>
+                  <div>Line-H (%)</div>
+                  <div>Tracking (em)</div>
+                  <div>Margin-B (rem)</div>
                 </div>
-              ))}
+                {TYPOGRAPHY_LEVELS.map(level => (
+                  <div key={level.key} className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] gap-3 items-center">
+                    <div className="text-xs font-semibold shrink-0">{level.label}</div>
+                    <input
+                      type="number" step="100"
+                      className="w-full bg-muted border border-border rounded px-2 py-1.5 text-xs outline-none focus:border-ring focus:bg-background transition-colors"
+                      value={variables[`${level.key}-font-weight`] || ''}
+                      onChange={e => handleChange(`${level.key}-font-weight`, e.target.value)}
+                    />
+                    <input
+                      type="number" step="1"
+                      className="w-full bg-muted border border-border rounded px-2 py-1.5 text-xs outline-none focus:border-ring focus:bg-background transition-colors"
+                      value={variables[`${level.key}-line-height`] ? Math.round(parseFloat(variables[`${level.key}-line-height`]) * 100) : ''}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value);
+                        if (!isNaN(val)) {
+                          handleChange(`${level.key}-line-height`, (val / 100).toString());
+                        } else if (e.target.value === '') {
+                          handleChange(`${level.key}-line-height`, '');
+                        }
+                      }}
+                    />
+                    <input
+                      type="number" step="0.01"
+                      className="w-full bg-muted border border-border rounded px-2 py-1.5 text-xs outline-none focus:border-ring focus:bg-background transition-colors"
+                      value={variables[`${level.key}-letter-spacing`] ? variables[`${level.key}-letter-spacing`].replace('em', '') : ''}
+                      onChange={e => handleChange(`${level.key}-letter-spacing`, e.target.value ? `${e.target.value}em` : '0em')}
+                    />
+                    <input
+                      type="number" step="0.1"
+                      className="w-full bg-muted border border-border rounded px-2 py-1.5 text-xs outline-none focus:border-ring focus:bg-background transition-colors"
+                      value={variables[`${level.key}-margin-bottom`] ? variables[`${level.key}-margin-bottom`].replace(/em|rem/, '') : ''}
+                      onChange={e => handleChange(`${level.key}-margin-bottom`, e.target.value ? `${e.target.value}rem` : '0rem')}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           
@@ -1024,8 +1068,11 @@ export default function LumosThemeEditor() {
           {renderColorInput('Primary Dark', 'color--primary-dark')}
           {renderColorInput('Secondary', 'color--secondary')}
           
-          <div className="mt-4 pt-4 border-t border-border">
-            <h4 className="text-xs font-semibold mb-2 flex justify-between">Grey Scale <span className="text-muted-foreground font-normal">900-50</span></h4>
+          <div className="mt-4 pt-2 border-t border-border">
+            <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-3 flex justify-between items-center">
+              <h4 className="text-xs font-semibold">Grey Scale</h4>
+              <span className="text-[10px] text-muted-foreground">900 → 50</span>
+            </div>
             {renderColorInput('900', 'color--grey-900')}
             {renderColorInput('800', 'color--grey-800')}
             {renderColorInput('700', 'color--grey-700')}
@@ -1039,13 +1086,13 @@ export default function LumosThemeEditor() {
           </div>
 
           {/* Custom Colors — user-defined tokens */}
-          <div className="mt-4 pt-4 border-t border-border">
-            <h4 className="text-xs font-semibold mb-3 flex justify-between items-center">
-              Custom Colors
-              <span className="text-[10px] font-normal text-muted-foreground">
+          <div className="mt-4 pt-2 border-t border-border">
+            <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-3 flex justify-between items-center">
+              <h4 className="text-xs font-semibold">Custom Colors</h4>
+              <span className="text-[10px] text-muted-foreground">
                 {Object.keys(variables).filter(k => k.startsWith('color--custom--')).length} tokens
               </span>
-            </h4>
+            </div>
 
             {/* Existing custom tokens */}
             {Object.keys(variables)
@@ -1129,7 +1176,10 @@ export default function LumosThemeEditor() {
 
       {renderAccordion('Spacing', 'spacing', (
         <>
-          {/* Controls */}
+          {/* Scale Controls */}
+          <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-3">
+            <h4 className="text-xs font-semibold">Scale Parameters</h4>
+          </div>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Base (px)</label>
@@ -1253,29 +1303,47 @@ export default function LumosThemeEditor() {
   );
 
   return (
-    <div className="relative w-full">
-      <div className="mb-4 pr-1">
-        <button 
-          onClick={() => setIsStudioOpen(true)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-md font-semibold transition-colors bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm text-sm"
-        >
-          ⛶ Ouvrir le Studio Lumos
-        </button>
-      </div>
+    <div className="relative w-full h-full overflow-y-auto isolate">
+      <div className="px-1 pt-2 pb-8 overflow-visible">
+        <div className="mb-4">
+          <button
+            onClick={() => setIsStudioOpen(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-md font-semibold transition-colors bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm text-sm"
+          >
+            ⛶ Ouvrir le Studio Lumos
+          </button>
+        </div>
 
-      {content}
+        {content}
+      </div>
 
       {isStudioOpen && (
         <div 
           className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto pointer-events-auto cursor-pointer"
           onClick={() => setIsStudioOpen(false)}
         >
-          <div 
-            className="w-[95vw] h-[90vh] max-w-none bg-background border border-border rounded-xl shadow-2xl flex flex-col relative overflow-hidden pointer-events-auto cursor-default"
+          <div
+            className="w-[92vw] h-[90vh] max-w-none bg-background border border-border rounded-xl shadow-2xl flex flex-col relative pointer-events-auto cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex-none flex justify-between items-center px-6 py-4 border-b border-border bg-card">
-              <h2 className="text-2xl font-bold">Lumos Design Studio</h2>
+              <div className="flex items-center gap-4">
+                <h2 className="text-2xl font-bold">Lumos Design Studio</h2>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(getCompleteBridgeCSS());
+                    const btn = e.currentTarget;
+                    const orig = btn.innerText;
+                    btn.innerText = '✓ Copied!';
+                    setTimeout(() => { btn.innerText = orig; }, 2000);
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-md border border-border hover:bg-muted text-muted-foreground transition-all"
+                  title="Copier le code Bridge complet pour Porduction (Publish)"
+                >
+                  📋 Copy Bridge CSS
+                </button>
+              </div>
               <button 
                 onClick={(e) => { e.stopPropagation(); setIsStudioOpen(false); }}
                 className="relative z-[100000] cursor-pointer w-10 h-10 flex items-center justify-center hover:bg-muted rounded-full text-lg font-medium transition-colors border border-border"
@@ -1284,8 +1352,8 @@ export default function LumosThemeEditor() {
                 ✕
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-8 relative">
-              <div className="max-w-6xl mx-auto">
+            <div className="flex-1 overflow-y-auto px-6 pb-6 isolate">
+              <div className="max-w-5xl mx-auto pt-6 overflow-visible">
                 {content}
               </div>
             </div>
