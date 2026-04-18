@@ -29,6 +29,28 @@ export default function LumosThemeEditor() {
   const [newColorName, setNewColorName] = useState('');
   const [newColorValue, setNewColorValue] = useState('#3b82f6');
 
+  // Spacing system state
+  const [spaceBase, setSpaceBase] = useState(16);       // base size in px
+  const [spaceRatio, setSpaceRatio] = useState(1.25);   // scale multiplier
+  const [spaceVpMin, setSpaceVpMin] = useState(375);    // min viewport px
+  const [spaceVpMax, setSpaceVpMax] = useState(1366);   // max viewport px
+  const [spaceSyncStatus, setSpaceSyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
+
+  // Typography system state
+  const [typographySyncStatus, setTypographySyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
+  const [isStudioOpen, setIsStudioOpen] = useState(false);
+
+  // Kill Switch (Escape key)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsStudioOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Subscribe to the Ycode fonts store (source of truth for installed fonts)
   const usedFonts = useFontsStore((state) => state.fonts);
 
@@ -40,7 +62,34 @@ export default function LumosThemeEditor() {
       .then(res => res.json())
       .then(data => {
         if (data.variables) {
-          setVariables(data.variables);
+          const vars = { ...data.variables };
+          const missingUpdates: Record<string, string> = {};
+          
+          // Inject Default Hardcoded Fallbacks for Typography if missing
+          ['display', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'body', 'small'].forEach(lvl => {
+            if (!vars[`${lvl}-font-weight`]) missingUpdates[`${lvl}-font-weight`] = '600';
+            if (!vars[`${lvl}-letter-spacing`]) missingUpdates[`${lvl}-letter-spacing`] = '0em';
+            if (!vars[`${lvl}-margin-bottom`]) missingUpdates[`${lvl}-margin-bottom`] = '0rem';
+            
+            if (!vars[`${lvl}-line-height`]) {
+              if (['display', 'h1', 'h2'].includes(lvl)) missingUpdates[`${lvl}-line-height`] = '1.2';
+              else if (lvl === 'h3') missingUpdates[`${lvl}-line-height`] = '1.3';
+              else if (['h4', 'h5'].includes(lvl)) missingUpdates[`${lvl}-line-height`] = '1.4';
+              else missingUpdates[`${lvl}-line-height`] = '1.5';
+            }
+          });
+          
+          if (Object.keys(missingUpdates).length > 0) {
+            Object.assign(vars, missingUpdates);
+            // Instantly auto-save defaults so we never see an empty inputs issue again
+            fetch('/api/lumos', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ updates: missingUpdates })
+            }).catch(console.error);
+          }
+          
+          setVariables(vars);
         }
         setLoading(false);
       });
@@ -79,7 +128,7 @@ export default function LumosThemeEditor() {
         const hexValue = variables[key];
         if (existingByName[label]) {
           return fetch(`/ycode/api/color-variables/${existingByName[label]}`, {
-            method: 'PATCH',
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ value: hexValue }),
           });
@@ -123,14 +172,409 @@ export default function LumosThemeEditor() {
       delete next[key];
       return next;
     });
-    // Also remove from the CSS file via the API
-    // (the API replaces the value — we pass an empty/invalid marker that gets cleaned up)
-    // For now, save a placeholder that the CSS engine will ignore
     fetch('/api/lumos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ updates: { [key]: '__remove__' } }),
     }).catch(() => {});
+  };
+
+  // ─── TYPOGRAPHY ──────────────────────────────────────────────────────────
+  
+  const TYPOGRAPHY_LEVELS = [
+    { key: 'display', label: 'Display' },
+    { key: 'h1', label: 'H1' },
+    { key: 'h2', label: 'H2' },
+    { key: 'h3', label: 'H3' },
+    { key: 'h4', label: 'H4' },
+    { key: 'h5', label: 'H5' },
+    { key: 'h6', label: 'H6' },
+    { key: 'body', label: 'Body' },
+    { key: 'small', label: 'Small' },
+  ];
+
+  // ─── SPACING ──────────────────────────────────────────────────────────────
+
+  /** Spacing token definitions (key, label, steps from base) */
+  const SPACE_TOKENS = [
+    { key: 'space-3xs', label: '3XS', steps: -3 },
+    { key: 'space-2xs', label: '2XS', steps: -2 },
+    { key: 'space-xs',  label: 'XS',  steps: -1 },
+    { key: 'space-s',   label: 'S',   steps:  0 },
+    { key: 'space-m',   label: 'M',   steps:  1 },
+    { key: 'space-l',   label: 'L',   steps:  2 },
+    { key: 'space-xl',  label: 'XL',  steps:  3 },
+    { key: 'space-2xl', label: '2XL', steps:  4 },
+    { key: 'space-3xl', label: '3XL', steps:  5 },
+  ] as const;
+
+  /**
+   * Generate a fluid clamp() value for a given size.
+   * Formula: clamp(minPx, fluidMid, maxPx)
+   * where minPx = size at spaceVpMin, maxPx = size at spaceVpMax
+   */
+  const generateClamp = (sizePx: number): string => {
+    const minPx  = sizePx;
+    const maxPx  = Math.round(sizePx * spaceRatio * 100) / 100;
+    // Fluid slope: (maxPx - minPx) / (vpMax - vpMin) * 100vw
+    const slope  = ((maxPx - minPx) / (spaceVpMax - spaceVpMin));
+    const intercept = minPx - slope * spaceVpMin;
+    const minRem  = (minPx / 16).toFixed(3);
+    const maxRem  = (maxPx / 16).toFixed(3);
+    const intRem  = (intercept / 16).toFixed(3);
+    const slopeVw = (slope * 100).toFixed(3);
+    return `clamp(${minRem}rem, ${intRem}rem + ${slopeVw}vw, ${maxRem}rem)`;
+  };
+
+  /**
+   * Compute the px size of a token given its step index from the base.
+   * Steps < 0 divide by ratio; steps > 0 multiply by ratio.
+   */
+  const tokenPx = (steps: number): number => {
+    if (steps >= 0) return spaceBase * Math.pow(spaceRatio, steps);
+    return spaceBase / Math.pow(spaceRatio, -steps);
+  };
+
+  // ─── RUNTIME BRIDGE (v7.0) ────────────────────────────────────────────────
+  /**
+   * Generate the complete CSS bridge as a string.
+   *
+   * v8.0 — Unique-token nomenclature.
+   * The bridge now targets the FULL token name (`space-m`, `space-3xs`, …)
+   * rather than short suffixes (`m`, `3xs`). This eliminates any
+   * cross-match risk with unrelated class fragments (e.g. `mt-auto`,
+   * `pt-0`, `gap-4`) and guarantees we only ever style classes that
+   * were produced by a Lumos token picked in Ycode's Style Panel.
+   *
+   * Ycode's Style Panel emits classes like `mt-space-m` (prefix + "-" + token name)
+   * when a named CSS variable is applied to a spacing property, so the
+   * selector `[class*="mt-space-m" i]` is an exact, guaranteed hit.
+   *
+   * Values are computed from the current scale state (not from the CSS file),
+   * so the bridge is always in sync with the Lumos panel controls.
+   */
+  const generateSpacingBridgeCSS = (): string => {
+    // Unique full-name tokens → CSS variable.
+    // IMPORTANT: ordered most-specific → least-specific so that, if
+    // rules ever tied, the longer token still wins.
+    const tokens: { token: string; cssVar: string }[] = [
+      { token: 'space-3xs', cssVar: '--space-3xs' },
+      { token: 'space-2xs', cssVar: '--space-2xs' },
+      { token: 'space-xs',  cssVar: '--space-xs'  },
+      { token: 'space-s',   cssVar: '--space-s'   },
+      { token: 'space-m',   cssVar: '--space-m'   },
+      { token: 'space-l',   cssVar: '--space-l'   },
+      { token: 'space-xl',  cssVar: '--space-xl'  },
+      { token: 'space-2xl', cssVar: '--space-2xl' },
+      { token: 'space-3xl', cssVar: '--space-3xl' },
+    ];
+
+    // CSS utility prefix → CSS property (or shorthand).
+    // Use the special marker `:VAR` to splice the value into shorthand rules.
+    const props: { prefix: string; property: string }[] = [
+      { prefix: 'pt',  property: 'padding-top' },
+      { prefix: 'pb',  property: 'padding-bottom' },
+      { prefix: 'pl',  property: 'padding-left' },
+      { prefix: 'pr',  property: 'padding-right' },
+      { prefix: 'px',  property: 'padding-left:VAR!important;padding-right' },  // shorthand trick
+      { prefix: 'py',  property: 'padding-top:VAR!important;padding-bottom' },
+      { prefix: 'mt',  property: 'margin-top' },
+      { prefix: 'mb',  property: 'margin-bottom' },
+      { prefix: 'ml',  property: 'margin-left' },
+      { prefix: 'mr',  property: 'margin-right' },
+      { prefix: 'mx',  property: 'margin-left:VAR!important;margin-right' },
+      { prefix: 'my',  property: 'margin-top:VAR!important;margin-bottom' },
+      { prefix: 'gap', property: 'gap' },
+    ];
+
+    const scope = ':where(#ybody,.y-canvas,[data-ycode-canvas])';
+    const lines: string[] = [
+      '/* Lumos Runtime Bridge v8.0 — auto-generated, do not edit */',
+      '/* Unique-token selectors: [class*="prop-space-X" i] — case-insensitive substring match */',
+    ];
+
+    for (const tok of tokens) {
+      lines.push(`/* ── ${tok.token.toUpperCase()} ── */`);
+      const val = `var(${tok.cssVar})`;
+
+      // 1. Bare token fallback: [class*="space-m" i] — catches ANY class
+      //    containing the token name, even if Ycode adopts a new prefix
+      //    convention in the future. Applies to every common box property
+      //    so we never miss a hit.
+      lines.push(
+        `${scope} [class*="${tok.token}" i]{` +
+        `--lumos-${tok.token}:${val}!important` +
+        `}`
+      );
+
+      // 2. Prefixed combinations: [class*="mt-space-m" i] { margin-top: var(--space-m) !important }
+      //    These are the authoritative rules — they map each Ycode utility
+      //    prefix to its exact CSS property.
+      for (const prop of props) {
+        const selector = `${scope} [class*="${prop.prefix}-${tok.token}" i]`;
+        if (prop.property.includes(':VAR')) {
+          const expanded = prop.property.replace(':VAR', `:${val}`);
+          lines.push(`${selector}{${expanded}:${val}!important}`);
+        } else {
+          lines.push(`${selector}{${prop.property}:${val}!important}`);
+        }
+      }
+    }
+
+    return lines.join('\n');
+  };
+
+  /**
+   * Mount / update the runtime bridge in both the host document
+   * and every canvas iframe. Runs whenever the scale parameters change.
+   */
+  useEffect(() => {
+    const css = generateSpacingBridgeCSS();
+    const TAG_ID = 'lumos-runtime-bridge';
+
+    const inject = (doc: Document | null | undefined) => {
+      if (!doc || !doc.head) return;
+      
+      // Spacing Bridge
+      let el = doc.getElementById(TAG_ID) as HTMLStyleElement | null;
+      if (!el) {
+        el = doc.createElement('style') as HTMLStyleElement;
+        el.id = TAG_ID;
+        doc.head.appendChild(el);
+      }
+      el.textContent = css;
+
+      // Typography Bridge
+      const typoCSS = generateTypographyBridgeCSS();
+      let typoEl = doc.getElementById('lumos-runtime-typography') as HTMLStyleElement | null;
+      if (!typoEl) {
+        typoEl = doc.createElement('style') as HTMLStyleElement;
+        typoEl.id = 'lumos-runtime-typography';
+        doc.head.appendChild(typoEl);
+      }
+      typoEl.textContent = typoCSS;
+      
+      // Verification logic: only log if we injected into an iframe (not the main builder document)
+      if (doc !== document) {
+        console.log(`[Lumos] Successfully injected Runtime Bridges into iframe`);
+      }
+    };
+
+    // 1. Host document (builder UI / Style Panel preview)
+    inject(document);
+
+    // 2. Every canvas iframe that is ALREADY in the DOM
+    const injectAllIframes = () => {
+      document.querySelectorAll('iframe').forEach(iframe => {
+        try { inject(iframe.contentDocument); } catch { /* cross-origin — skip */ }
+      });
+    };
+    injectAllIframes();
+
+    // 3. Iframes that (re)load later — hook their `load` event
+    const loadHandlers = new WeakMap<HTMLIFrameElement, () => void>();
+    const attachLoadHandler = (iframe: HTMLIFrameElement) => {
+      if (loadHandlers.has(iframe)) return;
+      const handler = () => {
+        try { inject(iframe.contentDocument); } catch { /* cross-origin */ }
+      };
+      loadHandlers.set(iframe, handler);
+      iframe.addEventListener('load', handler);
+    };
+    document.querySelectorAll('iframe').forEach(attachLoadHandler);
+
+    // 4. Iframes that get INSERTED into the DOM after mount — watch with MutationObserver
+    const mo = new MutationObserver(mutations => {
+      for (const m of mutations) {
+        m.addedNodes.forEach(node => {
+          if (node instanceof HTMLIFrameElement) {
+            attachLoadHandler(node);
+            try { inject(node.contentDocument); } catch { /* cross-origin */ }
+          } else if (node instanceof HTMLElement) {
+            node.querySelectorAll?.('iframe').forEach(iframe => {
+              attachLoadHandler(iframe as HTMLIFrameElement);
+              try { inject((iframe as HTMLIFrameElement).contentDocument); } catch (e) { console.debug('LumosThemeEditor: cross-origin iframe ignored', e); }
+            });
+          }
+        });
+      }
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      mo.disconnect();
+      document.querySelectorAll('iframe').forEach(iframe => {
+        const h = loadHandlers.get(iframe as HTMLIFrameElement);
+        if (h) iframe.removeEventListener('load', h);
+      });
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaceBase, spaceRatio, spaceVpMin, spaceVpMax]);
+
+  // ─── TYPOGRAPHY RUNTIME BRIDGE (v9.0) ─────────────────────────────────────
+  
+  const generateTypographyBridgeCSS = (): string => {
+    const scope = ':where(#ybody, .y-canvas, [data-ycode-canvas])';
+    const lines: string[] = ['/* Lumos Runtime Typography Bridge v9.0 */'];
+    
+    // Font Smoothing
+    const smoothing = variables['font-smoothing'] === 'antialiased';
+    if (smoothing) {
+      lines.push(`${scope} { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }`);
+    }
+
+    TYPOGRAPHY_LEVELS.forEach(lvl => {
+      let selector = '';
+      if (lvl.key === 'body') {
+        selector = `${scope} p`;
+      } else if (lvl.key === 'display') {
+        selector = `${scope} .u-text-display`;
+      } else if (lvl.key === 'small') {
+        selector = `${scope} .u-text-small`;
+      } else {
+        selector = `${scope} ${lvl.key}`; // h1-h6
+      }
+      
+      lines.push(`${selector} {`);
+      lines.push(`  font-weight: var(--${lvl.key}-font-weight) !important;`);
+      lines.push(`  line-height: var(--${lvl.key}-line-height) !important;`);
+      lines.push(`  letter-spacing: var(--${lvl.key}-letter-spacing) !important;`);
+      lines.push(`  margin-bottom: var(--${lvl.key}-margin-bottom) !important;`);
+      lines.push(`}`);
+    });
+
+    return lines.join('\n');
+  };
+
+  /**
+   * Push spacing tokens into Ycode's color_variables store.
+
+   *
+   * v8.1 — Categorized Nomenclature.
+   * The variable NAME registered in Ycode uses the "Lumos / " prefix followed
+   * by the raw token key (e.g. `Lumos / space-m`). This keeps all variables cleanly
+   * grouped in the Ycode Style Panel under the Lumos folder.
+   * Because Ycode derives utility classes from the full slug (e.g. `mt-lumos-space-m`),
+   * our Runtime Bridge's substring selector `[class*="space-m" i]` expertly
+   * intercepts it regardless of the prefix string.
+   */
+  const syncSpacingToYcode = async () => {
+    setSpaceSyncStatus('syncing');
+    try {
+      const existing = await fetch('/ycode/api/color-variables').then(r => r.json());
+      const existingByName: Record<string, string> = {};
+      for (const v of (existing.data || [])) existingByName[v.name] = v.id;
+
+      const requests = SPACE_TOKENS.map(token => {
+        const px         = tokenPx(token.steps);
+        const name       = `Lumos / ${token.key}`;             // e.g. "Lumos / space-m"
+        const legacyName = `Lumos / Space ${token.label}`;     // e.g. "Lumos / Space M"
+        const value      = `${Math.round(px)}px`;              // human-readable px fallback
+
+        // Prefer updating an entry already saved under the new name
+        if (existingByName[name]) {
+          return fetch(`/ycode/api/color-variables/${existingByName[name]}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, value }),
+          });
+        }
+
+        // Migrate a legacy entry: rename it AND update its value in a single PUT
+        if (existingByName[legacyName]) {
+          return fetch(`/ycode/api/color-variables/${existingByName[legacyName]}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, value }),
+          });
+        }
+
+        // Migrate if it was briefly named just "space-m" from previous versions
+        if (existingByName[token.key]) {
+          return fetch(`/ycode/api/color-variables/${existingByName[token.key]}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, value }),
+          });
+        }
+
+        // No prior entry — create a fresh one under the canonical name
+        return fetch('/ycode/api/color-variables', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, value }),
+        });
+      });
+
+      await Promise.all(requests);
+      await loadColorVariables();
+      setSpaceSyncStatus('done');
+      setTimeout(() => setSpaceSyncStatus('idle'), 3000);
+    } catch (e) {
+      console.error('Lumos: Failed to sync spacing', e);
+      setSpaceSyncStatus('error');
+      setTimeout(() => setSpaceSyncStatus('idle'), 3000);
+    }
+  };
+
+  /**
+   * Push typography tokens into Ycode's color_variables store.
+   * Ex: `Lumos / h1-line-height`, `Lumos / h1-letter-spacing`
+   */
+  const syncTypographyToYcode = async () => {
+    setTypographySyncStatus('syncing');
+    try {
+      const existing = await fetch('/ycode/api/color-variables').then(r => r.json());
+      const existingByName: Record<string, string> = {};
+      for (const v of (existing.data || [])) existingByName[v.name] = v.id;
+
+      const requests: Promise<any>[] = [];
+      
+      TYPOGRAPHY_LEVELS.forEach(level => {
+        ['weight', 'line-height', 'letter-spacing', 'margin-bottom'].forEach(prop => {
+          const cssVarKey = `${level.key}-${prop}`; // e.g. "h1-line-height"
+          const name = `Lumos / ${cssVarKey}`;
+          const value = variables[cssVarKey] || 'inherit'; 
+          
+          if (existingByName[name]) {
+            requests.push(fetch(`/ycode/api/color-variables/${existingByName[name]}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, value }),
+            }));
+          } else {
+            requests.push(fetch('/ycode/api/color-variables', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, value }),
+            }));
+          }
+        });
+      });
+
+      await Promise.all(requests);
+      await loadColorVariables();
+      setTypographySyncStatus('done');
+      setTimeout(() => setTypographySyncStatus('idle'), 3000);
+    } catch (e) {
+      console.error('Lumos: Failed to sync typography', e);
+      setTypographySyncStatus('error');
+      setTimeout(() => setTypographySyncStatus('idle'), 3000);
+    }
+  };
+
+  /** Save spacing params to global-theme.css via /api/lumos */
+  const saveSpacingToTheme = () => {
+    const updates: Record<string, string> = {};
+    SPACE_TOKENS.forEach(token => {
+      const px    = tokenPx(token.steps);
+      updates[token.key] = generateClamp(px);
+    });
+    fetch('/api/lumos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates }),
+    }).then(() => triggerIframeCSSReload()).catch(() => {});
   };
 
   const triggerIframeCSSReload = async () => {
@@ -151,6 +595,28 @@ export default function LumosThemeEditor() {
           if (styleEl) {
             styleEl.textContent = css;
           }
+
+          // Also re-inject the runtime spacing bridge so it survives iframe reloads
+          const bridgeCSS = generateSpacingBridgeCSS();
+          let bridgeEl = iframeDoc.getElementById('lumos-runtime-bridge') as HTMLStyleElement | null;
+          if (!bridgeEl) {
+            bridgeEl = iframeDoc.createElement('style') as HTMLStyleElement;
+            bridgeEl.id = 'lumos-runtime-bridge';
+            iframeDoc.head.appendChild(bridgeEl);
+          }
+          bridgeEl.textContent = bridgeCSS;
+
+          // Re-inject the runtime typography bridge
+          const typoCSS = generateTypographyBridgeCSS();
+          let typoEl = iframeDoc.getElementById('lumos-runtime-typography') as HTMLStyleElement | null;
+          if (!typoEl) {
+            typoEl = iframeDoc.createElement('style') as HTMLStyleElement;
+            typoEl.id = 'lumos-runtime-typography';
+            iframeDoc.head.appendChild(typoEl);
+          }
+          typoEl.textContent = typoCSS;
+          
+          console.log(`[Lumos] Successfully injected Runtime Bridges into iframe (trigger reload)`);
 
           // Also set CSS variables directly on #ybody for instant rendering
           // without waiting for a full style sheet reload
@@ -181,13 +647,29 @@ export default function LumosThemeEditor() {
     } catch (e) {
       console.error('Failed to save Lumos variables', e);
     }
-  }, []);
+  }, [triggerIframeCSSReload]);
 
   const debouncedSave = useDebounce(saveUpdates, 300);
 
   const handleChange = (key: string, value: string) => {
     setVariables(prev => ({ ...prev, [key]: value }));
     debouncedSave({ [key]: value });
+  };
+
+  const resetTypographyToDefaults = () => {
+    const updates: Record<string, string> = {};
+    ['display', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'body', 'small'].forEach(lvl => {
+      updates[`${lvl}-font-weight`] = '600';
+      updates[`${lvl}-letter-spacing`] = '0em';
+      updates[`${lvl}-margin-bottom`] = '0rem';
+      
+      if (['display', 'h1', 'h2'].includes(lvl)) updates[`${lvl}-line-height`] = '1.2';
+      else if (lvl === 'h3') updates[`${lvl}-line-height`] = '1.3';
+      else if (['h4', 'h5'].includes(lvl)) updates[`${lvl}-line-height`] = '1.4';
+      else updates[`${lvl}-line-height`] = '1.5';
+    });
+    setVariables(prev => ({ ...prev, ...updates }));
+    saveUpdates(updates);
   };
 
   const [openSection, setOpenSection] = useState<string>('general');
@@ -365,19 +847,7 @@ export default function LumosThemeEditor() {
     { label: 'Text Small', minKey: '_typography---font-size--text-small-min', maxKey: '_typography---font-size--text-small-max' },
   ];
 
-  const spacingPairs = [
-    { label: 'Section Space', minKey: '_spacing---section-space--main-min', maxKey: '_spacing---section-space--main-max' },
-    { label: 'Space 1', minKey: '_spacing---space--1-min', maxKey: '_spacing---space--1-max' },
-    { label: 'Space 2', minKey: '_spacing---space--2-min', maxKey: '_spacing---space--2-max' },
-    { label: 'Space 3', minKey: '_spacing---space--3-min', maxKey: '_spacing---space--3-max' },
-    { label: 'Space 4', minKey: '_spacing---space--4-min', maxKey: '_spacing---space--4-max' },
-    { label: 'Space 5', minKey: '_spacing---space--5-min', maxKey: '_spacing---space--5-max' },
-    { label: 'Space 6', minKey: '_spacing---space--6-min', maxKey: '_spacing---space--6-max' },
-    { label: 'Space 7', minKey: '_spacing---space--7-min', maxKey: '_spacing---space--7-max' },
-    { label: 'Space 8', minKey: '_spacing---space--8-min', maxKey: '_spacing---space--8-max' },
-  ];
-
-  return (
+  const content = (
     <div className="flex flex-col w-full pb-8 pr-1">
       {renderAccordion('General', 'general', (
         <>
@@ -397,8 +867,6 @@ export default function LumosThemeEditor() {
         </>
       ))}
 
-      {renderAccordion('Spacing', 'spacing', renderPairGroups(spacingPairs))}
-
       {renderAccordion('Type Size', 'typesize', renderPairGroups(typographyPairs))}
 
       {renderAccordion('Typography', 'typography', (
@@ -411,10 +879,100 @@ export default function LumosThemeEditor() {
           </div>
 
           <div className="pt-4 border-t border-border">
-            <h4 className="text-xs font-semibold mb-2">Global Defaults</h4>
-            {renderTextInput('Font Weight', '_text-style---font-weight')}
-            {renderNumberInput('Line Height', '_text-style---line-height', '0.1')}
-            {renderTextInput('Margin Bottom', '_text-style---margin-bottom')}
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-xs font-semibold">Typography Levels</h4>
+              <label className="flex items-center gap-2 text-[10px] cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={variables['font-smoothing'] === 'antialiased'}
+                  onChange={(e) => handleChange('font-smoothing', e.target.checked ? 'antialiased' : 'auto')}
+                />
+                Enable Font Smoothing (Antialiased)
+              </label>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] gap-4 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                <div>Level</div>
+                <div>Weight</div>
+                <div>Line Height (%)</div>
+                <div>Letter Spacing (em)</div>
+                <div>Margin Bottom (rem)</div>
+              </div>
+              {TYPOGRAPHY_LEVELS.map(level => (
+                <div key={level.key} className="grid grid-cols-[80px_1fr_1fr_1fr_1fr] gap-4 items-center">
+                  <div className="text-xs font-semibold">{level.label}</div>
+                  <input
+                    type="number" step="100"
+                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-ring"
+                    value={variables[`${level.key}-font-weight`] || ''}
+                    onChange={e => handleChange(`${level.key}-font-weight`, e.target.value)}
+                  />
+                  <input
+                    type="number" step="1"
+                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-ring"
+                    value={variables[`${level.key}-line-height`] ? Math.round(parseFloat(variables[`${level.key}-line-height`]) * 100) : ''}
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val)) {
+                        handleChange(`${level.key}-line-height`, (val / 100).toString());
+                      } else if (e.target.value === '') {
+                        handleChange(`${level.key}-line-height`, '');
+                      }
+                    }}
+                  />
+                  <input
+                    type="number" step="0.01"
+                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-ring"
+                    value={variables[`${level.key}-letter-spacing`] ? variables[`${level.key}-letter-spacing`].replace('em', '') : ''}
+                    onChange={e => handleChange(`${level.key}-letter-spacing`, e.target.value ? `${e.target.value}em` : '0em')}
+                  />
+                  <input
+                    type="number" step="0.1"
+                    className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-ring"
+                    value={variables[`${level.key}-margin-bottom`] ? variables[`${level.key}-margin-bottom`].replace(/em|rem/, '') : ''}
+                    onChange={e => handleChange(`${level.key}-margin-bottom`, e.target.value ? `${e.target.value}rem` : '0rem')}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t border-border flex gap-2">
+            <button
+              onClick={resetTypographyToDefaults}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+                bg-background border border-border hover:bg-muted"
+            >
+              ↺ Reset to System Defaults
+            </button>
+            <button
+              onClick={syncTypographyToYcode}
+              disabled={typographySyncStatus === 'syncing'}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+                bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {typographySyncStatus === 'syncing' && (
+                <svg
+                  className="animate-spin w-3 h-3" viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25" cx="12"
+                    cy="12" r="10"
+                    stroke="currentColor" strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8z"
+                  />
+                </svg>
+              )}
+              {typographySyncStatus === 'idle' && '⇄ Sync Typo → Ycode'}
+              {typographySyncStatus === 'syncing' && 'Syncing…'}
+              {typographySyncStatus === 'done' && '✓ Synced'}
+              {typographySyncStatus === 'error' && 'Failed'}
+            </button>
           </div>
 
           <div className="mt-4 pt-4 border-t border-border">
@@ -568,6 +1126,172 @@ export default function LumosThemeEditor() {
           </div>
         </>
       ))}
+
+      {renderAccordion('Spacing', 'spacing', (
+        <>
+          {/* Controls */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Base (px)</label>
+              <input
+                type="number" min={8}
+                max={32} step={1}
+                className="w-full bg-background border border-border rounded px-2 py-1 text-xs outline-none focus:border-ring"
+                value={spaceBase}
+                onChange={e => setSpaceBase(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Ratio</label>
+              <select
+                className="w-full bg-background border border-border rounded px-2 py-1 text-xs outline-none focus:border-ring"
+                value={spaceRatio}
+                onChange={e => setSpaceRatio(Number(e.target.value))}
+              >
+                <option value={1.125}>1.125 — Major Second</option>
+                <option value={1.25}>1.250 — Major Third</option>
+                <option value={1.333}>1.333 — Perfect Fourth</option>
+                <option value={1.5}>1.500 — Perfect Fifth</option>
+                <option value={2}>2.000 — Octave</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Viewport min (px)</label>
+              <input
+                type="number" min={320}
+                max={640} step={1}
+                className="w-full bg-background border border-border rounded px-2 py-1 text-xs outline-none focus:border-ring"
+                value={spaceVpMin}
+                onChange={e => setSpaceVpMin(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Viewport max (px)</label>
+              <input
+                type="number" min={1024}
+                max={2560} step={1}
+                className="w-full bg-background border border-border rounded px-2 py-1 text-xs outline-none focus:border-ring"
+                value={spaceVpMax}
+                onChange={e => setSpaceVpMax(Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          {/* Apply button */}
+          <button
+            onClick={saveSpacingToTheme}
+            className="w-full mb-4 px-3 py-1.5 rounded-md text-xs font-medium bg-muted text-foreground hover:bg-muted/70 border border-border transition-colors"
+          >
+            ↻ Apply Scale to Canvas
+          </button>
+
+          {/* Visual token preview */}
+          <div className="space-y-1.5 mb-4">
+            <div className="text-[10px] text-muted-foreground bg-muted/40 p-2 rounded mb-3 border border-border">
+              <strong className="block mb-1 text-foreground">💡 Usage Hint</strong>
+              Use these exact lowercase token names in Ycode variables to match the automatic spacing bridge (e.g. <code>space-3xs</code>, <code>space-m</code>).
+            </div>
+            {SPACE_TOKENS.map(token => {
+              const px  = tokenPx(token.steps);
+              const maxBarPx = tokenPx(5); // 3XL is the widest
+              const barPct   = Math.min((px / maxBarPx) * 100, 100);
+              const minRem   = (px / 16).toFixed(2);
+              const maxRem   = ((px * spaceRatio) / 16).toFixed(2);
+              return (
+                <div key={token.key} className="flex items-center gap-2">
+                  <span className="w-16 text-[10px] font-mono font-bold text-muted-foreground text-right shrink-0">{token.key.toLowerCase()}</span>
+                  <div className="flex-1 bg-muted rounded-sm overflow-hidden h-4">
+                    <div
+                      className="h-full bg-primary/40 rounded-sm transition-all duration-300"
+                      style={{ width: `${barPct}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono text-muted-foreground w-24 shrink-0">
+                    {minRem}→{maxRem}rem
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Sync to Ycode */}
+          <div className="pt-3 border-t border-border">
+            <p className="text-[10px] text-muted-foreground mb-2 leading-snug">
+              Register spacing tokens as CSS variables in the Ycode Style Panel.
+            </p>
+            <button
+              onClick={syncSpacingToYcode}
+              disabled={spaceSyncStatus === 'syncing'}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+                bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {spaceSyncStatus === 'syncing' && (
+                <svg
+                  className="animate-spin w-3 h-3" viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25" cx="12"
+                    cy="12" r="10"
+                    stroke="currentColor" strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8z"
+                  />
+                </svg>
+              )}
+              {spaceSyncStatus === 'idle'    && '⇄ Sync → Ycode Variables'}
+              {spaceSyncStatus === 'syncing' && 'Syncing…'}
+              {spaceSyncStatus === 'done'    && '✓ Tokens registered!'}
+              {spaceSyncStatus === 'error'   && '✗ Error — check console'}
+            </button>
+          </div>
+        </>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="relative w-full">
+      <div className="mb-4 pr-1">
+        <button 
+          onClick={() => setIsStudioOpen(true)}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-md font-semibold transition-colors bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm text-sm"
+        >
+          ⛶ Ouvrir le Studio Lumos
+        </button>
+      </div>
+
+      {content}
+
+      {isStudioOpen && (
+        <div 
+          className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto pointer-events-auto cursor-pointer"
+          onClick={() => setIsStudioOpen(false)}
+        >
+          <div 
+            className="w-[95vw] h-[90vh] max-w-none bg-background border border-border rounded-xl shadow-2xl flex flex-col relative overflow-hidden pointer-events-auto cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex-none flex justify-between items-center px-6 py-4 border-b border-border bg-card">
+              <h2 className="text-2xl font-bold">Lumos Design Studio</h2>
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsStudioOpen(false); }}
+                className="relative z-[100000] cursor-pointer w-10 h-10 flex items-center justify-center hover:bg-muted rounded-full text-lg font-medium transition-colors border border-border"
+                title="Fermer le Design Studio"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-8 relative">
+              <div className="max-w-6xl mx-auto">
+                {content}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

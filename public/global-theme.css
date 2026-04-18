@@ -48,21 +48,52 @@
   --_spacing---space--7-min: 3;    --_spacing---space--7-max: 4;
   --_spacing---space--8-min: 4;    --_spacing---space--8-max: 6;
 
-  /* --- 5. TEXT STYLE OPTIONS --- */
+  /* --- 5. TEXT STYLE OPTIONS (Granular Levels v9.0) --- */
   --_text-style---font-family: inherit;
-  --_text-style---font-weight: 400;
-  --_text-style---line-height: 1.5;
-  --_text-style---margin-bottom: 0rem;
-  --_text-style---trim-top: 0.39em;
-  --_text-style---trim-bottom: 0.37em;
-  --_text-style---optical-offset: -0.08em;
+  --_text-style---trim-top: 0.35em;
+  --_text-style---trim-bottom: 0.34em;
+  --_text-style---optical-offset: -0.04em;
+
+  --font-smoothing: antialiased;
+
+  --display-font-weight: 600; --display-line-height: 1.2; --display-letter-spacing: -0.02em; --display-margin-bottom: 0rem;
+  --h1-font-weight: 700; --h1-line-height: 1.2; --h1-letter-spacing: -0.02em; --h1-margin-bottom: 0rem;
+  --h2-font-weight: 700; --h2-line-height: 1.2; --h2-letter-spacing: -0.02em; --h2-margin-bottom: 0rem;
+  --h3-font-weight: 600; --h3-line-height: 1.3; --h3-letter-spacing: 0em; --h3-margin-bottom: 0rem;
+  --h4-font-weight: 600; --h4-line-height: 1.4; --h4-letter-spacing: 0em; --h4-margin-bottom: 0rem;
+  --h5-font-weight: 500; --h5-line-height: 1.4; --h5-letter-spacing: 0em; --h5-margin-bottom: 0rem;
+  --h6-font-weight: 500; --h6-line-height: 1.5; --h6-letter-spacing: 0em; --h6-margin-bottom: 0rem;
+  --body-font-weight: 400; --body-line-height: 1.5; --body-letter-spacing: 0em; --body-margin-bottom: 0rem;
+  --small-font-weight: 400; --small-line-height: 1.5; --small-letter-spacing: 0em; --small-margin-bottom: 0rem;
+
 
   /* --- 5b. FONT ROLE VARIABLES --- */
   /* Assign font roles to each part of the typography system.
      Default: inherit (no change). Set via the Lumos panel. */
   --_typography---font-family-headings: 'Poppins', sans-serif;
   --_typography---font-family-body: 'Poppins', sans-serif;
-  
+
+  /* --- 5c. FLUID SPACING SCALE ---
+     Scale: clamp(min, fluid, max)
+     Base: 16px · Ratio: 1.25 (Major Third)
+     Viewport: 375px → 1366px
+     Managed via the Lumos Spacing panel. */
+  --space-base:  16;           /* px, unitless for calc() */
+  --space-ratio: 1.25;         /* multiplication ratio between steps */
+  --space-vp-min: 375;         /* min viewport (px, unitless) */
+  --space-vp-max: 1366;        /* max viewport (px, unitless) */
+
+  /* Generated scale (min → fluid → max) */
+  --space-3xs: clamp(0.422rem, 0.369rem + 0.227vw, 0.563rem);   /*  4px →  6px */
+  --space-2xs: clamp(0.563rem, 0.492rem + 0.302vw, 0.750rem);   /*  6px →  10px */
+  --space-xs:  clamp(0.750rem, 0.656rem + 0.403vw, 1.000rem);   /*  8px →  12px */
+  --space-s:   clamp(1.000rem, 0.874rem + 0.538vw, 1.333rem);   /* 12px →  18px */
+  --space-m:   clamp(1.333rem, 1.165rem + 0.717vw, 1.777rem);   /* 16px →  24px */
+  --space-l:   clamp(1.777rem, 1.553rem + 0.956vw, 2.369rem);   /* 20px →  30px */
+  --space-xl:  clamp(2.369rem, 2.070rem + 1.274vw, 3.158rem);   /* 24px →  36px */
+  --space-2xl: clamp(3.157rem, 2.759rem + 1.698vw, 4.209rem);   /* 32px →  48px */
+  --space-3xl: clamp(4.209rem, 3.678rem + 2.262vw, 5.610rem);   /* 48px →  72px */
+
   /* --- 6. CORE COLORS --- */
   --color--primary: #5465FF;
   --color--primary-dark: #788BFF;
@@ -109,15 +140,8 @@
   --theme--accent: var(--theme-dark--accent);
 }
 
-/* --- 6. TEXT RESET --- */
-#ybody h1 h2 h3 h4 h5 h6 p .u-text-display .u-text-main h1 h2 h3 h4 h5 h6 p h1 h2 h3 h4 h5 h6 p h1 h2 h3 h4 h5 h6 p {
-  font-family: var(--_text-style---font-family) !important;
-  font-weight: var(--_text-style---font-weight) !important;
-  line-height: var(--_text-style---line-height) !important;
-  margin-bottom: var(--_text-style---margin-bottom) !important;
-}
+  /* (Legacy Text Reset removed in favor of runtime bridge & level-specific styling) */
 
-/* --- 6.2 FONT ROLES (Headings vs Body) --- */
 
 /* Variables déclarées DANS l'iframe (sur #ybody) pour qu'elles soient
    accessibles aux enfants — pas sur :root (page principale de l'éditeur) */
@@ -221,8 +245,8 @@
 #ybody .y-text-editor p,
 #ybody .ProseMirror p,
 #ybody [contenteditable="true"] p {
-  --_text-style---trim-top: 0em !important;
-  --_text-style---trim-bottom: 0em !important;
+  --_text-style---trim-top: 0.35em;
+  --_text-style---trim-bottom: 0.34em;
   font-size: inherit !important;
   font-family: inherit !important;
   font-weight: inherit !important;
@@ -253,8 +277,8 @@
 /* 4. Spans / em / strong injectés par Tiptap — aussi sans Trim */
 #ybody .y-text-editor :is(span, em, strong, s, u, a, code),
 #ybody .ProseMirror :is(span, em, strong, s, u, a, code) {
-  --_text-style---trim-top: 0em !important;
-  --_text-style---trim-bottom: 0em !important;
+  --_text-style---trim-top: 0.35em;
+  --_text-style---trim-bottom: 0.34em;
   font-size: inherit !important;
   line-height: inherit !important;
 }
@@ -287,13 +311,13 @@
 /* Sans-Serif (Inter) : Souvent besoin d'un décalage plus fort */
 :is(#ybody, .y-canvas, [data-ycode-canvas]) :is([style*="font-family: 'Inter'"], [style*="font-family: Inter"], [style*="font-family: 'Inter var'"], [style*="font-family: Inter var"]) {
   /* On surcharge la variable pour cette police spécifique */
-  --_text-style---optical-offset: -0.08em;
+  --_text-style---optical-offset: -0.04em;
 }
 
 /* Serif (Playfair Display) : Décalage plus subtil */
 :is(#ybody, .y-canvas, [data-ycode-canvas]) :is([style*="font-family: 'Playfair Display'"], [style*="font-family: Playfair Display"]) {
   /* On surcharge la variable pour cette police spécifique */
-  --_text-style---optical-offset: -0.08em;
+  --_text-style---optical-offset: -0.04em;
 }
 #ybody p { font-size: clamp(var(--_typography---font-size--text-main-min) * 1rem, var(--_typography---font-size--text-main-min) * 1rem + (var(--_typography---font-size--text-main-max) - var(--_typography---font-size--text-main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--text-main-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
 
