@@ -1060,21 +1060,27 @@ export function removeConflictsForClass(
   existingClasses: string[],
   newClass: string
 ): string[] {
+  // Extract the breakpoint of the incoming class so conflict removal is scoped
+  // to the same breakpoint only — never touches classes from other breakpoints.
+  // e.g. adding "max-lg:text-green" removes "max-lg:text-red" but keeps "text-red".
+  const { breakpoint } = parseBreakpointClass(newClass);
   const affectedProperties = getAffectedProperties(newClass);
 
-  // Start with existing classes
   let result = existingClasses;
 
-  // Remove conflicts for each affected property
   affectedProperties.forEach(property => {
-    result = removeConflictingClasses(result, property);
+    result = removeConflictingClassesForBreakpoint(result, property, breakpoint);
   });
 
   // Additional check: if newClass is a standard color class (e.g., text-blue-500),
-  // also remove arbitrary color values (e.g., text-[#000000])
+  // also remove arbitrary color values (e.g., text-[#000000]) — same breakpoint only.
   if (isStandardColorClass(newClass)) {
     affectedProperties.forEach(property => {
-      result = result.filter(cls => !isArbitraryColorClass(cls, property));
+      result = result.filter(cls => {
+        const { breakpoint: clsBp, baseClass: clsBase } = parseBreakpointClass(cls);
+        if (clsBp !== breakpoint) return true;
+        return !isArbitraryColorClass(clsBase, property);
+      });
     });
   }
 

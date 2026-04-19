@@ -1191,6 +1191,83 @@ export default function StudioThemeEditor() {
         </>
       ))}
 
+      {renderAccordion('Layout Utilities', 'layout-utils', (
+        <div className="space-y-4 text-xs">
+          {/* Breakpoint cascade reminder */}
+          <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm">
+            <h4 className="text-xs font-semibold">Prefixes responsifs</h4>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-1">
+            {[
+              { bp: 'Desktop', prefix: '—', sub: 'aucun préfixe' },
+              { bp: 'Tablette', prefix: 'max-lg:', sub: 'ou md:' },
+              { bp: 'Mobile', prefix: 'max-md:', sub: 'ou sm:' },
+            ].map(({ bp, prefix, sub }) => (
+              <div key={bp} className="bg-muted rounded-md p-2 text-center">
+                <div className="font-semibold text-[10px] text-muted-foreground mb-1">{bp}</div>
+                <code className="block text-[11px] font-mono font-bold text-foreground">{prefix}</code>
+                <div className="text-[9px] text-muted-foreground mt-0.5">{sub}</div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground leading-snug">
+            Mobile hérite de la tablette si aucune classe mobile n&apos;est définie. Tablette hérite du desktop.
+          </p>
+
+          {/* u-grid-outset */}
+          <div>
+            <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-2">
+              <h4 className="text-xs font-semibold">u-grid-outset — Débord de gouttière</h4>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2 leading-snug">Dépasse la gouttière de la grille <code>(--site--gutter)</code> sans sortir de la marge site.</p>
+            <div className="space-y-1">
+              {[
+                { cls: 'u-grid-outset',       desc: 'Déborde des deux gouttières (gauche + droite)' },
+                { cls: 'u-grid-outset-left',  desc: 'Déborde uniquement de la gouttière gauche' },
+                { cls: 'u-grid-outset-right', desc: 'Déborde uniquement de la gouttière droite' },
+              ].map(({ cls, desc }) => (
+                <div key={cls} className="flex items-start gap-2">
+                  <code className="shrink-0 bg-primary/10 text-primary rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold">{cls}</code>
+                  <span className="text-[10px] text-muted-foreground pt-0.5">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* u-break */}
+          <div>
+            <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-2">
+              <h4 className="text-xs font-semibold">u-break — Débord de marge site</h4>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2 leading-snug">Sort de la marge du site <code>(--site--margin-fluid)</code>. Cascade depuis tablette vers mobile.</p>
+            <div className="space-y-1">
+              {[
+                { cls: 'u-break-left',  desc: 'Sort jusqu\'au bord gauche du viewport' },
+                { cls: 'u-break-right', desc: 'Sort jusqu\'au bord droit du viewport' },
+                { cls: 'u-break-full',  desc: 'Sort des deux côtés (gauche + droite)' },
+                { cls: 'u-full-bleed',  desc: 'Pleine largeur viewport (margin: 50% - 50vw)' },
+                { cls: 'u-break-none',  desc: 'Annule un break — reset à 100%' },
+              ].map(({ cls, desc }) => (
+                <div key={cls} className="flex items-start gap-2">
+                  <code className="shrink-0 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded px-1.5 py-0.5 text-[10px] font-mono font-semibold">{cls}</code>
+                  <span className="text-[10px] text-muted-foreground pt-0.5">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Example */}
+          <div className="bg-muted/40 rounded-md p-3 border border-border">
+            <div className="text-[10px] font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Exemple combiné</div>
+            <code className="block text-[10px] font-mono text-foreground leading-relaxed">
+              u-break-right<br />
+              <span className="text-primary">max-lg:</span>u-break-full<br />
+              <span className="text-muted-foreground">{/* mobile hérite max-lg: → u-break-full */}</span>
+            </code>
+          </div>
+        </div>
+      ))}
+
       {renderAccordion('Spacing', 'spacing', (
         <>
           {/* Scale Controls */}
