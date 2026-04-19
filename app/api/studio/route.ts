@@ -8,11 +8,11 @@ const APP_THEME_PATH = path.join(process.cwd(), 'app', 'global-theme.css');
 export async function GET() {
   try {
     const css = await fs.readFile(THEME_PATH, 'utf-8');
-    const startIdx = css.indexOf('/* LUMOS_CORE_START */');
-    const endIdx = css.indexOf('/* LUMOS_CORE_END */');
+    const startIdx = css.indexOf('/* STUDIO_CORE_START */');
+    const endIdx = css.indexOf('/* STUDIO_CORE_END */');
     
     if (startIdx === -1 || endIdx === -1) {
-      return NextResponse.json({ error: 'Lumos core section not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Studio core section not found' }, { status: 404 });
     }
     
     const coreSection = css.substring(startIdx, endIdx);
@@ -46,14 +46,14 @@ export async function POST(request: Request) {
       } else if (new RegExp(`--${key}:`).test(css)) {
         css = css.replace(new RegExp(`(--${key}:\\s*)([^;]+)(;)`, 'g'), `$1${value}$3`);
       } else {
-        css = css.replace('/* LUMOS_CORE_END */', `:root {\n  --${key}: ${value};\n}\n/* LUMOS_CORE_END */`);
+        css = css.replace('/* STUDIO_CORE_END */', `:root {\n  --${key}: ${value};\n}\n/* STUDIO_CORE_END */`);
       }
     }
 
     // 2. Injecter les Bridges CSS de manière persistente pour la Production
     if (bridges && typeof bridges === 'string') {
-      const bridgeStart = '/* LUMOS_RUNTIME_BRIDGES_START */';
-      const bridgeEnd = '/* LUMOS_RUNTIME_BRIDGES_END */';
+      const bridgeStart = '/* STUDIO_RUNTIME_BRIDGES_START */';
+      const bridgeEnd = '/* STUDIO_RUNTIME_BRIDGES_END */';
       const bridgeBlock = `\n${bridgeStart}\n${bridges}\n${bridgeEnd}\n`;
 
       if (css.includes(bridgeStart) && css.includes(bridgeEnd)) {

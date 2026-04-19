@@ -3,7 +3,7 @@
    ============================================================ */
 @import "tailwindcss";
 @import "tw-animate-css";
-/* Lumos — importé au niveau racine pour éviter CssSyntaxError */
+/* Studio — importé au niveau racine pour éviter CssSyntaxError */
 @import "./global-theme.css";
 
 /* ============================================================

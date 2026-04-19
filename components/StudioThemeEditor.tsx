@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import { useFontsStore } from '@/stores/useFontsStore';
-import { BUILT_IN_FONTS } from '@/lib/font-utils';
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
-
 // Debounce helper
 function useDebounce<T extends (...args: any[]) => void>(callback: T, delay: number) {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -18,7 +17,7 @@ function useDebounce<T extends (...args: any[]) => void>(callback: T, delay: num
   }, [callback, delay]);
 }
 
-export default function LumosThemeEditor() {
+export default function StudioThemeEditor() {
   const pathname = usePathname() || '';
   const isBuilder = pathname.includes('/ycode') || pathname.includes('/builder');
   
@@ -34,6 +33,7 @@ export default function LumosThemeEditor() {
   const [spaceVpMin, setSpaceVpMin] = useState(375);    // min viewport px
   const [spaceVpMax, setSpaceVpMax] = useState(1366);   // max viewport px
   const [spaceSyncStatus, setSpaceSyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
+  const mountSyncDone = useRef(false);
 
   // Typography system state
   const [typographySyncStatus, setTypographySyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
@@ -57,7 +57,7 @@ export default function LumosThemeEditor() {
   const loadColorVariables = useColorVariablesStore((state) => state.loadColorVariables);
 
   useEffect(() => {
-    fetch('/api/lumos')
+    fetch('/api/studio')
       .then(res => res.json())
       .then(data => {
         if (data.variables) {
@@ -80,7 +80,7 @@ export default function LumosThemeEditor() {
 
           if (Object.keys(missingUpdates).length > 0) {
             Object.assign(vars, missingUpdates);
-            fetch('/api/lumos', {
+            fetch('/api/studio', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ updates: missingUpdates })
@@ -88,14 +88,27 @@ export default function LumosThemeEditor() {
           }
 
           setVariables(vars);
+
+          // Hydrate spacing scale params from persisted CSS variables
+          if (vars['space-base'])   setSpaceBase(Number(vars['space-base']));
+          if (vars['space-ratio'])  setSpaceRatio(Number(vars['space-ratio']));
+          if (vars['space-vp-min']) setSpaceVpMin(Number(vars['space-vp-min']));
+          if (vars['space-vp-max']) setSpaceVpMax(Number(vars['space-vp-max']));
         }
       })
-      .catch(err => console.error('Lumos: Failed to load theme', err))
+      .catch(err => console.error('Studio: Failed to load theme', err))
       .finally(() => setLoading(false));
   }, []);
 
+  // Silent one-shot sync: register spacing tokens in Ycode DB after hydration
+  useEffect(() => {
+    if (loading || mountSyncDone.current) return;
+    mountSyncDone.current = true;
+    upsertSpacingTokens();
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /**
-   * Push Lumos color tokens into Ycode's color_variables store so they
+   * Push Studio color tokens into Ycode's color_variables store so they
    * appear in the native Style Panel as selectable CSS variables.
    * Dynamically scans ALL color-- keys — fixed tokens + user-added custom ones.
    */
@@ -112,13 +125,13 @@ export default function LumosThemeEditor() {
       const colorTokens = Object.keys(variables)
         .filter(k => k.startsWith('color--') && variables[k]?.startsWith('#'))
         .map(key => {
-          // Build a human-readable label: "color--primary" → "Lumos / Primary"
-          //                               "color--custom--brand-blue" → "Lumos / Brand Blue"
+          // Build a human-readable label: "color--primary" → "Studio / Primary"
+          //                               "color--custom--brand-blue" → "Studio / Brand Blue"
           const slug = key
             .replace(/^color--custom--/, '')
             .replace(/^color--/, '')
             .replace(/-/g, ' ');
-          const label = `Lumos / ${slug.charAt(0).toUpperCase()}${slug.slice(1)}`;
+          const label = `Studio / ${slug.charAt(0).toUpperCase()}${slug.slice(1)}`;
           return { key, label };
         });
 
@@ -147,7 +160,7 @@ export default function LumosThemeEditor() {
       setSyncStatus('done');
       setTimeout(() => setSyncStatus('idle'), 3000);
     } catch (e) {
-      console.error('Lumos: Failed to sync palette to Ycode', e);
+      console.error('Studio: Failed to sync palette to Ycode', e);
       setSyncStatus('error');
       setTimeout(() => setSyncStatus('idle'), 3000);
     }
@@ -171,7 +184,7 @@ export default function LumosThemeEditor() {
       delete next[key];
       return next;
     });
-    fetch('/api/lumos', {
+    fetch('/api/studio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ updates: { [key]: '__remove__' } }),
@@ -244,14 +257,14 @@ export default function LumosThemeEditor() {
    * rather than short suffixes (`m`, `3xs`). This eliminates any
    * cross-match risk with unrelated class fragments (e.g. `mt-auto`,
    * `pt-0`, `gap-4`) and guarantees we only ever style classes that
-   * were produced by a Lumos token picked in Ycode's Style Panel.
+   * were produced by a Studio token picked in Ycode's Style Panel.
    *
    * Ycode's Style Panel emits classes like `mt-space-m` (prefix + "-" + token name)
    * when a named CSS variable is applied to a spacing property, so the
    * selector `[class*="mt-space-m" i]` is an exact, guaranteed hit.
    *
    * Values are computed from the current scale state (not from the CSS file),
-   * so the bridge is always in sync with the Lumos panel controls.
+   * so the bridge is always in sync with the Studio panel controls.
    */
   const generateSpacingBridgeCSS = useCallback((): string => {
     // Unique full-name tokens → CSS variable.
@@ -289,7 +302,7 @@ export default function LumosThemeEditor() {
 
     const scope = ':where(body)';
     const lines: string[] = [
-      '/* Lumos Runtime Bridge v8.0 — auto-generated, do not edit */',
+      '/* Studio Runtime Bridge v8.0 — auto-generated, do not edit */',
       '/* Unique-token selectors: [class*="prop-space-X" i] — case-insensitive substring match */',
     ];
 
@@ -303,7 +316,7 @@ export default function LumosThemeEditor() {
       //    so we never miss a hit.
       lines.push(
         `${scope} [class*="${tok.token}" i]{` +
-        `--lumos-${tok.token}:${val}!important` +
+        `--studio-${tok.token}:${val}!important` +
         `}`
       );
 
@@ -328,7 +341,7 @@ export default function LumosThemeEditor() {
 
   const generateTypographyBridgeCSS = useCallback((): string => {
     const scope = ':where(body)';
-    const lines: string[] = ['/* Lumos Runtime Typography Bridge v9.0 */'];
+    const lines: string[] = ['/* Studio Runtime Typography Bridge v9.0 */'];
 
     const smoothing = variables['font-smoothing'] === 'antialiased';
     if (smoothing) {
@@ -366,11 +379,11 @@ export default function LumosThemeEditor() {
    */
   useEffect(() => {
     const css = generateSpacingBridgeCSS();
-    const TAG_ID = 'lumos-runtime-bridge';
+    const TAG_ID = 'studio-runtime-bridge';
 
     const inject = (doc: Document | null | undefined) => {
       if (!doc || !doc.head) return;
-      
+
       // Spacing Bridge
       let el = doc.getElementById(TAG_ID) as HTMLStyleElement | null;
       if (!el) {
@@ -382,17 +395,16 @@ export default function LumosThemeEditor() {
 
       // Typography Bridge
       const typoCSS = generateTypographyBridgeCSS();
-      let typoEl = doc.getElementById('lumos-runtime-typography') as HTMLStyleElement | null;
+      let typoEl = doc.getElementById('studio-runtime-typography') as HTMLStyleElement | null;
       if (!typoEl) {
         typoEl = doc.createElement('style') as HTMLStyleElement;
-        typoEl.id = 'lumos-runtime-typography';
+        typoEl.id = 'studio-runtime-typography';
         doc.head.appendChild(typoEl);
       }
       typoEl.textContent = typoCSS;
-      
-      // Verification logic: only log if we injected into an iframe (not the main builder document)
+
       if (doc !== document) {
-        console.log(`[Lumos] Successfully injected Runtime Bridges into iframe`);
+        console.log(`[Studio] Successfully injected Runtime Bridges into iframe`);
       }
     };
 
@@ -429,7 +441,7 @@ export default function LumosThemeEditor() {
           } else if (node instanceof HTMLElement) {
             node.querySelectorAll?.('iframe').forEach(iframe => {
               attachLoadHandler(iframe as HTMLIFrameElement);
-              try { inject((iframe as HTMLIFrameElement).contentDocument); } catch (e) { console.debug('LumosThemeEditor: cross-origin iframe ignored', e); }
+              try { inject((iframe as HTMLIFrameElement).contentDocument); } catch (e) { console.debug('StudioThemeEditor: cross-origin iframe ignored', e); }
             });
           }
         });
@@ -451,67 +463,64 @@ export default function LumosThemeEditor() {
 
    *
    * v8.1 — Categorized Nomenclature.
-   * The variable NAME registered in Ycode uses the "Lumos / " prefix followed
-   * by the raw token key (e.g. `Lumos / space-m`). This keeps all variables cleanly
-   * grouped in the Ycode Style Panel under the Lumos folder.
-   * Because Ycode derives utility classes from the full slug (e.g. `mt-lumos-space-m`),
+   * The variable NAME registered in Ycode uses the "Studio / " prefix followed
+   * by the raw token key (e.g. `Studio / space-m`). This keeps all variables cleanly
+   * grouped in the Ycode Style Panel under the Studio folder.
+   * Because Ycode derives utility classes from the full slug (e.g. `mt-studio-space-m`),
    * our Runtime Bridge's substring selector `[class*="space-m" i]` expertly
    * intercepts it regardless of the prefix string.
    */
-  const syncSpacingToYcode = async () => {
-    setSpaceSyncStatus('syncing');
-    try {
-      const existing = await fetch('/ycode/api/color-variables').then(r => r.json());
-      const existingByName: Record<string, string> = {};
-      for (const v of (existing.data || [])) existingByName[v.name] = v.id;
+  // Core upsert logic — no UI status, safe to call silently (mount, auto-sync)
+  const upsertSpacingTokens = async () => {
+    const existing = await fetch('/ycode/api/color-variables').then(r => r.json());
+    const existingByName: Record<string, string> = {};
+    for (const v of (existing.data || [])) existingByName[v.name] = v.id;
 
-      const requests = SPACE_TOKENS.map(token => {
-        const px         = tokenPx(token.steps);
-        const name       = `Lumos / ${token.key}`;             // e.g. "Lumos / space-m"
-        const legacyName = `Lumos / Space ${token.label}`;     // e.g. "Lumos / Space M"
-        const value      = `${Math.round(px)}px`;              // human-readable px fallback
+    const requests = SPACE_TOKENS.filter(token => token.key).map(token => {
+      const name       = `Studio / ${token.key}`;
+      const legacyName = `Studio / Space ${token.label}`;
+      const value      = `var(--${token.key})`;
 
-        // Prefer updating an entry already saved under the new name
-        if (existingByName[name]) {
-          return fetch(`/ycode/api/color-variables/${existingByName[name]}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, value }),
-          });
-        }
-
-        // Migrate a legacy entry: rename it AND update its value in a single PUT
-        if (existingByName[legacyName]) {
-          return fetch(`/ycode/api/color-variables/${existingByName[legacyName]}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, value }),
-          });
-        }
-
-        // Migrate if it was briefly named just "space-m" from previous versions
-        if (existingByName[token.key]) {
-          return fetch(`/ycode/api/color-variables/${existingByName[token.key]}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, value }),
-          });
-        }
-
-        // No prior entry — create a fresh one under the canonical name
-        return fetch('/ycode/api/color-variables', {
-          method: 'POST',
+      if (existingByName[name]) {
+        return fetch(`/ycode/api/color-variables/${existingByName[name]}`, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, value }),
         });
+      }
+      if (existingByName[legacyName]) {
+        return fetch(`/ycode/api/color-variables/${existingByName[legacyName]}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, value }),
+        });
+      }
+      if (existingByName[token.key]) {
+        return fetch(`/ycode/api/color-variables/${existingByName[token.key]}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, value }),
+        });
+      }
+      return fetch('/ycode/api/color-variables', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, value }),
       });
+    });
 
-      await Promise.all(requests);
-      await loadColorVariables();
+    await Promise.all(requests);
+    await loadColorVariables();
+  };
+
+  const syncSpacingToYcode = async () => {
+    setSpaceSyncStatus('syncing');
+    try {
+      await upsertSpacingTokens();
       setSpaceSyncStatus('done');
       setTimeout(() => setSpaceSyncStatus('idle'), 3000);
     } catch (e) {
-      console.error('Lumos: Failed to sync spacing', e);
+      console.error('Studio: Failed to sync spacing', e);
       setSpaceSyncStatus('error');
       setTimeout(() => setSpaceSyncStatus('idle'), 3000);
     }
@@ -519,7 +528,7 @@ export default function LumosThemeEditor() {
 
   /**
    * Push typography tokens into Ycode's color_variables store.
-   * Ex: `Lumos / h1-line-height`, `Lumos / h1-letter-spacing`
+   * Ex: `Studio / h1-line-height`, `Studio / h1-letter-spacing`
    */
   const syncTypographyToYcode = async () => {
     setTypographySyncStatus('syncing');
@@ -533,7 +542,7 @@ export default function LumosThemeEditor() {
       TYPOGRAPHY_LEVELS.forEach(level => {
         ['weight', 'line-height', 'letter-spacing', 'margin-bottom'].forEach(prop => {
           const cssVarKey = `${level.key}-${prop}`; // e.g. "h1-line-height"
-          const name = `Lumos / ${cssVarKey}`;
+          const name = `Studio / ${cssVarKey}`;
           const value = variables[cssVarKey] || 'inherit'; 
           
           if (existingByName[name]) {
@@ -557,7 +566,7 @@ export default function LumosThemeEditor() {
       setTypographySyncStatus('done');
       setTimeout(() => setTypographySyncStatus('idle'), 3000);
     } catch (e) {
-      console.error('Lumos: Failed to sync typography', e);
+      console.error('Studio: Failed to sync typography', e);
       setTypographySyncStatus('error');
       setTimeout(() => setTypographySyncStatus('idle'), 3000);
     }
@@ -565,12 +574,20 @@ export default function LumosThemeEditor() {
 
   /** Save spacing params to global-theme.css via saveUpdates (includes bridges + publish fix) */
   const saveSpacingToTheme = () => {
-    const updates: Record<string, string> = {};
+    // Persist the 4 scale params so they survive a browser reload
+    const updates: Record<string, string> = {
+      'space-base':   String(spaceBase),
+      'space-ratio':  String(spaceRatio),
+      'space-vp-min': String(spaceVpMin),
+      'space-vp-max': String(spaceVpMax),
+    };
     SPACE_TOKENS.forEach(token => {
       const px = tokenPx(token.steps);
       updates[token.key] = generateClamp(px);
     });
     saveUpdates(updates);
+    // Auto-upsert all spacing tokens into Ycode's color-variables DB
+    syncSpacingToYcode();
   };
 
   const triggerIframeCSSReload = async () => {
@@ -587,32 +604,32 @@ export default function LumosThemeEditor() {
           if (!iframeDoc) return;
 
           // Update the runtime style block (the actual mechanism used by Canvas.tsx)
-          const styleEl = iframeDoc.getElementById('lumos-runtime-css') as HTMLStyleElement | null;
+          const styleEl = iframeDoc.getElementById('studio-runtime-css') as HTMLStyleElement | null;
           if (styleEl) {
             styleEl.textContent = css;
           }
 
           // Also re-inject the runtime spacing bridge so it survives iframe reloads
           const bridgeCSS = generateSpacingBridgeCSS();
-          let bridgeEl = iframeDoc.getElementById('lumos-runtime-bridge') as HTMLStyleElement | null;
+          let bridgeEl = iframeDoc.getElementById('studio-runtime-bridge') as HTMLStyleElement | null;
           if (!bridgeEl) {
             bridgeEl = iframeDoc.createElement('style') as HTMLStyleElement;
-            bridgeEl.id = 'lumos-runtime-bridge';
+            bridgeEl.id = 'studio-runtime-bridge';
             iframeDoc.head.appendChild(bridgeEl);
           }
           bridgeEl.textContent = bridgeCSS;
 
           // Re-inject the runtime typography bridge
           const typoCSS = generateTypographyBridgeCSS();
-          let typoEl = iframeDoc.getElementById('lumos-runtime-typography') as HTMLStyleElement | null;
+          let typoEl = iframeDoc.getElementById('studio-runtime-typography') as HTMLStyleElement | null;
           if (!typoEl) {
             typoEl = iframeDoc.createElement('style') as HTMLStyleElement;
-            typoEl.id = 'lumos-runtime-typography';
+            typoEl.id = 'studio-runtime-typography';
             iframeDoc.head.appendChild(typoEl);
           }
           typoEl.textContent = typoCSS;
           
-          console.log(`[Lumos] Successfully injected Runtime Bridges into iframe (trigger reload)`);
+          console.log(`[Studio] Successfully injected Runtime Bridges into iframe (trigger reload)`);
 
           // Also set CSS variables directly on #ybody for instant rendering
           // without waiting for a full style sheet reload
@@ -628,7 +645,7 @@ export default function LumosThemeEditor() {
         }
       });
     } catch (e) {
-      console.warn('Lumos: Failed to reload iframe CSS', e);
+      console.warn('Studio: Failed to reload iframe CSS', e);
     }
   };
 
@@ -643,7 +660,7 @@ export default function LumosThemeEditor() {
     try {
       const combinedBridges = getCompleteBridgeCSS();
 
-      await fetch('/api/lumos', {
+      await fetch('/api/studio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ updates, bridges: combinedBridges })
@@ -657,8 +674,8 @@ export default function LumosThemeEditor() {
           const json = await settingsRes.json();
           const currentCustomCss = json.data || '';
           
-          const startMarker = '/* LUMOS_RUNTIME_BRIDGES_START */';
-          const endMarker = '/* LUMOS_RUNTIME_BRIDGES_END */';
+          const startMarker = '/* STUDIO_RUNTIME_BRIDGES_START */';
+          const endMarker = '/* STUDIO_RUNTIME_BRIDGES_END */';
           const varBlock = `:root {\n${Object.entries(variables).map(([k, v]) => `  --${k}: ${v};`).join('\n')}\n}`;
           const bridgeBlock = `\n${startMarker}\n${varBlock}\n\n${combinedBridges}\n${endMarker}\n`;
           
@@ -678,10 +695,10 @@ export default function LumosThemeEditor() {
           });
         }
       } catch (err) {
-        console.warn('Lumos: Failed to auto-sync with custom_css', err);
+        console.warn('Studio: Failed to auto-sync with custom_css', err);
       }
     } catch (e) {
-      console.error('Failed to save Lumos variables', e);
+      console.error('Failed to save Studio variables', e);
     }
   }, [triggerIframeCSSReload, getCompleteBridgeCSS, variables]);
 
@@ -1030,10 +1047,10 @@ export default function LumosThemeEditor() {
 
       {renderAccordion('Colors', 'colors', (
         <>
-          {/* Sync button to push Lumos tokens into Ycode's native color palette */}
+          {/* Sync button to push Studio tokens into Ycode's native color palette */}
           <div className="mb-4 pb-4 border-b border-border">
             <p className="text-[10px] text-muted-foreground mb-2 leading-snug">
-              Push Lumos tokens to the Ycode palette so they appear as CSS variables in the Style Panel.
+              Push Studio tokens to the Ycode palette so they appear as CSS variables in the Style Panel.
             </p>
             <button
               onClick={syncToYcodePalette}
@@ -1310,25 +1327,26 @@ export default function LumosThemeEditor() {
             onClick={() => setIsStudioOpen(true)}
             className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-md font-semibold transition-colors bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm text-sm"
           >
-            ⛶ Ouvrir le Studio Lumos
+            ⛶ Ouvrir le Studio
           </button>
         </div>
 
         {content}
       </div>
 
-      {isStudioOpen && (
-        <div 
+      {isStudioOpen && createPortal(
+        <div
           className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto pointer-events-auto cursor-pointer"
           onClick={() => setIsStudioOpen(false)}
         >
+
           <div
             className="w-[92vw] h-[90vh] max-w-none bg-background border border-border rounded-xl shadow-2xl flex flex-col relative pointer-events-auto cursor-default"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex-none flex justify-between items-center px-6 py-4 border-b border-border bg-card">
               <div className="flex items-center gap-4">
-                <h2 className="text-2xl font-bold">Lumos Design Studio</h2>
+                <h2 className="text-2xl font-bold">Studio Design</h2>
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1359,7 +1377,7 @@ export default function LumosThemeEditor() {
             </div>
           </div>
         </div>
-      )}
+        , document.body)}
     </div>
   );
 }

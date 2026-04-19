@@ -161,6 +161,9 @@ const RightSidebar = React.memo(function RightSidebar({
   }, [urlState.rightTab, activeTab]);
 
   const [currentClassInput, setCurrentClassInput] = useState<string>('');
+  const [editingClass, setEditingClass] = useState<string | null>(null);
+  const [editingClassValue, setEditingClassValue] = useState<string>('');
+  const editingCommittedRef = useRef(false);
   const [customId, setCustomId] = useState<string>('');
   const [containerTag, setContainerTag] = useState<string>('div');
   const [textTag, setTextTag] = useState<string>('p');
@@ -831,6 +834,37 @@ const RightSidebar = React.memo(function RightSidebar({
       addClass(currentClassInput);
     }
   }, [addClass, currentClassInput]);
+
+  const commitClassEdit = useCallback((oldClass: string, newValue: string) => {
+    if (editingCommittedRef.current) return;
+    editingCommittedRef.current = true;
+    const trimmed = newValue.trim();
+    setEditingClass(null);
+    setEditingClassValue('');
+    if (!trimmed || trimmed === oldClass || !selectedLayer) return;
+
+    // Single atomic swap — avoids the removeClass+addClass race on shared classesArray state
+    const newClasses = classesArray
+      .map(cls => cls === oldClass ? trimmed : cls)
+      .join(' ');
+
+    setClassesInput(newClasses);
+
+    if (showTextStyleControls && activeTextStyleKey) {
+      const currentTextStyles = selectedLayer.textStyles ?? { ...DEFAULT_TEXT_STYLES };
+      const currentTextStyle = currentTextStyles[activeTextStyleKey] || { design: {}, classes: '' };
+      handleLayerUpdate(selectedLayer.id, {
+        textStyles: {
+          ...currentTextStyles,
+          [activeTextStyleKey]: { ...currentTextStyle, classes: newClasses },
+        },
+      });
+    } else {
+      const parsedDesign = classesToDesign([trimmed]);
+      const updatedDesign = mergeDesign(selectedLayer.design, parsedDesign);
+      handleLayerUpdate(selectedLayer.id, { classes: newClasses, design: updatedDesign });
+    }
+  }, [classesArray, selectedLayer, handleLayerUpdate, showTextStyleControls, activeTextStyleKey]);
 
   // Handle custom ID change - store in settings.id (takes priority over attributes.id in renderer)
   const handleIdChange = (value: string) => {
@@ -1859,21 +1893,52 @@ const RightSidebar = React.memo(function RightSidebar({
                 <div className="flex flex-wrap gap-1.5">
                   {/* Layer's own classes (excluding style classes) */}
                   {layerOnlyClasses.map((cls, index) => (
-                    <Badge
-                      variant="secondary"
-                      className="truncate max-w-50"
-                      key={`layer-${index}`}
-                    >
-                      <span className="truncate">{cls}</span>
-                      <Button
-                        onClick={() => removeClass(cls)}
-                        className="size-4! p-0! -mr-1"
-                        variant="outline"
-                        disabled={isLockedByOther}
+                    editingClass === cls ? (
+                      <input
+                        key={`edit-${index}`}
+                        autoFocus
+                        value={editingClassValue}
+                        onChange={e => setEditingClassValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            editingCommittedRef.current = false;
+                            commitClassEdit(cls, editingClassValue);
+                          }
+                          if (e.key === 'Escape') {
+                            editingCommittedRef.current = true;
+                            setEditingClass(null);
+                            setEditingClassValue('');
+                          }
+                        }}
+                        onBlur={() => {
+                          editingCommittedRef.current = false;
+                          commitClassEdit(cls, editingClassValue);
+                        }}
+                        className="h-6 px-2 rounded-md border border-ring bg-background text-xs outline-none font-mono min-w-0"
+                        style={{ width: `${Math.max(editingClassValue.length, 4) + 2}ch` }}
+                      />
+                    ) : (
+                      <Badge
+                        variant="secondary"
+                        className="truncate max-w-50"
+                        key={`layer-${index}`}
                       >
-                        <Icon name="x" className="size-2" />
-                      </Button>
-                    </Badge>
+                        <span
+                          className="truncate cursor-text hover:text-foreground transition-colors"
+                          title="Click to edit"
+                          onClick={() => { if (!isLockedByOther) { setEditingClass(cls); setEditingClassValue(cls); } }}
+                        >{cls}</span>
+                        <Button
+                          onClick={() => removeClass(cls)}
+                          className="size-4! p-0! -mr-1"
+                          variant="outline"
+                          disabled={isLockedByOther}
+                        >
+                          <Icon name="x" className="size-2" />
+                        </Button>
+                      </Badge>
+                    )
                   ))}
                 </div>
               )}

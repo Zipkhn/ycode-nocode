@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 // 4. Internal components
 import LayersTree from './LayersTree';
 import LeftSidebarPages from './LeftSidebarPages';
-import LumosThemeEditor from '@/components/LumosThemeEditor';
+import StudioThemeEditor from '@/components/StudioThemeEditor';
 
 // Lazy-loaded components (heavy, not needed immediately)
 const ElementLibrary = lazy(() => import('./ElementLibrary'));
@@ -309,7 +309,7 @@ const LeftSidebar = React.memo(function LeftSidebar({
             <TabsList className="w-full shrink-0">
               <TabsTrigger value="layers">Layers</TabsTrigger>
               <TabsTrigger value="pages">Pages</TabsTrigger>
-              <TabsTrigger value="theme">Lumos</TabsTrigger>
+              <TabsTrigger value="theme">Studio</TabsTrigger>
             </TabsList>
 
             <hr className="mt-4" />
@@ -376,7 +376,7 @@ const LeftSidebar = React.memo(function LeftSidebar({
               className="flex flex-col min-h-0 overflow-y-auto no-scrollbar pt-4"
               forceMount
             >
-              <LumosThemeEditor />
+              <StudioThemeEditor />
             </TabsContent>
 
           </Tabs>

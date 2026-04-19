@@ -1,12 +1,10 @@
-/* LUMOS_CORE_START */
+/* STUDIO_CORE_START */
 
 :root, html, body {
   /* --- 0. FORCE BRUTE TEST --- */
   /* Remove this once confirmed working! */
   --test-active: 1;
 }
-
-
 
 :root, html, body {
   /* --- 1. CONFIGURATION --- */
@@ -67,10 +65,9 @@
   --body-font-weight: 400; --body-line-height: 1.5; --body-letter-spacing: 0em; --body-margin-bottom: 0rem;
   --small-font-weight: 400; --small-line-height: 1.5; --small-letter-spacing: 0em; --small-margin-bottom: 0rem;
 
-
-  /* --- 5b. FONT ROLE VARIABLES --- */
+/* --- 5b. FONT ROLE VARIABLES --- */
   /* Assign font roles to each part of the typography system.
-     Default: inherit (no change). Set via the Lumos panel. */
+     Default: inherit (no change). Set via the Studio panel. */
   --_typography---font-family-headings: 'Poppins', sans-serif;
   --_typography---font-family-body: 'Poppins', sans-serif;
 
@@ -78,22 +75,22 @@
      Scale: clamp(min, fluid, max)
      Base: 16px · Ratio: 1.25 (Major Third)
      Viewport: 375px → 1366px
-     Managed via the Lumos Spacing panel. */
+     Managed via the Studio Spacing panel. */
   --space-base:  16;           /* px, unitless for calc() */
-  --space-ratio: 1.25;         /* multiplication ratio between steps */
+  --space-ratio: 1.333;         /* multiplication ratio between steps */
   --space-vp-min: 375;         /* min viewport (px, unitless) */
-  --space-vp-max: 1366;        /* max viewport (px, unitless) */
+  --space-vp-max: 1440;        /* max viewport (px, unitless) */
 
   /* Generated scale (min → fluid → max) */
-  --space-3xs: clamp(0.422rem, 0.369rem + 0.227vw, 0.563rem);   /*  4px →  6px */
-  --space-2xs: clamp(0.563rem, 0.492rem + 0.302vw, 0.750rem);   /*  6px →  10px */
-  --space-xs:  clamp(0.750rem, 0.656rem + 0.403vw, 1.000rem);   /*  8px →  12px */
-  --space-s:   clamp(1.000rem, 0.874rem + 0.538vw, 1.333rem);   /* 12px →  18px */
-  --space-m:   clamp(1.333rem, 1.165rem + 0.717vw, 1.777rem);   /* 16px →  24px */
-  --space-l:   clamp(1.777rem, 1.553rem + 0.956vw, 2.369rem);   /* 20px →  30px */
-  --space-xl:  clamp(2.369rem, 2.070rem + 1.274vw, 3.158rem);   /* 24px →  36px */
-  --space-2xl: clamp(3.157rem, 2.759rem + 1.698vw, 4.209rem);   /* 32px →  48px */
-  --space-3xl: clamp(4.209rem, 3.678rem + 2.262vw, 5.610rem);   /* 48px →  72px */
+  --space-3xs: clamp(0.422rem, 0.373rem + 0.211vw, 0.563rem);   /*  4px →  6px */
+  --space-2xs: clamp(0.563rem, 0.497rem + 0.281vw, 0.750rem);   /*  6px →  10px */
+  --space-xs:  clamp(0.750rem, 0.662rem + 0.375vw, 1.000rem);   /*  8px →  12px */
+  --space-s:   clamp(1.000rem, 0.883rem + 0.500vw, 1.333rem);   /* 12px →  18px */
+  --space-m:   clamp(1.333rem, 1.177rem + 0.667vw, 1.777rem);   /* 16px →  24px */
+  --space-l:   clamp(1.777rem, 1.568rem + 0.889vw, 2.369rem);   /* 20px →  30px */
+  --space-xl:  clamp(2.369rem, 2.091rem + 1.185vw, 3.158rem);   /* 24px →  36px */
+  --space-2xl: clamp(3.157rem, 2.787rem + 1.580vw, 4.209rem);   /* 32px →  48px */
+  --space-3xl: clamp(4.209rem, 3.715rem + 2.105vw, 5.610rem);   /* 48px →  72px */
 
   /* --- 6. CORE COLORS --- */
   --color--primary: #5465FF;
@@ -142,7 +139,6 @@
 }
 
   /* (Legacy Text Reset removed in favor of runtime bridge & level-specific styling) */
-
 
 /* Variables déclarées DANS l'iframe (sur #ybody) pour qu'elles soient
    accessibles aux enfants — pas sur :root (page principale de l'éditeur) */
@@ -290,7 +286,7 @@
    font-size: inherit;
 }
 
-/* Reset font-sizes natively for tags first to establish baseline (neutralized if Lumos classes are present) */
+/* Reset font-sizes natively for tags first to establish baseline (neutralized if Studio classes are present) */
 #ybody h1 { font-size: clamp(var(--_typography---font-size--h1-min) * 1rem, var(--_typography---font-size--h1-min) * 1rem + (var(--_typography---font-size--h1-max) - var(--_typography---font-size--h1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h1-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
 #ybody h2 { font-size: clamp(var(--_typography---font-size--h2-min) * 1rem, var(--_typography---font-size--h2-min) * 1rem + (var(--_typography---font-size--h2-max) - var(--_typography---font-size--h2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h2-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
 #ybody h3 { font-size: clamp(var(--_typography---font-size--h3-min) * 1rem, var(--_typography---font-size--h3-min) * 1rem + (var(--_typography---font-size--h3-max) - var(--_typography---font-size--h3-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h3-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
@@ -303,7 +299,7 @@
 :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-text-display,
 :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-full h1,
 :is(#ybody, .y-canvas, [data-ycode-canvas]) h1.u-text-display {
-  /* Offset optique par défaut — Connecté au panel Lumos */
+  /* Offset optique par défaut — Connecté au panel Studio */
   margin-left: var(--_text-style---optical-offset, 0em) !important;
 }
 
@@ -322,14 +318,13 @@
 }
 #ybody p { font-size: clamp(var(--_typography---font-size--text-main-min) * 1rem, var(--_typography---font-size--text-main-min) * 1rem + (var(--_typography---font-size--text-main-max) - var(--_typography---font-size--text-main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--text-main-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
 
-
 /* --- 8. MAST STRUCTURE (Super Specific) --- */
 #ybody .u-row { display: flex !important; flex-wrap: wrap !important; margin-inline: calc(var(--site--gutter) * -1) !important; }
 #ybody .u-col { flex: 1 1 0% !important; padding-inline: var(--site--gutter) !important; }
 
-/* Grid Parent — BRIDGE LUMOS ↔ NOTRE VARIABLE */
+/* Grid Parent — BRIDGE STUDIO ↔ NOTRE VARIABLE */
 :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-grid {
-  /* Pont : force la variable interne Lumos à lire la nôtre (Nombre de colonnes) */
+  /* Pont : force la variable interne Studio à lire la nôtre (Nombre de colonnes) */
   --_column-count---value: var(--site--column-count, 12) !important;
   display: grid !important;
   width: 100% !important;
@@ -338,27 +333,8 @@
   row-gap: var(--site--gutter, 1rem) !important;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* LUMOS_SPANS_START */
-/* Grid Spans 1-12 (Lumos Native — generated) */
+/* STUDIO_SPANS_START */
+/* Grid Spans 1-12 (Studio Native — generated) */
 :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-1 { grid-column: span 1 / span 1 !important; box-sizing: border-box !important; }
 :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-2 { grid-column: span 2 / span 2 !important; box-sizing: border-box !important; }
 :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-3 { grid-column: span 3 / span 3 !important; box-sizing: border-box !important; }
@@ -372,8 +348,7 @@
 :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-11 { grid-column: span 11 / span 11 !important; box-sizing: border-box !important; }
 :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-12 { grid-column: span 12 / span 12 !important; box-sizing: border-box !important; }
 :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-col-span-full { grid-column: 1 / -1 !important; }
-/* LUMOS_SPANS_END */
-
+/* STUDIO_SPANS_END */
 
 /* Grid Row Spans 1-12 */
 #ybody .u-row-span-1 { grid-row: span 1 / span 1 !important; }
@@ -390,12 +365,6 @@
 #ybody .u-row-span-12 { grid-row: span 12 / span 12 !important; }
 #ybody .u-row-span-full { grid-row: 1 / -1 !important; }
 
-/* Grid Spans 1-12 with ID Stacking */
-/* Grid Spans 1-12 with ID Stacking */
-/* Grid Spans 1-12 with ID Stacking */
-/* Grid Spans 1-12 with ID Stacking */
-/* Grid Spans 1-12 with ID Stacking */
-/* Grid Spans 1-12 with ID Stacking */
 /* Grid Helpers & Stack */
 #ybody .u-stack { display: flex !important; flex-direction: column !important; }
 #ybody .u-stack-gap-main { gap: clamp(var(--_spacing---space--4-min) * 1rem, var(--_spacing---space--4-min) * 1rem + (var(--_spacing---space--4-max) - var(--_spacing---space--4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_spacing---space--4-max) * 1rem) !important; }
@@ -444,9 +413,6 @@ html:has(#ybody), body:has(#ybody) { height: 100% !important; margin: 0 !importa
 body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; background-color: rgba(255, 0, 0, 0.05) !important; border-inline: 1px solid rgba(255, 0, 0, 0.1) !important; }
 /* Supprime ou commente ces blocs qui forcent 12 colonnes sur petit écran */
 
-
-
-
 /* Hauteur Canva Fix */
 #ybody {
   min-height: 100vh !important;
@@ -455,7 +421,6 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 /* Dev overlay : masquer les colonnes au-delà du breakpoint actif */
 @media (min-width: 768px) and (max-width: 1024px) { .dev-grid_wrapper .u-grid > div:nth-child(n+9) { display: none !important; } }
 @media (max-width: 767px) { .dev-grid_wrapper .u-grid > div:nth-child(n+5) { display: none !important; } }
-
 
 /* --- 14. SUR-SPÉCIFICITÉ : TYPOGRAPHY UTILITIES --- */
 /* Placed at the very bottom to ensure they override everything else */
@@ -550,8 +515,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   line-height: var(--_text-style---line-height, 1.2) !important; 
 }
 
-
-/* --- Responsive Breakpoints (Lumos) --- */
+/* --- Responsive Breakpoints (Studio) --- */
 
 /* Tablette large (768px – 1024px) : 8 colonnes */
 @media screen and (min-width: 768px) and (max-width: 1024px) {
@@ -597,16 +561,13 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   }
 }
 
-/* LUMOS_CORE_END */
+/* STUDIO_CORE_END */
 
-
-
-
-/* LUMOS_RUNTIME_BRIDGES_START */
-/* Lumos Runtime Bridge v8.0 — auto-generated, do not edit */
+/* STUDIO_RUNTIME_BRIDGES_START */
+/* Studio Runtime Bridge v8.0 — auto-generated, do not edit */
 /* Unique-token selectors: [class*="prop-space-X" i] — case-insensitive substring match */
 /* ── SPACE-3XS ── */
-:where(body) [class*="space-3xs" i]{--lumos-space-3xs:var(--space-3xs)!important}
+:where(body) [class*="space-3xs" i]{--studio-space-3xs:var(--space-3xs)!important}
 :where(body) [class*="pt-space-3xs" i]{padding-top:var(--space-3xs)!important}
 :where(body) [class*="pb-space-3xs" i]{padding-bottom:var(--space-3xs)!important}
 :where(body) [class*="pl-space-3xs" i]{padding-left:var(--space-3xs)!important}
@@ -621,7 +582,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) [class*="my-space-3xs" i]{margin-top:var(--space-3xs)!important;margin-bottom:var(--space-3xs)!important}
 :where(body) [class*="gap-space-3xs" i]{gap:var(--space-3xs)!important}
 /* ── SPACE-2XS ── */
-:where(body) [class*="space-2xs" i]{--lumos-space-2xs:var(--space-2xs)!important}
+:where(body) [class*="space-2xs" i]{--studio-space-2xs:var(--space-2xs)!important}
 :where(body) [class*="pt-space-2xs" i]{padding-top:var(--space-2xs)!important}
 :where(body) [class*="pb-space-2xs" i]{padding-bottom:var(--space-2xs)!important}
 :where(body) [class*="pl-space-2xs" i]{padding-left:var(--space-2xs)!important}
@@ -636,7 +597,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) [class*="my-space-2xs" i]{margin-top:var(--space-2xs)!important;margin-bottom:var(--space-2xs)!important}
 :where(body) [class*="gap-space-2xs" i]{gap:var(--space-2xs)!important}
 /* ── SPACE-XS ── */
-:where(body) [class*="space-xs" i]{--lumos-space-xs:var(--space-xs)!important}
+:where(body) [class*="space-xs" i]{--studio-space-xs:var(--space-xs)!important}
 :where(body) [class*="pt-space-xs" i]{padding-top:var(--space-xs)!important}
 :where(body) [class*="pb-space-xs" i]{padding-bottom:var(--space-xs)!important}
 :where(body) [class*="pl-space-xs" i]{padding-left:var(--space-xs)!important}
@@ -651,7 +612,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) [class*="my-space-xs" i]{margin-top:var(--space-xs)!important;margin-bottom:var(--space-xs)!important}
 :where(body) [class*="gap-space-xs" i]{gap:var(--space-xs)!important}
 /* ── SPACE-S ── */
-:where(body) [class*="space-s" i]{--lumos-space-s:var(--space-s)!important}
+:where(body) [class*="space-s" i]{--studio-space-s:var(--space-s)!important}
 :where(body) [class*="pt-space-s" i]{padding-top:var(--space-s)!important}
 :where(body) [class*="pb-space-s" i]{padding-bottom:var(--space-s)!important}
 :where(body) [class*="pl-space-s" i]{padding-left:var(--space-s)!important}
@@ -666,7 +627,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) [class*="my-space-s" i]{margin-top:var(--space-s)!important;margin-bottom:var(--space-s)!important}
 :where(body) [class*="gap-space-s" i]{gap:var(--space-s)!important}
 /* ── SPACE-M ── */
-:where(body) [class*="space-m" i]{--lumos-space-m:var(--space-m)!important}
+:where(body) [class*="space-m" i]{--studio-space-m:var(--space-m)!important}
 :where(body) [class*="pt-space-m" i]{padding-top:var(--space-m)!important}
 :where(body) [class*="pb-space-m" i]{padding-bottom:var(--space-m)!important}
 :where(body) [class*="pl-space-m" i]{padding-left:var(--space-m)!important}
@@ -681,7 +642,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) [class*="my-space-m" i]{margin-top:var(--space-m)!important;margin-bottom:var(--space-m)!important}
 :where(body) [class*="gap-space-m" i]{gap:var(--space-m)!important}
 /* ── SPACE-L ── */
-:where(body) [class*="space-l" i]{--lumos-space-l:var(--space-l)!important}
+:where(body) [class*="space-l" i]{--studio-space-l:var(--space-l)!important}
 :where(body) [class*="pt-space-l" i]{padding-top:var(--space-l)!important}
 :where(body) [class*="pb-space-l" i]{padding-bottom:var(--space-l)!important}
 :where(body) [class*="pl-space-l" i]{padding-left:var(--space-l)!important}
@@ -696,7 +657,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) [class*="my-space-l" i]{margin-top:var(--space-l)!important;margin-bottom:var(--space-l)!important}
 :where(body) [class*="gap-space-l" i]{gap:var(--space-l)!important}
 /* ── SPACE-XL ── */
-:where(body) [class*="space-xl" i]{--lumos-space-xl:var(--space-xl)!important}
+:where(body) [class*="space-xl" i]{--studio-space-xl:var(--space-xl)!important}
 :where(body) [class*="pt-space-xl" i]{padding-top:var(--space-xl)!important}
 :where(body) [class*="pb-space-xl" i]{padding-bottom:var(--space-xl)!important}
 :where(body) [class*="pl-space-xl" i]{padding-left:var(--space-xl)!important}
@@ -711,7 +672,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) [class*="my-space-xl" i]{margin-top:var(--space-xl)!important;margin-bottom:var(--space-xl)!important}
 :where(body) [class*="gap-space-xl" i]{gap:var(--space-xl)!important}
 /* ── SPACE-2XL ── */
-:where(body) [class*="space-2xl" i]{--lumos-space-2xl:var(--space-2xl)!important}
+:where(body) [class*="space-2xl" i]{--studio-space-2xl:var(--space-2xl)!important}
 :where(body) [class*="pt-space-2xl" i]{padding-top:var(--space-2xl)!important}
 :where(body) [class*="pb-space-2xl" i]{padding-bottom:var(--space-2xl)!important}
 :where(body) [class*="pl-space-2xl" i]{padding-left:var(--space-2xl)!important}
@@ -726,7 +687,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) [class*="my-space-2xl" i]{margin-top:var(--space-2xl)!important;margin-bottom:var(--space-2xl)!important}
 :where(body) [class*="gap-space-2xl" i]{gap:var(--space-2xl)!important}
 /* ── SPACE-3XL ── */
-:where(body) [class*="space-3xl" i]{--lumos-space-3xl:var(--space-3xl)!important}
+:where(body) [class*="space-3xl" i]{--studio-space-3xl:var(--space-3xl)!important}
 :where(body) [class*="pt-space-3xl" i]{padding-top:var(--space-3xl)!important}
 :where(body) [class*="pb-space-3xl" i]{padding-bottom:var(--space-3xl)!important}
 :where(body) [class*="pl-space-3xl" i]{padding-left:var(--space-3xl)!important}
@@ -741,7 +702,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) [class*="my-space-3xl" i]{margin-top:var(--space-3xl)!important;margin-bottom:var(--space-3xl)!important}
 :where(body) [class*="gap-space-3xl" i]{gap:var(--space-3xl)!important}
 
-/* Lumos Runtime Typography Bridge v9.0 */
+/* Studio Runtime Typography Bridge v9.0 */
 :where(body) { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 :where(body) .u-text-display {
   font-weight: var(--display-font-weight) !important;
@@ -785,6 +746,12 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   letter-spacing: var(--h6-letter-spacing) !important;
   margin-bottom: var(--h6-margin-bottom) !important;
 }
+:where(body) .u-text-large {
+  font-weight: var(--large-font-weight) !important;
+  line-height: var(--large-line-height) !important;
+  letter-spacing: var(--large-letter-spacing) !important;
+  margin-bottom: var(--large-margin-bottom) !important;
+}
 :where(body) p {
   font-weight: var(--body-font-weight) !important;
   line-height: var(--body-line-height) !important;
@@ -797,7 +764,5 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   letter-spacing: var(--small-letter-spacing) !important;
   margin-bottom: var(--small-margin-bottom) !important;
 }
-/* LUMOS_RUNTIME_BRIDGES_END */
-
-
+/* STUDIO_RUNTIME_BRIDGES_END */
 
