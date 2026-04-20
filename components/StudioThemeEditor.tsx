@@ -813,6 +813,143 @@ export default function StudioThemeEditor() {
     );
   };
 
+  // ─── COLOR SCALE GENERATION ──────────────────────────────────────────────
+
+  const hexToHsl = (hex: string): [number, number, number] | null => {
+    const m = hex.match(/^#([0-9a-f]{6})$/i);
+    if (!m) return null;
+    const r = parseInt(m[1].slice(0, 2), 16) / 255;
+    const g = parseInt(m[1].slice(2, 4), 16) / 255;
+    const b = parseInt(m[1].slice(4, 6), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    if (max === min) return [0, 0, l * 100];
+    const d = max - min;
+    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    let h: number;
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      default: h = ((r - g) / d + 4) / 6;
+    }
+    return [h * 360, s * 100, l * 100];
+  };
+
+  const hslToHex = (h: number, s: number, l: number): string => {
+    h /= 360; s /= 100; l /= 100;
+    const hue2rgb = (p: number, q: number, t: number) => {
+      if (t < 0) t += 1; if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    let r: number, g: number, b: number;
+    if (s === 0) { r = g = b = l; } else {
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1/3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1/3);
+    }
+    const toHex = (x: number) => Math.round(Math.min(255, Math.max(0, x * 255))).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  };
+
+  const generateColorScale = (baseHex: string, prefix: string): Record<string, string> => {
+    const hsl = hexToHsl(baseHex);
+    if (!hsl) return {};
+    const [h, s, baseLightness] = hsl;
+    const result: Record<string, string> = { [`color--${prefix}-500`]: baseHex };
+    const darkerSteps = [600, 700, 800, 900] as const;
+    darkerSteps.forEach((step, idx) => {
+      const t = (idx + 1) / darkerSteps.length;
+      const lightness = baseLightness * (1 - t) + 10 * t;
+      const saturation = s * (1 - t * 0.25);
+      result[`color--${prefix}-${step}`] = hslToHex(h, Math.min(100, saturation), Math.max(0, lightness));
+    });
+    const lighterSteps = [400, 300, 200, 100, 50] as const;
+    lighterSteps.forEach((step, idx) => {
+      const t = (idx + 1) / lighterSteps.length;
+      const lightness = baseLightness + (97 - baseLightness) * t;
+      const saturation = s * (1 - t * 0.65);
+      result[`color--${prefix}-${step}`] = hslToHex(h, Math.max(0, saturation), Math.min(100, lightness));
+    });
+    return result;
+  };
+
+  const applyColorScale = (baseHex: string, prefix: string) => {
+    const scale = generateColorScale(baseHex, prefix);
+    if (!Object.keys(scale).length) return;
+    setVariables(prev => ({ ...prev, ...scale }));
+    saveUpdates(scale);
+  };
+
+  const SCALE_STEPS = [900, 800, 700, 600, 500, 400, 300, 200, 100, 50] as const;
+
+  const renderColorScaleSection = (title: string, prefix: string) => {
+    const baseHex = variables[`color--${prefix}-500`] || '#5465FF';
+    const hexVal = baseHex.startsWith('#') && baseHex.length >= 7 ? baseHex.substring(0, 7) : '#5465FF';
+    return (
+      <div>
+        <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-3 flex justify-between items-center">
+          <h4 className="text-xs font-semibold">{title}</h4>
+          <span className="text-[10px] text-muted-foreground">auto scale</span>
+        </div>
+        {/* Base color picker */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <label className="text-xs text-muted-foreground w-1/3 truncate">Base (500)</label>
+          <div className="flex items-center gap-2 w-2/3">
+            <input
+              type="color"
+              className="w-6 h-6 p-0 border-border rounded cursor-pointer shrink-0"
+              value={hexVal}
+              onChange={(e) => applyColorScale(e.target.value, prefix)}
+            />
+            <input
+              type="text"
+              className="flex-1 min-w-0 bg-background border border-border rounded px-2 py-1 text-xs outline-none focus:border-ring"
+              value={variables[`color--${prefix}-500`] || ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                handleChange(`color--${prefix}-500`, v);
+                if (/^#[0-9a-f]{6}$/i.test(v)) applyColorScale(v, prefix);
+              }}
+            />
+          </div>
+        </div>
+        {/* Swatch preview strip */}
+        <div className="flex gap-0.5 mb-3 rounded overflow-hidden h-6">
+          {SCALE_STEPS.map(step => {
+            const color = variables[`color--${prefix}-${step}`] || '#ccc';
+            return (
+              <div
+                key={step}
+                className="flex-1 cursor-pointer hover:scale-y-110 transition-transform origin-bottom"
+                style={{ backgroundColor: color }}
+                title={`${step}: ${color}`}
+              />
+            );
+          })}
+        </div>
+        {/* Individual fine-tune inputs */}
+        <details className="group">
+          <summary className="text-[10px] text-muted-foreground cursor-pointer select-none mb-2 flex items-center gap-1">
+            <svg
+              className="w-3 h-3 group-open:rotate-90 transition-transform" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor"
+              strokeWidth="2"
+            ><path d="m9 18 6-6-6-6" /></svg>
+            Adjust individually
+          </summary>
+          <div className="mt-1">
+            {SCALE_STEPS.map(step => renderColorInput(String(step), `color--${prefix}-${step}`))}
+          </div>
+        </details>
+      </div>
+    );
+  };
+
   const renderColorInput = (label: string, key: string) => {
     // Basic fix to extract hex from potential var() fallback or raw string 
     // Usually <input type="color"> requires 6-digit hex
@@ -1089,10 +1226,12 @@ export default function StudioThemeEditor() {
             </button>
           </div>
 
-          {renderColorInput('Primary', 'color--primary')}
-          {renderColorInput('Primary Dark', 'color--primary-dark')}
-          {renderColorInput('Secondary', 'color--secondary')}
-          
+          {renderColorScaleSection('Primary', 'primary')}
+
+          <div className="mt-4 pt-2 border-t border-border">
+            {renderColorScaleSection('Secondary', 'secondary')}
+          </div>
+
           <div className="mt-4 pt-2 border-t border-border">
             <div className="bg-muted/60 -mx-4 px-4 py-2 border-b border-border rounded-sm mb-3 flex justify-between items-center">
               <h4 className="text-xs font-semibold">Grey Scale</h4>
@@ -1432,20 +1571,6 @@ export default function StudioThemeEditor() {
             <div className="flex-none flex justify-between items-center px-6 py-4 border-b border-border bg-card">
               <div className="flex items-center gap-4">
                 <h2 className="text-2xl font-bold">Studio Design</h2>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(getCompleteBridgeCSS());
-                    const btn = e.currentTarget;
-                    const orig = btn.innerText;
-                    btn.innerText = '✓ Copied!';
-                    setTimeout(() => { btn.innerText = orig; }, 2000);
-                  }}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-md border border-border hover:bg-muted text-muted-foreground transition-all"
-                  title="Copier le code Bridge complet pour Porduction (Publish)"
-                >
-                  📋 Copy Bridge CSS
-                </button>
               </div>
               <button 
                 onClick={(e) => { e.stopPropagation(); setIsStudioOpen(false); }}

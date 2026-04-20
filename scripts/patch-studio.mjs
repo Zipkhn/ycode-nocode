@@ -43,6 +43,43 @@ function cleanupCSS(content) {
 }
 
 /**
+ * Ensure primary/secondary color scale variables exist in STUDIO_CORE.
+ * Only injects variables that are missing — never overwrites user-set values.
+ */
+function ensureColorScales(content) {
+  const CORE_END = '/* STUDIO_CORE_END */';
+  if (!content.includes(CORE_END)) return content;
+
+  const PRIMARY_DEFAULTS = {
+    'color--primary-900': '#0D1133', 'color--primary-800': '#1A2366',
+    'color--primary-700': '#2B3799', 'color--primary-600': '#3D4DCC',
+    'color--primary-500': '#5465FF', 'color--primary-400': '#788BFF',
+    'color--primary-300': '#9DB4FF', 'color--primary-200': '#C4D0FF',
+    'color--primary-100': '#E0E6FF', 'color--primary-50':  '#F0F3FF',
+  };
+  const SECONDARY_DEFAULTS = {
+    'color--secondary-900': '#1A2E6E', 'color--secondary-800': '#2B47A8',
+    'color--secondary-700': '#4060CC', 'color--secondary-600': '#5878E8',
+    'color--secondary-500': '#7A93FF', 'color--secondary-400': '#9DB4FF',
+    'color--secondary-300': '#B8C8FF', 'color--secondary-200': '#D1DCFF',
+    'color--secondary-100': '#E8EEFF', 'color--secondary-50':  '#F5F7FF',
+  };
+
+  const missing = [];
+  for (const [key, val] of Object.entries({ ...PRIMARY_DEFAULTS, ...SECONDARY_DEFAULTS })) {
+    if (!content.includes(`--${key}:`)) missing.push(`  --${key}: ${val};`);
+  }
+
+  if (missing.length > 0) {
+    content = content.replace(CORE_END, `:root {\n${missing.join('\n')}\n}\n${CORE_END}`);
+    console.log(`✅ Injected ${missing.length} missing color scale vars (primary/secondary)`);
+  } else {
+    console.log('✅ Color scales (primary/secondary) already present');
+  }
+  return content;
+}
+
+/**
  * Ensure --space-0: 0px is defined in the STUDIO_CORE section.
  * Fixes any previous run that wrote unitless `0`.
  */
@@ -431,13 +468,16 @@ ${buildResponsiveBreaks('sm\\:')}
     content = content.replace(RESP_END, `${responsiveBlock}${RESP_END}`);
   }
 
-  /* ── 6. Ensure --space-0: 0px is in STUDIO_CORE ── */
+  /* ── 6. Ensure primary/secondary color scales in STUDIO_CORE ── */
+  content = ensureColorScales(content);
+
+  /* ── 7. Ensure --space-0: 0px is in STUDIO_CORE ── */
   content = ensureSpaceZeroVar(content);
 
-  /* ── 7. Regenerate runtime bridges ── */
+  /* ── 8. Regenerate runtime bridges ── */
   content = injectRuntimeBridges(content);
 
-  /* ── 8. Write public + sync to app ── */
+  /* ── 9. Write public + sync to app ── */
   fs.writeFileSync(publicThemePath, content, 'utf8');
   console.log('✅ public/global-theme.css updated');
 
