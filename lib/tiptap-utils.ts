@@ -116,7 +116,7 @@ export function contentHasBlockElements(content: any): boolean {
   // Handle Tiptap doc structure
   if (content.type === 'doc' && Array.isArray(content.content)) {
     return content.content.some((block: any) =>
-      block.type === 'bulletList' || block.type === 'orderedList' || block.type === 'richTextComponent' || block.type === 'horizontalRule'
+      block.type === 'bulletList' || block.type === 'orderedList' || block.type === 'richTextComponent' || block.type === 'horizontalRule' || block.type === 'table'
     );
   }
 

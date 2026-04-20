@@ -279,7 +279,7 @@ const CLASS_PROPERTY_MAP: Record<string, RegExp> = {
   borderBottomWidth: /^border-b(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
   borderLeftWidth: /^border-l(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
   borderStyle: /^border-(solid|dashed|dotted|double|hidden|none)$/,
-  borderColor: /^border-(?!(?:solid|dashed|dotted|double|hidden|none)$)(?!t-|r-|b-|l-|x-|y-)((\w+)(-\d+)?|\[(?:#|rgb|color:var).+\])(\/\d+)?$/,
+  borderColor: /^border-(?!(?:solid|dashed|dotted|double|hidden|none|collapse|separate)$)(?!t-|r-|b-|l-|x-|y-|spacing)((\w+)(-\d+)?|\[(?:#|rgb|color:var).+\])(\/\d+)?$/,
   borderRadius: /^rounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full|-\[.+\])?$/,
   borderTopLeftRadius: /^rounded-tl(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full|-\[.+\])?$/,
   borderTopRightRadius: /^rounded-tr(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full|-\[.+\])?$/,

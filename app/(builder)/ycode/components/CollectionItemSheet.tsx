@@ -47,6 +47,7 @@ import { isAssetFieldType, isMultipleAssetField, getFileManagerCategory, getAsse
 import type { StatusAction } from '@/lib/collection-field-utils';
 import { CollectionStatusPill, parseStatusValue } from './CollectionStatusPill';
 import { formatDateInTimezone, localDatetimeToUTC, clampDateInputValue } from '@/lib/date-format-utils';
+import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { toast } from 'sonner';
 import ReferenceFieldCombobox from './ReferenceFieldCombobox';
@@ -591,7 +592,7 @@ export default function CollectionItemSheet({
                           )}
                         </div>
                         <FormControl>
-                          <div className={isSynced ? 'opacity-50 pointer-events-none' : undefined}>
+                          <div className={cn('min-w-0', isSynced && 'opacity-50 pointer-events-none')}>
                           {field.type === 'rich_text' ? (
                             <div>
                               <RichTextEditor

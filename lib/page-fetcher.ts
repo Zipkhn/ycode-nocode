@@ -1390,7 +1390,7 @@ function resolveRichTextVariables(
       n?.type === 'paragraph' || n?.type === 'heading' ||
       n?.type === 'bulletList' || n?.type === 'orderedList' ||
       n?.type === 'richTextComponent' || n?.type === 'richTextImage' ||
-      n?.type === 'horizontalRule';
+      n?.type === 'table' || n?.type === 'richTextHtmlEmbed' || n?.type === 'horizontalRule';
     const hasBlockChildren = result.content.some(isBlockNode);
     if (hasBlockChildren) {
       const lifted: any[] = [];
@@ -3078,6 +3078,7 @@ function renderTiptapToHtml(
   textStyles?: Record<string, any>,
   renderComponentHtml?: RenderComponentHtmlFn,
   linkContext?: LinkResolutionContext,
+  parentRowIdx = 0,
 ): string {
   if (!content || typeof content !== 'object') {
     return '';
@@ -3264,6 +3265,57 @@ function renderTiptapToHtml(
       );
     }
     return `<div data-component-id="${escapeHtml(content.attrs.componentId)}"></div>`;
+  }
+
+  if (content.type === 'table') {
+    const rows = (content.content || [])
+      .map((row: any, rowIdx: number) => renderTiptapToHtml(row, textStyles, renderComponentHtml, linkContext, rowIdx))
+      .join('');
+
+    const mergedStyles = { ...DEFAULT_TEXT_STYLES, ...textStyles };
+    const tableClass = mergedStyles?.table?.classes || '';
+    const classAttr = tableClass ? ` class="${escapeHtml(tableClass)}"` : '';
+
+    return `<div class="overflow-x-auto max-w-full"><table${classAttr}><tbody>${rows}</tbody></table></div>`;
+  }
+
+  if (content.type === 'tableRow') {
+    const mergedStyles = { ...DEFAULT_TEXT_STYLES, ...textStyles };
+    const rowClass = mergedStyles?.tableRow?.classes || '';
+    const rowClassAttr = rowClass ? ` class="${escapeHtml(rowClass)}"` : '';
+    const cells = (content.content || [])
+      .map((node: any, cellIdx: number) => {
+        if (node.type !== 'tableCell' && node.type !== 'tableHeader') {
+          return renderTiptapToHtml(node, textStyles, renderComponentHtml, linkContext, parentRowIdx);
+        }
+        const tag = node.type === 'tableHeader' ? 'th' : 'td';
+        const cellStyleKey = node.type === 'tableHeader' ? 'tableHeader' : 'tableCell';
+        let cellClass = mergedStyles?.[cellStyleKey]?.classes || '';
+        const borders: string[] = [];
+        if (parentRowIdx > 0) borders.push('border-t-[1px]');
+        if (cellIdx > 0) borders.push('border-l-[1px]');
+        if (borders.length > 0) {
+          const borderClasses = `${borders.join(' ')} border-solid border-[#000000]/10`;
+          cellClass = cellClass ? `${cellClass} ${borderClasses}` : borderClasses;
+        }
+        const attrs: string[] = [];
+        if (cellClass) attrs.push(`class="${escapeHtml(cellClass)}"`);
+        if (node.attrs?.colspan && node.attrs.colspan > 1) attrs.push(`colspan="${node.attrs.colspan}"`);
+        if (node.attrs?.rowspan && node.attrs.rowspan > 1) attrs.push(`rowspan="${node.attrs.rowspan}"`);
+        const attrStr = attrs.length > 0 ? ' ' + attrs.join(' ') : '';
+        const cellContent = (node.content || [])
+          .map((child: any) => renderTiptapToHtml(child, textStyles, renderComponentHtml, linkContext))
+          .join('');
+        return `<${tag}${attrStr}>${cellContent}</${tag}>`;
+      })
+      .join('');
+    return `<tr${rowClassAttr}>${cells}</tr>`;
+  }
+
+  // Handle HTML embed blocks — render empty placeholder;
+  // HtmlEmbedRenderer injects the code client-side via useEffect
+  if (content.type === 'richTextHtmlEmbed') {
+    return '';
   }
 
   // Fallback: recursively process content

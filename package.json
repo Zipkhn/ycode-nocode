@@ -1,6 +1,6 @@
 {
   "name": "ycode",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "description": "Visual website builder you can self-host",
   "license": "MIT",
   "private": false,
@@ -74,6 +74,10 @@
     "@tiptap/extension-placeholder": "^3.11.0",
     "@tiptap/extension-subscript": "^3.15.3",
     "@tiptap/extension-superscript": "^3.15.3",
+    "@tiptap/extension-table": "^3.22.4",
+    "@tiptap/extension-table-cell": "^3.22.4",
+    "@tiptap/extension-table-header": "^3.22.4",
+    "@tiptap/extension-table-row": "^3.22.4",
     "@tiptap/pm": "^3.10.5",
     "@tiptap/react": "^3.10.7",
     "@tiptap/starter-kit": "^3.10.7",
