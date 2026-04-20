@@ -959,9 +959,14 @@ function renderTableNode(
   const styleKey = styleKeyMap[node.type];
   let className = styleKey ? getTextStyleClasses(textStyles, styleKey) : '';
 
-  if ((node.type === 'tableCell' || node.type === 'tableHeader') && parentRowIdx > 0) {
-    const borderClasses = 'border-t-[1px] border-solid border-[#000000]/10';
-    className = className ? `${className} ${borderClasses}` : borderClasses;
+  if (node.type === 'tableCell' || node.type === 'tableHeader') {
+    const borders: string[] = [];
+    if (parentRowIdx > 0) borders.push('border-t-[1px]');
+    if (nodeIdx > 0) borders.push('border-l-[1px]');
+    if (borders.length > 0) {
+      const borderClasses = `${borders.join(' ')} border-solid border-[#000000]/10`;
+      className = className ? `${className} ${borderClasses}` : borderClasses;
+    }
   }
 
   const props: Record<string, any> = { key };

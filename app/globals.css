@@ -278,6 +278,13 @@
   @apply border-t border-border;
 }
 
+.rich-text-editor-full.ProseMirror td + td,
+.rich-text-editor-full.ProseMirror td + th,
+.rich-text-editor-full.ProseMirror th + td,
+.rich-text-editor-full.ProseMirror th + th {
+  @apply border-l border-border;
+}
+
 .rich-text-editor-full.ProseMirror th {
   @apply bg-muted font-semibold;
 }

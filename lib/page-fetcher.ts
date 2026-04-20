@@ -3284,36 +3284,32 @@ function renderTiptapToHtml(
     const rowClass = mergedStyles?.tableRow?.classes || '';
     const rowClassAttr = rowClass ? ` class="${escapeHtml(rowClass)}"` : '';
     const cells = (content.content || [])
-      .map((node: any) => renderTiptapToHtml(node, textStyles, renderComponentHtml, linkContext, parentRowIdx))
+      .map((node: any, cellIdx: number) => {
+        if (node.type !== 'tableCell' && node.type !== 'tableHeader') {
+          return renderTiptapToHtml(node, textStyles, renderComponentHtml, linkContext, parentRowIdx);
+        }
+        const tag = node.type === 'tableHeader' ? 'th' : 'td';
+        const cellStyleKey = node.type === 'tableHeader' ? 'tableHeader' : 'tableCell';
+        let cellClass = mergedStyles?.[cellStyleKey]?.classes || '';
+        const borders: string[] = [];
+        if (parentRowIdx > 0) borders.push('border-t-[1px]');
+        if (cellIdx > 0) borders.push('border-l-[1px]');
+        if (borders.length > 0) {
+          const borderClasses = `${borders.join(' ')} border-solid border-[#000000]/10`;
+          cellClass = cellClass ? `${cellClass} ${borderClasses}` : borderClasses;
+        }
+        const attrs: string[] = [];
+        if (cellClass) attrs.push(`class="${escapeHtml(cellClass)}"`);
+        if (node.attrs?.colspan && node.attrs.colspan > 1) attrs.push(`colspan="${node.attrs.colspan}"`);
+        if (node.attrs?.rowspan && node.attrs.rowspan > 1) attrs.push(`rowspan="${node.attrs.rowspan}"`);
+        const attrStr = attrs.length > 0 ? ' ' + attrs.join(' ') : '';
+        const cellContent = (node.content || [])
+          .map((child: any) => renderTiptapToHtml(child, textStyles, renderComponentHtml, linkContext))
+          .join('');
+        return `<${tag}${attrStr}>${cellContent}</${tag}>`;
+      })
       .join('');
     return `<tr${rowClassAttr}>${cells}</tr>`;
-  }
-
-  if (content.type === 'tableCell' || content.type === 'tableHeader') {
-    const tag = content.type === 'tableHeader' ? 'th' : 'td';
-    const mergedStyles = { ...DEFAULT_TEXT_STYLES, ...textStyles };
-    const cellStyleKey = content.type === 'tableHeader' ? 'tableHeader' : 'tableCell';
-    let cellClass = mergedStyles?.[cellStyleKey]?.classes || '';
-    if (parentRowIdx > 0) {
-      cellClass = cellClass
-        ? `${cellClass} border-t-[1px] border-solid border-[#000000]/10`
-        : 'border-t-[1px] border-solid border-[#000000]/10';
-    }
-    const attrs: string[] = [];
-    if (cellClass) {
-      attrs.push(`class="${escapeHtml(cellClass)}"`);
-    }
-    if (content.attrs?.colspan && content.attrs.colspan > 1) {
-      attrs.push(`colspan="${content.attrs.colspan}"`);
-    }
-    if (content.attrs?.rowspan && content.attrs.rowspan > 1) {
-      attrs.push(`rowspan="${content.attrs.rowspan}"`);
-    }
-    const attrStr = attrs.length > 0 ? ' ' + attrs.join(' ') : '';
-    const cellContent = (content.content || [])
-      .map((node: any) => renderTiptapToHtml(node, textStyles, renderComponentHtml, linkContext))
-      .join('');
-    return `<${tag}${attrStr}>${cellContent}</${tag}>`;
   }
 
   // Fallback: recursively process content

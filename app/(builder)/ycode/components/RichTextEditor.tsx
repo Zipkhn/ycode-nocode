@@ -1449,6 +1449,10 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(({
               setTableContextMenuOpen(false);
               return;
             }
+            const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+            if (pos) {
+              editor.chain().focus().setTextSelection(pos.pos).run();
+            }
             setTableContextMenuOpen(true);
           }}
         >
