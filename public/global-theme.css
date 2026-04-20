@@ -54,8 +54,8 @@
 
   --font-smoothing: antialiased;
 
-  --display-font-weight: 400; --display-line-height: 1.2; --display-letter-spacing: -0.02em; --display-margin-bottom: 0rem;
-  --h1-font-weight: 700; --h1-line-height: 1.2; --h1-letter-spacing: -0.02em; --h1-margin-bottom: 0rem;
+  --display-font-weight: 600; --display-line-height: 1.2; --display-letter-spacing: -0.02em; --display-margin-bottom: 0rem;
+  --h1-font-weight: 600; --h1-line-height: 1.2; --h1-letter-spacing: -0.02em; --h1-margin-bottom: 0rem;
   --h2-font-weight: 700; --h2-line-height: 1.2; --h2-letter-spacing: -0.02em; --h2-margin-bottom: 0rem;
   --h3-font-weight: 600; --h3-line-height: 1.3; --h3-letter-spacing: 0em; --h3-margin-bottom: 0rem;
   --h4-font-weight: 600; --h4-line-height: 1.4; --h4-letter-spacing: 0em; --h4-margin-bottom: 0rem;
@@ -720,208 +720,420 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   :is(#ybody, .y-canvas, [data-ycode-canvas]) .sm\:u-break-none  { margin-left: 0 !important; margin-right: 0 !important; width: 100% !important; }
 }
 
+:root {
+  --space-0: 0px;
+}
 /* STUDIO_CORE_END */
 
 /* STUDIO_RUNTIME_BRIDGES_START */
-/* Studio Runtime Bridge v8.0 — auto-generated, do not edit */
-/* Unique-token selectors: [class*="prop-space-X" i] — case-insensitive substring match */
-/* ── SPACE-3XS ── */
-:where(body) [class*="space-3xs" i]{--studio-space-3xs:var(--space-3xs)!important}
-:where(body) [class*="pt-space-3xs" i]{padding-top:var(--space-3xs)!important}
-:where(body) [class*="pb-space-3xs" i]{padding-bottom:var(--space-3xs)!important}
-:where(body) [class*="pl-space-3xs" i]{padding-left:var(--space-3xs)!important}
-:where(body) [class*="pr-space-3xs" i]{padding-right:var(--space-3xs)!important}
-:where(body) [class*="px-space-3xs" i]{padding-left:var(--space-3xs)!important;padding-right:var(--space-3xs)!important}
-:where(body) [class*="py-space-3xs" i]{padding-top:var(--space-3xs)!important;padding-bottom:var(--space-3xs)!important}
-:where(body) [class*="mt-space-3xs" i]{margin-top:var(--space-3xs)!important}
-:where(body) [class*="mb-space-3xs" i]{margin-bottom:var(--space-3xs)!important}
-:where(body) [class*="ml-space-3xs" i]{margin-left:var(--space-3xs)!important}
-:where(body) [class*="mr-space-3xs" i]{margin-right:var(--space-3xs)!important}
-:where(body) [class*="mx-space-3xs" i]{margin-left:var(--space-3xs)!important;margin-right:var(--space-3xs)!important}
-:where(body) [class*="my-space-3xs" i]{margin-top:var(--space-3xs)!important;margin-bottom:var(--space-3xs)!important}
-:where(body) [class*="gap-space-3xs" i]{gap:var(--space-3xs)!important}
-/* ── SPACE-2XS ── */
-:where(body) [class*="space-2xs" i]{--studio-space-2xs:var(--space-2xs)!important}
-:where(body) [class*="pt-space-2xs" i]{padding-top:var(--space-2xs)!important}
-:where(body) [class*="pb-space-2xs" i]{padding-bottom:var(--space-2xs)!important}
-:where(body) [class*="pl-space-2xs" i]{padding-left:var(--space-2xs)!important}
-:where(body) [class*="pr-space-2xs" i]{padding-right:var(--space-2xs)!important}
-:where(body) [class*="px-space-2xs" i]{padding-left:var(--space-2xs)!important;padding-right:var(--space-2xs)!important}
-:where(body) [class*="py-space-2xs" i]{padding-top:var(--space-2xs)!important;padding-bottom:var(--space-2xs)!important}
-:where(body) [class*="mt-space-2xs" i]{margin-top:var(--space-2xs)!important}
-:where(body) [class*="mb-space-2xs" i]{margin-bottom:var(--space-2xs)!important}
-:where(body) [class*="ml-space-2xs" i]{margin-left:var(--space-2xs)!important}
-:where(body) [class*="mr-space-2xs" i]{margin-right:var(--space-2xs)!important}
-:where(body) [class*="mx-space-2xs" i]{margin-left:var(--space-2xs)!important;margin-right:var(--space-2xs)!important}
-:where(body) [class*="my-space-2xs" i]{margin-top:var(--space-2xs)!important;margin-bottom:var(--space-2xs)!important}
-:where(body) [class*="gap-space-2xs" i]{gap:var(--space-2xs)!important}
-/* ── SPACE-XS ── */
-:where(body) [class*="space-xs" i]{--studio-space-xs:var(--space-xs)!important}
-:where(body) [class*="pt-space-xs" i]{padding-top:var(--space-xs)!important}
-:where(body) [class*="pb-space-xs" i]{padding-bottom:var(--space-xs)!important}
-:where(body) [class*="pl-space-xs" i]{padding-left:var(--space-xs)!important}
-:where(body) [class*="pr-space-xs" i]{padding-right:var(--space-xs)!important}
-:where(body) [class*="px-space-xs" i]{padding-left:var(--space-xs)!important;padding-right:var(--space-xs)!important}
-:where(body) [class*="py-space-xs" i]{padding-top:var(--space-xs)!important;padding-bottom:var(--space-xs)!important}
-:where(body) [class*="mt-space-xs" i]{margin-top:var(--space-xs)!important}
-:where(body) [class*="mb-space-xs" i]{margin-bottom:var(--space-xs)!important}
-:where(body) [class*="ml-space-xs" i]{margin-left:var(--space-xs)!important}
-:where(body) [class*="mr-space-xs" i]{margin-right:var(--space-xs)!important}
-:where(body) [class*="mx-space-xs" i]{margin-left:var(--space-xs)!important;margin-right:var(--space-xs)!important}
-:where(body) [class*="my-space-xs" i]{margin-top:var(--space-xs)!important;margin-bottom:var(--space-xs)!important}
-:where(body) [class*="gap-space-xs" i]{gap:var(--space-xs)!important}
-/* ── SPACE-S ── */
-:where(body) [class*="space-s" i]{--studio-space-s:var(--space-s)!important}
-:where(body) [class*="pt-space-s" i]{padding-top:var(--space-s)!important}
-:where(body) [class*="pb-space-s" i]{padding-bottom:var(--space-s)!important}
-:where(body) [class*="pl-space-s" i]{padding-left:var(--space-s)!important}
-:where(body) [class*="pr-space-s" i]{padding-right:var(--space-s)!important}
-:where(body) [class*="px-space-s" i]{padding-left:var(--space-s)!important;padding-right:var(--space-s)!important}
-:where(body) [class*="py-space-s" i]{padding-top:var(--space-s)!important;padding-bottom:var(--space-s)!important}
-:where(body) [class*="mt-space-s" i]{margin-top:var(--space-s)!important}
-:where(body) [class*="mb-space-s" i]{margin-bottom:var(--space-s)!important}
-:where(body) [class*="ml-space-s" i]{margin-left:var(--space-s)!important}
-:where(body) [class*="mr-space-s" i]{margin-right:var(--space-s)!important}
-:where(body) [class*="mx-space-s" i]{margin-left:var(--space-s)!important;margin-right:var(--space-s)!important}
-:where(body) [class*="my-space-s" i]{margin-top:var(--space-s)!important;margin-bottom:var(--space-s)!important}
-:where(body) [class*="gap-space-s" i]{gap:var(--space-s)!important}
-/* ── SPACE-M ── */
-:where(body) [class*="space-m" i]{--studio-space-m:var(--space-m)!important}
-:where(body) [class*="pt-space-m" i]{padding-top:var(--space-m)!important}
-:where(body) [class*="pb-space-m" i]{padding-bottom:var(--space-m)!important}
-:where(body) [class*="pl-space-m" i]{padding-left:var(--space-m)!important}
-:where(body) [class*="pr-space-m" i]{padding-right:var(--space-m)!important}
-:where(body) [class*="px-space-m" i]{padding-left:var(--space-m)!important;padding-right:var(--space-m)!important}
-:where(body) [class*="py-space-m" i]{padding-top:var(--space-m)!important;padding-bottom:var(--space-m)!important}
-:where(body) [class*="mt-space-m" i]{margin-top:var(--space-m)!important}
-:where(body) [class*="mb-space-m" i]{margin-bottom:var(--space-m)!important}
-:where(body) [class*="ml-space-m" i]{margin-left:var(--space-m)!important}
-:where(body) [class*="mr-space-m" i]{margin-right:var(--space-m)!important}
-:where(body) [class*="mx-space-m" i]{margin-left:var(--space-m)!important;margin-right:var(--space-m)!important}
-:where(body) [class*="my-space-m" i]{margin-top:var(--space-m)!important;margin-bottom:var(--space-m)!important}
-:where(body) [class*="gap-space-m" i]{gap:var(--space-m)!important}
-/* ── SPACE-L ── */
-:where(body) [class*="space-l" i]{--studio-space-l:var(--space-l)!important}
-:where(body) [class*="pt-space-l" i]{padding-top:var(--space-l)!important}
-:where(body) [class*="pb-space-l" i]{padding-bottom:var(--space-l)!important}
-:where(body) [class*="pl-space-l" i]{padding-left:var(--space-l)!important}
-:where(body) [class*="pr-space-l" i]{padding-right:var(--space-l)!important}
-:where(body) [class*="px-space-l" i]{padding-left:var(--space-l)!important;padding-right:var(--space-l)!important}
-:where(body) [class*="py-space-l" i]{padding-top:var(--space-l)!important;padding-bottom:var(--space-l)!important}
-:where(body) [class*="mt-space-l" i]{margin-top:var(--space-l)!important}
-:where(body) [class*="mb-space-l" i]{margin-bottom:var(--space-l)!important}
-:where(body) [class*="ml-space-l" i]{margin-left:var(--space-l)!important}
-:where(body) [class*="mr-space-l" i]{margin-right:var(--space-l)!important}
-:where(body) [class*="mx-space-l" i]{margin-left:var(--space-l)!important;margin-right:var(--space-l)!important}
-:where(body) [class*="my-space-l" i]{margin-top:var(--space-l)!important;margin-bottom:var(--space-l)!important}
-:where(body) [class*="gap-space-l" i]{gap:var(--space-l)!important}
-/* ── SPACE-XL ── */
-:where(body) [class*="space-xl" i]{--studio-space-xl:var(--space-xl)!important}
-:where(body) [class*="pt-space-xl" i]{padding-top:var(--space-xl)!important}
-:where(body) [class*="pb-space-xl" i]{padding-bottom:var(--space-xl)!important}
-:where(body) [class*="pl-space-xl" i]{padding-left:var(--space-xl)!important}
-:where(body) [class*="pr-space-xl" i]{padding-right:var(--space-xl)!important}
-:where(body) [class*="px-space-xl" i]{padding-left:var(--space-xl)!important;padding-right:var(--space-xl)!important}
-:where(body) [class*="py-space-xl" i]{padding-top:var(--space-xl)!important;padding-bottom:var(--space-xl)!important}
-:where(body) [class*="mt-space-xl" i]{margin-top:var(--space-xl)!important}
-:where(body) [class*="mb-space-xl" i]{margin-bottom:var(--space-xl)!important}
-:where(body) [class*="ml-space-xl" i]{margin-left:var(--space-xl)!important}
-:where(body) [class*="mr-space-xl" i]{margin-right:var(--space-xl)!important}
-:where(body) [class*="mx-space-xl" i]{margin-left:var(--space-xl)!important;margin-right:var(--space-xl)!important}
-:where(body) [class*="my-space-xl" i]{margin-top:var(--space-xl)!important;margin-bottom:var(--space-xl)!important}
-:where(body) [class*="gap-space-xl" i]{gap:var(--space-xl)!important}
-/* ── SPACE-2XL ── */
-:where(body) [class*="space-2xl" i]{--studio-space-2xl:var(--space-2xl)!important}
-:where(body) [class*="pt-space-2xl" i]{padding-top:var(--space-2xl)!important}
-:where(body) [class*="pb-space-2xl" i]{padding-bottom:var(--space-2xl)!important}
-:where(body) [class*="pl-space-2xl" i]{padding-left:var(--space-2xl)!important}
-:where(body) [class*="pr-space-2xl" i]{padding-right:var(--space-2xl)!important}
-:where(body) [class*="px-space-2xl" i]{padding-left:var(--space-2xl)!important;padding-right:var(--space-2xl)!important}
-:where(body) [class*="py-space-2xl" i]{padding-top:var(--space-2xl)!important;padding-bottom:var(--space-2xl)!important}
-:where(body) [class*="mt-space-2xl" i]{margin-top:var(--space-2xl)!important}
-:where(body) [class*="mb-space-2xl" i]{margin-bottom:var(--space-2xl)!important}
-:where(body) [class*="ml-space-2xl" i]{margin-left:var(--space-2xl)!important}
-:where(body) [class*="mr-space-2xl" i]{margin-right:var(--space-2xl)!important}
-:where(body) [class*="mx-space-2xl" i]{margin-left:var(--space-2xl)!important;margin-right:var(--space-2xl)!important}
-:where(body) [class*="my-space-2xl" i]{margin-top:var(--space-2xl)!important;margin-bottom:var(--space-2xl)!important}
-:where(body) [class*="gap-space-2xl" i]{gap:var(--space-2xl)!important}
-/* ── SPACE-3XL ── */
-:where(body) [class*="space-3xl" i]{--studio-space-3xl:var(--space-3xl)!important}
-:where(body) [class*="pt-space-3xl" i]{padding-top:var(--space-3xl)!important}
-:where(body) [class*="pb-space-3xl" i]{padding-bottom:var(--space-3xl)!important}
-:where(body) [class*="pl-space-3xl" i]{padding-left:var(--space-3xl)!important}
-:where(body) [class*="pr-space-3xl" i]{padding-right:var(--space-3xl)!important}
-:where(body) [class*="px-space-3xl" i]{padding-left:var(--space-3xl)!important;padding-right:var(--space-3xl)!important}
-:where(body) [class*="py-space-3xl" i]{padding-top:var(--space-3xl)!important;padding-bottom:var(--space-3xl)!important}
-:where(body) [class*="mt-space-3xl" i]{margin-top:var(--space-3xl)!important}
-:where(body) [class*="mb-space-3xl" i]{margin-bottom:var(--space-3xl)!important}
-:where(body) [class*="ml-space-3xl" i]{margin-left:var(--space-3xl)!important}
-:where(body) [class*="mr-space-3xl" i]{margin-right:var(--space-3xl)!important}
-:where(body) [class*="mx-space-3xl" i]{margin-left:var(--space-3xl)!important;margin-right:var(--space-3xl)!important}
-:where(body) [class*="my-space-3xl" i]{margin-top:var(--space-3xl)!important;margin-bottom:var(--space-3xl)!important}
-:where(body) [class*="gap-space-3xl" i]{gap:var(--space-3xl)!important}
+/* Studio Runtime Bridge v9.1 — breakpoint-aware, auto-generated */
+:root{--space-0:0px}
+:is(:where(body) [class^="pt-space-3xs"],:where(body) [class*=" pt-space-3xs"]){padding-top:var(--space-3xs)!important}
+:is(:where(body) [class^="pb-space-3xs"],:where(body) [class*=" pb-space-3xs"]){padding-bottom:var(--space-3xs)!important}
+:is(:where(body) [class^="pl-space-3xs"],:where(body) [class*=" pl-space-3xs"]){padding-left:var(--space-3xs)!important}
+:is(:where(body) [class^="pr-space-3xs"],:where(body) [class*=" pr-space-3xs"]){padding-right:var(--space-3xs)!important}
+:is(:where(body) [class^="px-space-3xs"],:where(body) [class*=" px-space-3xs"]){padding-left:var(--space-3xs)!important;padding-right:var(--space-3xs)!important}
+:is(:where(body) [class^="py-space-3xs"],:where(body) [class*=" py-space-3xs"]){padding-top:var(--space-3xs)!important;padding-bottom:var(--space-3xs)!important}
+:is(:where(body) [class^="mt-space-3xs"],:where(body) [class*=" mt-space-3xs"]){margin-top:var(--space-3xs)!important}
+:is(:where(body) [class^="mb-space-3xs"],:where(body) [class*=" mb-space-3xs"]){margin-bottom:var(--space-3xs)!important}
+:is(:where(body) [class^="ml-space-3xs"],:where(body) [class*=" ml-space-3xs"]){margin-left:var(--space-3xs)!important}
+:is(:where(body) [class^="mr-space-3xs"],:where(body) [class*=" mr-space-3xs"]){margin-right:var(--space-3xs)!important}
+:is(:where(body) [class^="mx-space-3xs"],:where(body) [class*=" mx-space-3xs"]){margin-left:var(--space-3xs)!important;margin-right:var(--space-3xs)!important}
+:is(:where(body) [class^="my-space-3xs"],:where(body) [class*=" my-space-3xs"]){margin-top:var(--space-3xs)!important;margin-bottom:var(--space-3xs)!important}
+:is(:where(body) [class^="gap-space-3xs"],:where(body) [class*=" gap-space-3xs"]){gap:var(--space-3xs)!important}
+:is(:where(body) [class^="pt-space-2xs"],:where(body) [class*=" pt-space-2xs"]){padding-top:var(--space-2xs)!important}
+:is(:where(body) [class^="pb-space-2xs"],:where(body) [class*=" pb-space-2xs"]){padding-bottom:var(--space-2xs)!important}
+:is(:where(body) [class^="pl-space-2xs"],:where(body) [class*=" pl-space-2xs"]){padding-left:var(--space-2xs)!important}
+:is(:where(body) [class^="pr-space-2xs"],:where(body) [class*=" pr-space-2xs"]){padding-right:var(--space-2xs)!important}
+:is(:where(body) [class^="px-space-2xs"],:where(body) [class*=" px-space-2xs"]){padding-left:var(--space-2xs)!important;padding-right:var(--space-2xs)!important}
+:is(:where(body) [class^="py-space-2xs"],:where(body) [class*=" py-space-2xs"]){padding-top:var(--space-2xs)!important;padding-bottom:var(--space-2xs)!important}
+:is(:where(body) [class^="mt-space-2xs"],:where(body) [class*=" mt-space-2xs"]){margin-top:var(--space-2xs)!important}
+:is(:where(body) [class^="mb-space-2xs"],:where(body) [class*=" mb-space-2xs"]){margin-bottom:var(--space-2xs)!important}
+:is(:where(body) [class^="ml-space-2xs"],:where(body) [class*=" ml-space-2xs"]){margin-left:var(--space-2xs)!important}
+:is(:where(body) [class^="mr-space-2xs"],:where(body) [class*=" mr-space-2xs"]){margin-right:var(--space-2xs)!important}
+:is(:where(body) [class^="mx-space-2xs"],:where(body) [class*=" mx-space-2xs"]){margin-left:var(--space-2xs)!important;margin-right:var(--space-2xs)!important}
+:is(:where(body) [class^="my-space-2xs"],:where(body) [class*=" my-space-2xs"]){margin-top:var(--space-2xs)!important;margin-bottom:var(--space-2xs)!important}
+:is(:where(body) [class^="gap-space-2xs"],:where(body) [class*=" gap-space-2xs"]){gap:var(--space-2xs)!important}
+:is(:where(body) [class^="pt-space-xs"],:where(body) [class*=" pt-space-xs"]){padding-top:var(--space-xs)!important}
+:is(:where(body) [class^="pb-space-xs"],:where(body) [class*=" pb-space-xs"]){padding-bottom:var(--space-xs)!important}
+:is(:where(body) [class^="pl-space-xs"],:where(body) [class*=" pl-space-xs"]){padding-left:var(--space-xs)!important}
+:is(:where(body) [class^="pr-space-xs"],:where(body) [class*=" pr-space-xs"]){padding-right:var(--space-xs)!important}
+:is(:where(body) [class^="px-space-xs"],:where(body) [class*=" px-space-xs"]){padding-left:var(--space-xs)!important;padding-right:var(--space-xs)!important}
+:is(:where(body) [class^="py-space-xs"],:where(body) [class*=" py-space-xs"]){padding-top:var(--space-xs)!important;padding-bottom:var(--space-xs)!important}
+:is(:where(body) [class^="mt-space-xs"],:where(body) [class*=" mt-space-xs"]){margin-top:var(--space-xs)!important}
+:is(:where(body) [class^="mb-space-xs"],:where(body) [class*=" mb-space-xs"]){margin-bottom:var(--space-xs)!important}
+:is(:where(body) [class^="ml-space-xs"],:where(body) [class*=" ml-space-xs"]){margin-left:var(--space-xs)!important}
+:is(:where(body) [class^="mr-space-xs"],:where(body) [class*=" mr-space-xs"]){margin-right:var(--space-xs)!important}
+:is(:where(body) [class^="mx-space-xs"],:where(body) [class*=" mx-space-xs"]){margin-left:var(--space-xs)!important;margin-right:var(--space-xs)!important}
+:is(:where(body) [class^="my-space-xs"],:where(body) [class*=" my-space-xs"]){margin-top:var(--space-xs)!important;margin-bottom:var(--space-xs)!important}
+:is(:where(body) [class^="gap-space-xs"],:where(body) [class*=" gap-space-xs"]){gap:var(--space-xs)!important}
+:is(:where(body) [class^="pt-space-s"],:where(body) [class*=" pt-space-s"]){padding-top:var(--space-s)!important}
+:is(:where(body) [class^="pb-space-s"],:where(body) [class*=" pb-space-s"]){padding-bottom:var(--space-s)!important}
+:is(:where(body) [class^="pl-space-s"],:where(body) [class*=" pl-space-s"]){padding-left:var(--space-s)!important}
+:is(:where(body) [class^="pr-space-s"],:where(body) [class*=" pr-space-s"]){padding-right:var(--space-s)!important}
+:is(:where(body) [class^="px-space-s"],:where(body) [class*=" px-space-s"]){padding-left:var(--space-s)!important;padding-right:var(--space-s)!important}
+:is(:where(body) [class^="py-space-s"],:where(body) [class*=" py-space-s"]){padding-top:var(--space-s)!important;padding-bottom:var(--space-s)!important}
+:is(:where(body) [class^="mt-space-s"],:where(body) [class*=" mt-space-s"]){margin-top:var(--space-s)!important}
+:is(:where(body) [class^="mb-space-s"],:where(body) [class*=" mb-space-s"]){margin-bottom:var(--space-s)!important}
+:is(:where(body) [class^="ml-space-s"],:where(body) [class*=" ml-space-s"]){margin-left:var(--space-s)!important}
+:is(:where(body) [class^="mr-space-s"],:where(body) [class*=" mr-space-s"]){margin-right:var(--space-s)!important}
+:is(:where(body) [class^="mx-space-s"],:where(body) [class*=" mx-space-s"]){margin-left:var(--space-s)!important;margin-right:var(--space-s)!important}
+:is(:where(body) [class^="my-space-s"],:where(body) [class*=" my-space-s"]){margin-top:var(--space-s)!important;margin-bottom:var(--space-s)!important}
+:is(:where(body) [class^="gap-space-s"],:where(body) [class*=" gap-space-s"]){gap:var(--space-s)!important}
+:is(:where(body) [class^="pt-space-m"],:where(body) [class*=" pt-space-m"]){padding-top:var(--space-m)!important}
+:is(:where(body) [class^="pb-space-m"],:where(body) [class*=" pb-space-m"]){padding-bottom:var(--space-m)!important}
+:is(:where(body) [class^="pl-space-m"],:where(body) [class*=" pl-space-m"]){padding-left:var(--space-m)!important}
+:is(:where(body) [class^="pr-space-m"],:where(body) [class*=" pr-space-m"]){padding-right:var(--space-m)!important}
+:is(:where(body) [class^="px-space-m"],:where(body) [class*=" px-space-m"]){padding-left:var(--space-m)!important;padding-right:var(--space-m)!important}
+:is(:where(body) [class^="py-space-m"],:where(body) [class*=" py-space-m"]){padding-top:var(--space-m)!important;padding-bottom:var(--space-m)!important}
+:is(:where(body) [class^="mt-space-m"],:where(body) [class*=" mt-space-m"]){margin-top:var(--space-m)!important}
+:is(:where(body) [class^="mb-space-m"],:where(body) [class*=" mb-space-m"]){margin-bottom:var(--space-m)!important}
+:is(:where(body) [class^="ml-space-m"],:where(body) [class*=" ml-space-m"]){margin-left:var(--space-m)!important}
+:is(:where(body) [class^="mr-space-m"],:where(body) [class*=" mr-space-m"]){margin-right:var(--space-m)!important}
+:is(:where(body) [class^="mx-space-m"],:where(body) [class*=" mx-space-m"]){margin-left:var(--space-m)!important;margin-right:var(--space-m)!important}
+:is(:where(body) [class^="my-space-m"],:where(body) [class*=" my-space-m"]){margin-top:var(--space-m)!important;margin-bottom:var(--space-m)!important}
+:is(:where(body) [class^="gap-space-m"],:where(body) [class*=" gap-space-m"]){gap:var(--space-m)!important}
+:is(:where(body) [class^="pt-space-l"],:where(body) [class*=" pt-space-l"]){padding-top:var(--space-l)!important}
+:is(:where(body) [class^="pb-space-l"],:where(body) [class*=" pb-space-l"]){padding-bottom:var(--space-l)!important}
+:is(:where(body) [class^="pl-space-l"],:where(body) [class*=" pl-space-l"]){padding-left:var(--space-l)!important}
+:is(:where(body) [class^="pr-space-l"],:where(body) [class*=" pr-space-l"]){padding-right:var(--space-l)!important}
+:is(:where(body) [class^="px-space-l"],:where(body) [class*=" px-space-l"]){padding-left:var(--space-l)!important;padding-right:var(--space-l)!important}
+:is(:where(body) [class^="py-space-l"],:where(body) [class*=" py-space-l"]){padding-top:var(--space-l)!important;padding-bottom:var(--space-l)!important}
+:is(:where(body) [class^="mt-space-l"],:where(body) [class*=" mt-space-l"]){margin-top:var(--space-l)!important}
+:is(:where(body) [class^="mb-space-l"],:where(body) [class*=" mb-space-l"]){margin-bottom:var(--space-l)!important}
+:is(:where(body) [class^="ml-space-l"],:where(body) [class*=" ml-space-l"]){margin-left:var(--space-l)!important}
+:is(:where(body) [class^="mr-space-l"],:where(body) [class*=" mr-space-l"]){margin-right:var(--space-l)!important}
+:is(:where(body) [class^="mx-space-l"],:where(body) [class*=" mx-space-l"]){margin-left:var(--space-l)!important;margin-right:var(--space-l)!important}
+:is(:where(body) [class^="my-space-l"],:where(body) [class*=" my-space-l"]){margin-top:var(--space-l)!important;margin-bottom:var(--space-l)!important}
+:is(:where(body) [class^="gap-space-l"],:where(body) [class*=" gap-space-l"]){gap:var(--space-l)!important}
+:is(:where(body) [class^="pt-space-xl"],:where(body) [class*=" pt-space-xl"]){padding-top:var(--space-xl)!important}
+:is(:where(body) [class^="pb-space-xl"],:where(body) [class*=" pb-space-xl"]){padding-bottom:var(--space-xl)!important}
+:is(:where(body) [class^="pl-space-xl"],:where(body) [class*=" pl-space-xl"]){padding-left:var(--space-xl)!important}
+:is(:where(body) [class^="pr-space-xl"],:where(body) [class*=" pr-space-xl"]){padding-right:var(--space-xl)!important}
+:is(:where(body) [class^="px-space-xl"],:where(body) [class*=" px-space-xl"]){padding-left:var(--space-xl)!important;padding-right:var(--space-xl)!important}
+:is(:where(body) [class^="py-space-xl"],:where(body) [class*=" py-space-xl"]){padding-top:var(--space-xl)!important;padding-bottom:var(--space-xl)!important}
+:is(:where(body) [class^="mt-space-xl"],:where(body) [class*=" mt-space-xl"]){margin-top:var(--space-xl)!important}
+:is(:where(body) [class^="mb-space-xl"],:where(body) [class*=" mb-space-xl"]){margin-bottom:var(--space-xl)!important}
+:is(:where(body) [class^="ml-space-xl"],:where(body) [class*=" ml-space-xl"]){margin-left:var(--space-xl)!important}
+:is(:where(body) [class^="mr-space-xl"],:where(body) [class*=" mr-space-xl"]){margin-right:var(--space-xl)!important}
+:is(:where(body) [class^="mx-space-xl"],:where(body) [class*=" mx-space-xl"]){margin-left:var(--space-xl)!important;margin-right:var(--space-xl)!important}
+:is(:where(body) [class^="my-space-xl"],:where(body) [class*=" my-space-xl"]){margin-top:var(--space-xl)!important;margin-bottom:var(--space-xl)!important}
+:is(:where(body) [class^="gap-space-xl"],:where(body) [class*=" gap-space-xl"]){gap:var(--space-xl)!important}
+:is(:where(body) [class^="pt-space-2xl"],:where(body) [class*=" pt-space-2xl"]){padding-top:var(--space-2xl)!important}
+:is(:where(body) [class^="pb-space-2xl"],:where(body) [class*=" pb-space-2xl"]){padding-bottom:var(--space-2xl)!important}
+:is(:where(body) [class^="pl-space-2xl"],:where(body) [class*=" pl-space-2xl"]){padding-left:var(--space-2xl)!important}
+:is(:where(body) [class^="pr-space-2xl"],:where(body) [class*=" pr-space-2xl"]){padding-right:var(--space-2xl)!important}
+:is(:where(body) [class^="px-space-2xl"],:where(body) [class*=" px-space-2xl"]){padding-left:var(--space-2xl)!important;padding-right:var(--space-2xl)!important}
+:is(:where(body) [class^="py-space-2xl"],:where(body) [class*=" py-space-2xl"]){padding-top:var(--space-2xl)!important;padding-bottom:var(--space-2xl)!important}
+:is(:where(body) [class^="mt-space-2xl"],:where(body) [class*=" mt-space-2xl"]){margin-top:var(--space-2xl)!important}
+:is(:where(body) [class^="mb-space-2xl"],:where(body) [class*=" mb-space-2xl"]){margin-bottom:var(--space-2xl)!important}
+:is(:where(body) [class^="ml-space-2xl"],:where(body) [class*=" ml-space-2xl"]){margin-left:var(--space-2xl)!important}
+:is(:where(body) [class^="mr-space-2xl"],:where(body) [class*=" mr-space-2xl"]){margin-right:var(--space-2xl)!important}
+:is(:where(body) [class^="mx-space-2xl"],:where(body) [class*=" mx-space-2xl"]){margin-left:var(--space-2xl)!important;margin-right:var(--space-2xl)!important}
+:is(:where(body) [class^="my-space-2xl"],:where(body) [class*=" my-space-2xl"]){margin-top:var(--space-2xl)!important;margin-bottom:var(--space-2xl)!important}
+:is(:where(body) [class^="gap-space-2xl"],:where(body) [class*=" gap-space-2xl"]){gap:var(--space-2xl)!important}
+:is(:where(body) [class^="pt-space-3xl"],:where(body) [class*=" pt-space-3xl"]){padding-top:var(--space-3xl)!important}
+:is(:where(body) [class^="pb-space-3xl"],:where(body) [class*=" pb-space-3xl"]){padding-bottom:var(--space-3xl)!important}
+:is(:where(body) [class^="pl-space-3xl"],:where(body) [class*=" pl-space-3xl"]){padding-left:var(--space-3xl)!important}
+:is(:where(body) [class^="pr-space-3xl"],:where(body) [class*=" pr-space-3xl"]){padding-right:var(--space-3xl)!important}
+:is(:where(body) [class^="px-space-3xl"],:where(body) [class*=" px-space-3xl"]){padding-left:var(--space-3xl)!important;padding-right:var(--space-3xl)!important}
+:is(:where(body) [class^="py-space-3xl"],:where(body) [class*=" py-space-3xl"]){padding-top:var(--space-3xl)!important;padding-bottom:var(--space-3xl)!important}
+:is(:where(body) [class^="mt-space-3xl"],:where(body) [class*=" mt-space-3xl"]){margin-top:var(--space-3xl)!important}
+:is(:where(body) [class^="mb-space-3xl"],:where(body) [class*=" mb-space-3xl"]){margin-bottom:var(--space-3xl)!important}
+:is(:where(body) [class^="ml-space-3xl"],:where(body) [class*=" ml-space-3xl"]){margin-left:var(--space-3xl)!important}
+:is(:where(body) [class^="mr-space-3xl"],:where(body) [class*=" mr-space-3xl"]){margin-right:var(--space-3xl)!important}
+:is(:where(body) [class^="mx-space-3xl"],:where(body) [class*=" mx-space-3xl"]){margin-left:var(--space-3xl)!important;margin-right:var(--space-3xl)!important}
+:is(:where(body) [class^="my-space-3xl"],:where(body) [class*=" my-space-3xl"]){margin-top:var(--space-3xl)!important;margin-bottom:var(--space-3xl)!important}
+:is(:where(body) [class^="gap-space-3xl"],:where(body) [class*=" gap-space-3xl"]){gap:var(--space-3xl)!important}
+:is(:where(body) [class^="pt-space-0"],:where(body) [class*=" pt-space-0"]){padding-top:0px!important}
+:is(:where(body) [class^="pb-space-0"],:where(body) [class*=" pb-space-0"]){padding-bottom:0px!important}
+:is(:where(body) [class^="pl-space-0"],:where(body) [class*=" pl-space-0"]){padding-left:0px!important}
+:is(:where(body) [class^="pr-space-0"],:where(body) [class*=" pr-space-0"]){padding-right:0px!important}
+:is(:where(body) [class^="px-space-0"],:where(body) [class*=" px-space-0"]){padding-left:0px!important;padding-right:0px!important}
+:is(:where(body) [class^="py-space-0"],:where(body) [class*=" py-space-0"]){padding-top:0px!important;padding-bottom:0px!important}
+:is(:where(body) [class^="mt-space-0"],:where(body) [class*=" mt-space-0"]){margin-top:0px!important}
+:is(:where(body) [class^="mb-space-0"],:where(body) [class*=" mb-space-0"]){margin-bottom:0px!important}
+:is(:where(body) [class^="ml-space-0"],:where(body) [class*=" ml-space-0"]){margin-left:0px!important}
+:is(:where(body) [class^="mr-space-0"],:where(body) [class*=" mr-space-0"]){margin-right:0px!important}
+:is(:where(body) [class^="mx-space-0"],:where(body) [class*=" mx-space-0"]){margin-left:0px!important;margin-right:0px!important}
+:is(:where(body) [class^="my-space-0"],:where(body) [class*=" my-space-0"]){margin-top:0px!important;margin-bottom:0px!important}
+:is(:where(body) [class^="gap-space-0"],:where(body) [class*=" gap-space-0"]){gap:0px!important}
+@media screen and (max-width:1024px){
+:is(:where(body) [class*="max-lg:pt-space-3xs"],:where(body) [class*="md:pt-space-3xs"]){padding-top:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:pb-space-3xs"],:where(body) [class*="md:pb-space-3xs"]){padding-bottom:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:pl-space-3xs"],:where(body) [class*="md:pl-space-3xs"]){padding-left:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:pr-space-3xs"],:where(body) [class*="md:pr-space-3xs"]){padding-right:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:px-space-3xs"],:where(body) [class*="md:px-space-3xs"]){padding-left:var(--space-3xs)!important;padding-right:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:py-space-3xs"],:where(body) [class*="md:py-space-3xs"]){padding-top:var(--space-3xs)!important;padding-bottom:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:mt-space-3xs"],:where(body) [class*="md:mt-space-3xs"]){margin-top:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:mb-space-3xs"],:where(body) [class*="md:mb-space-3xs"]){margin-bottom:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:ml-space-3xs"],:where(body) [class*="md:ml-space-3xs"]){margin-left:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:mr-space-3xs"],:where(body) [class*="md:mr-space-3xs"]){margin-right:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:mx-space-3xs"],:where(body) [class*="md:mx-space-3xs"]){margin-left:var(--space-3xs)!important;margin-right:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:my-space-3xs"],:where(body) [class*="md:my-space-3xs"]){margin-top:var(--space-3xs)!important;margin-bottom:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:gap-space-3xs"],:where(body) [class*="md:gap-space-3xs"]){gap:var(--space-3xs)!important}
+:is(:where(body) [class*="max-lg:pt-space-2xs"],:where(body) [class*="md:pt-space-2xs"]){padding-top:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:pb-space-2xs"],:where(body) [class*="md:pb-space-2xs"]){padding-bottom:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:pl-space-2xs"],:where(body) [class*="md:pl-space-2xs"]){padding-left:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:pr-space-2xs"],:where(body) [class*="md:pr-space-2xs"]){padding-right:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:px-space-2xs"],:where(body) [class*="md:px-space-2xs"]){padding-left:var(--space-2xs)!important;padding-right:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:py-space-2xs"],:where(body) [class*="md:py-space-2xs"]){padding-top:var(--space-2xs)!important;padding-bottom:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:mt-space-2xs"],:where(body) [class*="md:mt-space-2xs"]){margin-top:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:mb-space-2xs"],:where(body) [class*="md:mb-space-2xs"]){margin-bottom:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:ml-space-2xs"],:where(body) [class*="md:ml-space-2xs"]){margin-left:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:mr-space-2xs"],:where(body) [class*="md:mr-space-2xs"]){margin-right:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:mx-space-2xs"],:where(body) [class*="md:mx-space-2xs"]){margin-left:var(--space-2xs)!important;margin-right:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:my-space-2xs"],:where(body) [class*="md:my-space-2xs"]){margin-top:var(--space-2xs)!important;margin-bottom:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:gap-space-2xs"],:where(body) [class*="md:gap-space-2xs"]){gap:var(--space-2xs)!important}
+:is(:where(body) [class*="max-lg:pt-space-xs"],:where(body) [class*="md:pt-space-xs"]){padding-top:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:pb-space-xs"],:where(body) [class*="md:pb-space-xs"]){padding-bottom:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:pl-space-xs"],:where(body) [class*="md:pl-space-xs"]){padding-left:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:pr-space-xs"],:where(body) [class*="md:pr-space-xs"]){padding-right:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:px-space-xs"],:where(body) [class*="md:px-space-xs"]){padding-left:var(--space-xs)!important;padding-right:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:py-space-xs"],:where(body) [class*="md:py-space-xs"]){padding-top:var(--space-xs)!important;padding-bottom:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:mt-space-xs"],:where(body) [class*="md:mt-space-xs"]){margin-top:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:mb-space-xs"],:where(body) [class*="md:mb-space-xs"]){margin-bottom:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:ml-space-xs"],:where(body) [class*="md:ml-space-xs"]){margin-left:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:mr-space-xs"],:where(body) [class*="md:mr-space-xs"]){margin-right:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:mx-space-xs"],:where(body) [class*="md:mx-space-xs"]){margin-left:var(--space-xs)!important;margin-right:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:my-space-xs"],:where(body) [class*="md:my-space-xs"]){margin-top:var(--space-xs)!important;margin-bottom:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:gap-space-xs"],:where(body) [class*="md:gap-space-xs"]){gap:var(--space-xs)!important}
+:is(:where(body) [class*="max-lg:pt-space-s"],:where(body) [class*="md:pt-space-s"]){padding-top:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:pb-space-s"],:where(body) [class*="md:pb-space-s"]){padding-bottom:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:pl-space-s"],:where(body) [class*="md:pl-space-s"]){padding-left:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:pr-space-s"],:where(body) [class*="md:pr-space-s"]){padding-right:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:px-space-s"],:where(body) [class*="md:px-space-s"]){padding-left:var(--space-s)!important;padding-right:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:py-space-s"],:where(body) [class*="md:py-space-s"]){padding-top:var(--space-s)!important;padding-bottom:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:mt-space-s"],:where(body) [class*="md:mt-space-s"]){margin-top:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:mb-space-s"],:where(body) [class*="md:mb-space-s"]){margin-bottom:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:ml-space-s"],:where(body) [class*="md:ml-space-s"]){margin-left:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:mr-space-s"],:where(body) [class*="md:mr-space-s"]){margin-right:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:mx-space-s"],:where(body) [class*="md:mx-space-s"]){margin-left:var(--space-s)!important;margin-right:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:my-space-s"],:where(body) [class*="md:my-space-s"]){margin-top:var(--space-s)!important;margin-bottom:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:gap-space-s"],:where(body) [class*="md:gap-space-s"]){gap:var(--space-s)!important}
+:is(:where(body) [class*="max-lg:pt-space-m"],:where(body) [class*="md:pt-space-m"]){padding-top:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:pb-space-m"],:where(body) [class*="md:pb-space-m"]){padding-bottom:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:pl-space-m"],:where(body) [class*="md:pl-space-m"]){padding-left:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:pr-space-m"],:where(body) [class*="md:pr-space-m"]){padding-right:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:px-space-m"],:where(body) [class*="md:px-space-m"]){padding-left:var(--space-m)!important;padding-right:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:py-space-m"],:where(body) [class*="md:py-space-m"]){padding-top:var(--space-m)!important;padding-bottom:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:mt-space-m"],:where(body) [class*="md:mt-space-m"]){margin-top:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:mb-space-m"],:where(body) [class*="md:mb-space-m"]){margin-bottom:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:ml-space-m"],:where(body) [class*="md:ml-space-m"]){margin-left:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:mr-space-m"],:where(body) [class*="md:mr-space-m"]){margin-right:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:mx-space-m"],:where(body) [class*="md:mx-space-m"]){margin-left:var(--space-m)!important;margin-right:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:my-space-m"],:where(body) [class*="md:my-space-m"]){margin-top:var(--space-m)!important;margin-bottom:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:gap-space-m"],:where(body) [class*="md:gap-space-m"]){gap:var(--space-m)!important}
+:is(:where(body) [class*="max-lg:pt-space-l"],:where(body) [class*="md:pt-space-l"]){padding-top:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:pb-space-l"],:where(body) [class*="md:pb-space-l"]){padding-bottom:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:pl-space-l"],:where(body) [class*="md:pl-space-l"]){padding-left:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:pr-space-l"],:where(body) [class*="md:pr-space-l"]){padding-right:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:px-space-l"],:where(body) [class*="md:px-space-l"]){padding-left:var(--space-l)!important;padding-right:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:py-space-l"],:where(body) [class*="md:py-space-l"]){padding-top:var(--space-l)!important;padding-bottom:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:mt-space-l"],:where(body) [class*="md:mt-space-l"]){margin-top:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:mb-space-l"],:where(body) [class*="md:mb-space-l"]){margin-bottom:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:ml-space-l"],:where(body) [class*="md:ml-space-l"]){margin-left:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:mr-space-l"],:where(body) [class*="md:mr-space-l"]){margin-right:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:mx-space-l"],:where(body) [class*="md:mx-space-l"]){margin-left:var(--space-l)!important;margin-right:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:my-space-l"],:where(body) [class*="md:my-space-l"]){margin-top:var(--space-l)!important;margin-bottom:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:gap-space-l"],:where(body) [class*="md:gap-space-l"]){gap:var(--space-l)!important}
+:is(:where(body) [class*="max-lg:pt-space-xl"],:where(body) [class*="md:pt-space-xl"]){padding-top:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:pb-space-xl"],:where(body) [class*="md:pb-space-xl"]){padding-bottom:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:pl-space-xl"],:where(body) [class*="md:pl-space-xl"]){padding-left:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:pr-space-xl"],:where(body) [class*="md:pr-space-xl"]){padding-right:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:px-space-xl"],:where(body) [class*="md:px-space-xl"]){padding-left:var(--space-xl)!important;padding-right:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:py-space-xl"],:where(body) [class*="md:py-space-xl"]){padding-top:var(--space-xl)!important;padding-bottom:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:mt-space-xl"],:where(body) [class*="md:mt-space-xl"]){margin-top:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:mb-space-xl"],:where(body) [class*="md:mb-space-xl"]){margin-bottom:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:ml-space-xl"],:where(body) [class*="md:ml-space-xl"]){margin-left:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:mr-space-xl"],:where(body) [class*="md:mr-space-xl"]){margin-right:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:mx-space-xl"],:where(body) [class*="md:mx-space-xl"]){margin-left:var(--space-xl)!important;margin-right:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:my-space-xl"],:where(body) [class*="md:my-space-xl"]){margin-top:var(--space-xl)!important;margin-bottom:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:gap-space-xl"],:where(body) [class*="md:gap-space-xl"]){gap:var(--space-xl)!important}
+:is(:where(body) [class*="max-lg:pt-space-2xl"],:where(body) [class*="md:pt-space-2xl"]){padding-top:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:pb-space-2xl"],:where(body) [class*="md:pb-space-2xl"]){padding-bottom:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:pl-space-2xl"],:where(body) [class*="md:pl-space-2xl"]){padding-left:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:pr-space-2xl"],:where(body) [class*="md:pr-space-2xl"]){padding-right:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:px-space-2xl"],:where(body) [class*="md:px-space-2xl"]){padding-left:var(--space-2xl)!important;padding-right:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:py-space-2xl"],:where(body) [class*="md:py-space-2xl"]){padding-top:var(--space-2xl)!important;padding-bottom:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:mt-space-2xl"],:where(body) [class*="md:mt-space-2xl"]){margin-top:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:mb-space-2xl"],:where(body) [class*="md:mb-space-2xl"]){margin-bottom:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:ml-space-2xl"],:where(body) [class*="md:ml-space-2xl"]){margin-left:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:mr-space-2xl"],:where(body) [class*="md:mr-space-2xl"]){margin-right:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:mx-space-2xl"],:where(body) [class*="md:mx-space-2xl"]){margin-left:var(--space-2xl)!important;margin-right:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:my-space-2xl"],:where(body) [class*="md:my-space-2xl"]){margin-top:var(--space-2xl)!important;margin-bottom:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:gap-space-2xl"],:where(body) [class*="md:gap-space-2xl"]){gap:var(--space-2xl)!important}
+:is(:where(body) [class*="max-lg:pt-space-3xl"],:where(body) [class*="md:pt-space-3xl"]){padding-top:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:pb-space-3xl"],:where(body) [class*="md:pb-space-3xl"]){padding-bottom:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:pl-space-3xl"],:where(body) [class*="md:pl-space-3xl"]){padding-left:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:pr-space-3xl"],:where(body) [class*="md:pr-space-3xl"]){padding-right:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:px-space-3xl"],:where(body) [class*="md:px-space-3xl"]){padding-left:var(--space-3xl)!important;padding-right:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:py-space-3xl"],:where(body) [class*="md:py-space-3xl"]){padding-top:var(--space-3xl)!important;padding-bottom:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:mt-space-3xl"],:where(body) [class*="md:mt-space-3xl"]){margin-top:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:mb-space-3xl"],:where(body) [class*="md:mb-space-3xl"]){margin-bottom:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:ml-space-3xl"],:where(body) [class*="md:ml-space-3xl"]){margin-left:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:mr-space-3xl"],:where(body) [class*="md:mr-space-3xl"]){margin-right:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:mx-space-3xl"],:where(body) [class*="md:mx-space-3xl"]){margin-left:var(--space-3xl)!important;margin-right:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:my-space-3xl"],:where(body) [class*="md:my-space-3xl"]){margin-top:var(--space-3xl)!important;margin-bottom:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:gap-space-3xl"],:where(body) [class*="md:gap-space-3xl"]){gap:var(--space-3xl)!important}
+:is(:where(body) [class*="max-lg:pt-space-0"],:where(body) [class*="md:pt-space-0"]){padding-top:0px!important}
+:is(:where(body) [class*="max-lg:pb-space-0"],:where(body) [class*="md:pb-space-0"]){padding-bottom:0px!important}
+:is(:where(body) [class*="max-lg:pl-space-0"],:where(body) [class*="md:pl-space-0"]){padding-left:0px!important}
+:is(:where(body) [class*="max-lg:pr-space-0"],:where(body) [class*="md:pr-space-0"]){padding-right:0px!important}
+:is(:where(body) [class*="max-lg:px-space-0"],:where(body) [class*="md:px-space-0"]){padding-left:0px!important;padding-right:0px!important}
+:is(:where(body) [class*="max-lg:py-space-0"],:where(body) [class*="md:py-space-0"]){padding-top:0px!important;padding-bottom:0px!important}
+:is(:where(body) [class*="max-lg:mt-space-0"],:where(body) [class*="md:mt-space-0"]){margin-top:0px!important}
+:is(:where(body) [class*="max-lg:mb-space-0"],:where(body) [class*="md:mb-space-0"]){margin-bottom:0px!important}
+:is(:where(body) [class*="max-lg:ml-space-0"],:where(body) [class*="md:ml-space-0"]){margin-left:0px!important}
+:is(:where(body) [class*="max-lg:mr-space-0"],:where(body) [class*="md:mr-space-0"]){margin-right:0px!important}
+:is(:where(body) [class*="max-lg:mx-space-0"],:where(body) [class*="md:mx-space-0"]){margin-left:0px!important;margin-right:0px!important}
+:is(:where(body) [class*="max-lg:my-space-0"],:where(body) [class*="md:my-space-0"]){margin-top:0px!important;margin-bottom:0px!important}
+:is(:where(body) [class*="max-lg:gap-space-0"],:where(body) [class*="md:gap-space-0"]){gap:0px!important}
+}
+@media screen and (max-width:767px){
+:is(:where(body) [class*="max-md:pt-space-3xs"],:where(body) [class*="sm:pt-space-3xs"]){padding-top:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:pb-space-3xs"],:where(body) [class*="sm:pb-space-3xs"]){padding-bottom:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:pl-space-3xs"],:where(body) [class*="sm:pl-space-3xs"]){padding-left:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:pr-space-3xs"],:where(body) [class*="sm:pr-space-3xs"]){padding-right:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:px-space-3xs"],:where(body) [class*="sm:px-space-3xs"]){padding-left:var(--space-3xs)!important;padding-right:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:py-space-3xs"],:where(body) [class*="sm:py-space-3xs"]){padding-top:var(--space-3xs)!important;padding-bottom:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:mt-space-3xs"],:where(body) [class*="sm:mt-space-3xs"]){margin-top:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:mb-space-3xs"],:where(body) [class*="sm:mb-space-3xs"]){margin-bottom:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:ml-space-3xs"],:where(body) [class*="sm:ml-space-3xs"]){margin-left:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:mr-space-3xs"],:where(body) [class*="sm:mr-space-3xs"]){margin-right:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:mx-space-3xs"],:where(body) [class*="sm:mx-space-3xs"]){margin-left:var(--space-3xs)!important;margin-right:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:my-space-3xs"],:where(body) [class*="sm:my-space-3xs"]){margin-top:var(--space-3xs)!important;margin-bottom:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:gap-space-3xs"],:where(body) [class*="sm:gap-space-3xs"]){gap:var(--space-3xs)!important}
+:is(:where(body) [class*="max-md:pt-space-2xs"],:where(body) [class*="sm:pt-space-2xs"]){padding-top:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:pb-space-2xs"],:where(body) [class*="sm:pb-space-2xs"]){padding-bottom:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:pl-space-2xs"],:where(body) [class*="sm:pl-space-2xs"]){padding-left:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:pr-space-2xs"],:where(body) [class*="sm:pr-space-2xs"]){padding-right:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:px-space-2xs"],:where(body) [class*="sm:px-space-2xs"]){padding-left:var(--space-2xs)!important;padding-right:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:py-space-2xs"],:where(body) [class*="sm:py-space-2xs"]){padding-top:var(--space-2xs)!important;padding-bottom:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:mt-space-2xs"],:where(body) [class*="sm:mt-space-2xs"]){margin-top:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:mb-space-2xs"],:where(body) [class*="sm:mb-space-2xs"]){margin-bottom:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:ml-space-2xs"],:where(body) [class*="sm:ml-space-2xs"]){margin-left:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:mr-space-2xs"],:where(body) [class*="sm:mr-space-2xs"]){margin-right:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:mx-space-2xs"],:where(body) [class*="sm:mx-space-2xs"]){margin-left:var(--space-2xs)!important;margin-right:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:my-space-2xs"],:where(body) [class*="sm:my-space-2xs"]){margin-top:var(--space-2xs)!important;margin-bottom:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:gap-space-2xs"],:where(body) [class*="sm:gap-space-2xs"]){gap:var(--space-2xs)!important}
+:is(:where(body) [class*="max-md:pt-space-xs"],:where(body) [class*="sm:pt-space-xs"]){padding-top:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:pb-space-xs"],:where(body) [class*="sm:pb-space-xs"]){padding-bottom:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:pl-space-xs"],:where(body) [class*="sm:pl-space-xs"]){padding-left:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:pr-space-xs"],:where(body) [class*="sm:pr-space-xs"]){padding-right:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:px-space-xs"],:where(body) [class*="sm:px-space-xs"]){padding-left:var(--space-xs)!important;padding-right:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:py-space-xs"],:where(body) [class*="sm:py-space-xs"]){padding-top:var(--space-xs)!important;padding-bottom:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:mt-space-xs"],:where(body) [class*="sm:mt-space-xs"]){margin-top:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:mb-space-xs"],:where(body) [class*="sm:mb-space-xs"]){margin-bottom:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:ml-space-xs"],:where(body) [class*="sm:ml-space-xs"]){margin-left:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:mr-space-xs"],:where(body) [class*="sm:mr-space-xs"]){margin-right:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:mx-space-xs"],:where(body) [class*="sm:mx-space-xs"]){margin-left:var(--space-xs)!important;margin-right:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:my-space-xs"],:where(body) [class*="sm:my-space-xs"]){margin-top:var(--space-xs)!important;margin-bottom:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:gap-space-xs"],:where(body) [class*="sm:gap-space-xs"]){gap:var(--space-xs)!important}
+:is(:where(body) [class*="max-md:pt-space-s"],:where(body) [class*="sm:pt-space-s"]){padding-top:var(--space-s)!important}
+:is(:where(body) [class*="max-md:pb-space-s"],:where(body) [class*="sm:pb-space-s"]){padding-bottom:var(--space-s)!important}
+:is(:where(body) [class*="max-md:pl-space-s"],:where(body) [class*="sm:pl-space-s"]){padding-left:var(--space-s)!important}
+:is(:where(body) [class*="max-md:pr-space-s"],:where(body) [class*="sm:pr-space-s"]){padding-right:var(--space-s)!important}
+:is(:where(body) [class*="max-md:px-space-s"],:where(body) [class*="sm:px-space-s"]){padding-left:var(--space-s)!important;padding-right:var(--space-s)!important}
+:is(:where(body) [class*="max-md:py-space-s"],:where(body) [class*="sm:py-space-s"]){padding-top:var(--space-s)!important;padding-bottom:var(--space-s)!important}
+:is(:where(body) [class*="max-md:mt-space-s"],:where(body) [class*="sm:mt-space-s"]){margin-top:var(--space-s)!important}
+:is(:where(body) [class*="max-md:mb-space-s"],:where(body) [class*="sm:mb-space-s"]){margin-bottom:var(--space-s)!important}
+:is(:where(body) [class*="max-md:ml-space-s"],:where(body) [class*="sm:ml-space-s"]){margin-left:var(--space-s)!important}
+:is(:where(body) [class*="max-md:mr-space-s"],:where(body) [class*="sm:mr-space-s"]){margin-right:var(--space-s)!important}
+:is(:where(body) [class*="max-md:mx-space-s"],:where(body) [class*="sm:mx-space-s"]){margin-left:var(--space-s)!important;margin-right:var(--space-s)!important}
+:is(:where(body) [class*="max-md:my-space-s"],:where(body) [class*="sm:my-space-s"]){margin-top:var(--space-s)!important;margin-bottom:var(--space-s)!important}
+:is(:where(body) [class*="max-md:gap-space-s"],:where(body) [class*="sm:gap-space-s"]){gap:var(--space-s)!important}
+:is(:where(body) [class*="max-md:pt-space-m"],:where(body) [class*="sm:pt-space-m"]){padding-top:var(--space-m)!important}
+:is(:where(body) [class*="max-md:pb-space-m"],:where(body) [class*="sm:pb-space-m"]){padding-bottom:var(--space-m)!important}
+:is(:where(body) [class*="max-md:pl-space-m"],:where(body) [class*="sm:pl-space-m"]){padding-left:var(--space-m)!important}
+:is(:where(body) [class*="max-md:pr-space-m"],:where(body) [class*="sm:pr-space-m"]){padding-right:var(--space-m)!important}
+:is(:where(body) [class*="max-md:px-space-m"],:where(body) [class*="sm:px-space-m"]){padding-left:var(--space-m)!important;padding-right:var(--space-m)!important}
+:is(:where(body) [class*="max-md:py-space-m"],:where(body) [class*="sm:py-space-m"]){padding-top:var(--space-m)!important;padding-bottom:var(--space-m)!important}
+:is(:where(body) [class*="max-md:mt-space-m"],:where(body) [class*="sm:mt-space-m"]){margin-top:var(--space-m)!important}
+:is(:where(body) [class*="max-md:mb-space-m"],:where(body) [class*="sm:mb-space-m"]){margin-bottom:var(--space-m)!important}
+:is(:where(body) [class*="max-md:ml-space-m"],:where(body) [class*="sm:ml-space-m"]){margin-left:var(--space-m)!important}
+:is(:where(body) [class*="max-md:mr-space-m"],:where(body) [class*="sm:mr-space-m"]){margin-right:var(--space-m)!important}
+:is(:where(body) [class*="max-md:mx-space-m"],:where(body) [class*="sm:mx-space-m"]){margin-left:var(--space-m)!important;margin-right:var(--space-m)!important}
+:is(:where(body) [class*="max-md:my-space-m"],:where(body) [class*="sm:my-space-m"]){margin-top:var(--space-m)!important;margin-bottom:var(--space-m)!important}
+:is(:where(body) [class*="max-md:gap-space-m"],:where(body) [class*="sm:gap-space-m"]){gap:var(--space-m)!important}
+:is(:where(body) [class*="max-md:pt-space-l"],:where(body) [class*="sm:pt-space-l"]){padding-top:var(--space-l)!important}
+:is(:where(body) [class*="max-md:pb-space-l"],:where(body) [class*="sm:pb-space-l"]){padding-bottom:var(--space-l)!important}
+:is(:where(body) [class*="max-md:pl-space-l"],:where(body) [class*="sm:pl-space-l"]){padding-left:var(--space-l)!important}
+:is(:where(body) [class*="max-md:pr-space-l"],:where(body) [class*="sm:pr-space-l"]){padding-right:var(--space-l)!important}
+:is(:where(body) [class*="max-md:px-space-l"],:where(body) [class*="sm:px-space-l"]){padding-left:var(--space-l)!important;padding-right:var(--space-l)!important}
+:is(:where(body) [class*="max-md:py-space-l"],:where(body) [class*="sm:py-space-l"]){padding-top:var(--space-l)!important;padding-bottom:var(--space-l)!important}
+:is(:where(body) [class*="max-md:mt-space-l"],:where(body) [class*="sm:mt-space-l"]){margin-top:var(--space-l)!important}
+:is(:where(body) [class*="max-md:mb-space-l"],:where(body) [class*="sm:mb-space-l"]){margin-bottom:var(--space-l)!important}
+:is(:where(body) [class*="max-md:ml-space-l"],:where(body) [class*="sm:ml-space-l"]){margin-left:var(--space-l)!important}
+:is(:where(body) [class*="max-md:mr-space-l"],:where(body) [class*="sm:mr-space-l"]){margin-right:var(--space-l)!important}
+:is(:where(body) [class*="max-md:mx-space-l"],:where(body) [class*="sm:mx-space-l"]){margin-left:var(--space-l)!important;margin-right:var(--space-l)!important}
+:is(:where(body) [class*="max-md:my-space-l"],:where(body) [class*="sm:my-space-l"]){margin-top:var(--space-l)!important;margin-bottom:var(--space-l)!important}
+:is(:where(body) [class*="max-md:gap-space-l"],:where(body) [class*="sm:gap-space-l"]){gap:var(--space-l)!important}
+:is(:where(body) [class*="max-md:pt-space-xl"],:where(body) [class*="sm:pt-space-xl"]){padding-top:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:pb-space-xl"],:where(body) [class*="sm:pb-space-xl"]){padding-bottom:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:pl-space-xl"],:where(body) [class*="sm:pl-space-xl"]){padding-left:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:pr-space-xl"],:where(body) [class*="sm:pr-space-xl"]){padding-right:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:px-space-xl"],:where(body) [class*="sm:px-space-xl"]){padding-left:var(--space-xl)!important;padding-right:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:py-space-xl"],:where(body) [class*="sm:py-space-xl"]){padding-top:var(--space-xl)!important;padding-bottom:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:mt-space-xl"],:where(body) [class*="sm:mt-space-xl"]){margin-top:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:mb-space-xl"],:where(body) [class*="sm:mb-space-xl"]){margin-bottom:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:ml-space-xl"],:where(body) [class*="sm:ml-space-xl"]){margin-left:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:mr-space-xl"],:where(body) [class*="sm:mr-space-xl"]){margin-right:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:mx-space-xl"],:where(body) [class*="sm:mx-space-xl"]){margin-left:var(--space-xl)!important;margin-right:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:my-space-xl"],:where(body) [class*="sm:my-space-xl"]){margin-top:var(--space-xl)!important;margin-bottom:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:gap-space-xl"],:where(body) [class*="sm:gap-space-xl"]){gap:var(--space-xl)!important}
+:is(:where(body) [class*="max-md:pt-space-2xl"],:where(body) [class*="sm:pt-space-2xl"]){padding-top:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:pb-space-2xl"],:where(body) [class*="sm:pb-space-2xl"]){padding-bottom:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:pl-space-2xl"],:where(body) [class*="sm:pl-space-2xl"]){padding-left:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:pr-space-2xl"],:where(body) [class*="sm:pr-space-2xl"]){padding-right:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:px-space-2xl"],:where(body) [class*="sm:px-space-2xl"]){padding-left:var(--space-2xl)!important;padding-right:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:py-space-2xl"],:where(body) [class*="sm:py-space-2xl"]){padding-top:var(--space-2xl)!important;padding-bottom:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:mt-space-2xl"],:where(body) [class*="sm:mt-space-2xl"]){margin-top:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:mb-space-2xl"],:where(body) [class*="sm:mb-space-2xl"]){margin-bottom:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:ml-space-2xl"],:where(body) [class*="sm:ml-space-2xl"]){margin-left:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:mr-space-2xl"],:where(body) [class*="sm:mr-space-2xl"]){margin-right:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:mx-space-2xl"],:where(body) [class*="sm:mx-space-2xl"]){margin-left:var(--space-2xl)!important;margin-right:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:my-space-2xl"],:where(body) [class*="sm:my-space-2xl"]){margin-top:var(--space-2xl)!important;margin-bottom:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:gap-space-2xl"],:where(body) [class*="sm:gap-space-2xl"]){gap:var(--space-2xl)!important}
+:is(:where(body) [class*="max-md:pt-space-3xl"],:where(body) [class*="sm:pt-space-3xl"]){padding-top:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:pb-space-3xl"],:where(body) [class*="sm:pb-space-3xl"]){padding-bottom:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:pl-space-3xl"],:where(body) [class*="sm:pl-space-3xl"]){padding-left:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:pr-space-3xl"],:where(body) [class*="sm:pr-space-3xl"]){padding-right:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:px-space-3xl"],:where(body) [class*="sm:px-space-3xl"]){padding-left:var(--space-3xl)!important;padding-right:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:py-space-3xl"],:where(body) [class*="sm:py-space-3xl"]){padding-top:var(--space-3xl)!important;padding-bottom:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:mt-space-3xl"],:where(body) [class*="sm:mt-space-3xl"]){margin-top:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:mb-space-3xl"],:where(body) [class*="sm:mb-space-3xl"]){margin-bottom:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:ml-space-3xl"],:where(body) [class*="sm:ml-space-3xl"]){margin-left:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:mr-space-3xl"],:where(body) [class*="sm:mr-space-3xl"]){margin-right:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:mx-space-3xl"],:where(body) [class*="sm:mx-space-3xl"]){margin-left:var(--space-3xl)!important;margin-right:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:my-space-3xl"],:where(body) [class*="sm:my-space-3xl"]){margin-top:var(--space-3xl)!important;margin-bottom:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:gap-space-3xl"],:where(body) [class*="sm:gap-space-3xl"]){gap:var(--space-3xl)!important}
+:is(:where(body) [class*="max-md:pt-space-0"],:where(body) [class*="sm:pt-space-0"]){padding-top:0px!important}
+:is(:where(body) [class*="max-md:pb-space-0"],:where(body) [class*="sm:pb-space-0"]){padding-bottom:0px!important}
+:is(:where(body) [class*="max-md:pl-space-0"],:where(body) [class*="sm:pl-space-0"]){padding-left:0px!important}
+:is(:where(body) [class*="max-md:pr-space-0"],:where(body) [class*="sm:pr-space-0"]){padding-right:0px!important}
+:is(:where(body) [class*="max-md:px-space-0"],:where(body) [class*="sm:px-space-0"]){padding-left:0px!important;padding-right:0px!important}
+:is(:where(body) [class*="max-md:py-space-0"],:where(body) [class*="sm:py-space-0"]){padding-top:0px!important;padding-bottom:0px!important}
+:is(:where(body) [class*="max-md:mt-space-0"],:where(body) [class*="sm:mt-space-0"]){margin-top:0px!important}
+:is(:where(body) [class*="max-md:mb-space-0"],:where(body) [class*="sm:mb-space-0"]){margin-bottom:0px!important}
+:is(:where(body) [class*="max-md:ml-space-0"],:where(body) [class*="sm:ml-space-0"]){margin-left:0px!important}
+:is(:where(body) [class*="max-md:mr-space-0"],:where(body) [class*="sm:mr-space-0"]){margin-right:0px!important}
+:is(:where(body) [class*="max-md:mx-space-0"],:where(body) [class*="sm:mx-space-0"]){margin-left:0px!important;margin-right:0px!important}
+:is(:where(body) [class*="max-md:my-space-0"],:where(body) [class*="sm:my-space-0"]){margin-top:0px!important;margin-bottom:0px!important}
+:is(:where(body) [class*="max-md:gap-space-0"],:where(body) [class*="sm:gap-space-0"]){gap:0px!important}
+}
 
 /* Studio Runtime Typography Bridge v9.0 */
-:where(body) { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-:where(body) .u-text-display {
-  font-weight: var(--display-font-weight) !important;
-  line-height: var(--display-line-height) !important;
-  letter-spacing: var(--display-letter-spacing) !important;
-  margin-bottom: var(--display-margin-bottom) !important;
-}
-:where(body) h1 {
-  font-weight: var(--h1-font-weight) !important;
-  line-height: var(--h1-line-height) !important;
-  letter-spacing: var(--h1-letter-spacing) !important;
-  margin-bottom: var(--h1-margin-bottom) !important;
-}
-:where(body) h2 {
-  font-weight: var(--h2-font-weight) !important;
-  line-height: var(--h2-line-height) !important;
-  letter-spacing: var(--h2-letter-spacing) !important;
-  margin-bottom: var(--h2-margin-bottom) !important;
-}
-:where(body) h3 {
-  font-weight: var(--h3-font-weight) !important;
-  line-height: var(--h3-line-height) !important;
-  letter-spacing: var(--h3-letter-spacing) !important;
-  margin-bottom: var(--h3-margin-bottom) !important;
-}
-:where(body) h4 {
-  font-weight: var(--h4-font-weight) !important;
-  line-height: var(--h4-line-height) !important;
-  letter-spacing: var(--h4-letter-spacing) !important;
-  margin-bottom: var(--h4-margin-bottom) !important;
-}
-:where(body) h5 {
-  font-weight: var(--h5-font-weight) !important;
-  line-height: var(--h5-line-height) !important;
-  letter-spacing: var(--h5-letter-spacing) !important;
-  margin-bottom: var(--h5-margin-bottom) !important;
-}
-:where(body) h6 {
-  font-weight: var(--h6-font-weight) !important;
-  line-height: var(--h6-line-height) !important;
-  letter-spacing: var(--h6-letter-spacing) !important;
-  margin-bottom: var(--h6-margin-bottom) !important;
-}
-:where(body) .u-text-large {
-  font-weight: var(--large-font-weight) !important;
-  line-height: var(--large-line-height) !important;
-  letter-spacing: var(--large-letter-spacing) !important;
-  margin-bottom: var(--large-margin-bottom) !important;
-}
-:where(body) p {
-  font-weight: var(--body-font-weight) !important;
-  line-height: var(--body-line-height) !important;
-  letter-spacing: var(--body-letter-spacing) !important;
-  margin-bottom: var(--body-margin-bottom) !important;
-}
-:where(body) .u-text-small {
-  font-weight: var(--small-font-weight) !important;
-  line-height: var(--small-line-height) !important;
-  letter-spacing: var(--small-letter-spacing) !important;
-  margin-bottom: var(--small-margin-bottom) !important;
-}
+:where(body) .u-text-display{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
+:where(body) h1{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
+:where(body) h2{font-weight:700!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
+:where(body) h3{font-weight:600!important;line-height:1.3!important;letter-spacing:0em!important;margin-bottom:0rem!important}
+:where(body) h4{font-weight:600!important;line-height:1.4!important;letter-spacing:0em!important;margin-bottom:0rem!important}
+:where(body) h5{font-weight:500!important;line-height:1.4!important;letter-spacing:0em!important;margin-bottom:0rem!important}
+:where(body) h6{font-weight:500!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
+:where(body) .u-text-large{font-weight:600!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
+:where(body) p{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
+:where(body) .u-text-small{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 /* STUDIO_RUNTIME_BRIDGES_END */
+
 

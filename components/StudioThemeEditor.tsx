@@ -33,7 +33,7 @@ export default function StudioThemeEditor() {
   const [spaceVpMin, setSpaceVpMin] = useState(375);    // min viewport px
   const [spaceVpMax, setSpaceVpMax] = useState(1366);   // max viewport px
   const [spaceSyncStatus, setSpaceSyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
-  const mountSyncDone = useRef(false);
+  const mountBridgeSyncDone = useRef(false);
 
   // Typography system state
   const [typographySyncStatus, setTypographySyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
@@ -100,11 +100,12 @@ export default function StudioThemeEditor() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Silent one-shot sync: register spacing tokens in Ycode DB after hydration
+  // One-shot: re-save the bridge to global-theme.css + custom_css after loading
+  // Ensures the published site and canvas always have the latest bridge version
   useEffect(() => {
-    if (loading || mountSyncDone.current) return;
-    mountSyncDone.current = true;
-    upsertSpacingTokens();
+    if (loading || mountBridgeSyncDone.current) return;
+    mountBridgeSyncDone.current = true;
+    saveUpdates({ 'space-0': '0px' });
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
@@ -135,9 +136,11 @@ export default function StudioThemeEditor() {
           return { key, label };
         });
 
-      // Fire all create/update requests in parallel
+      // Fire all create/update/rename requests in parallel
       const requests = colorTokens.map(({ key, label }) => {
         const hexValue = variables[key];
+
+        // 1. Entry already has the correct Studio / name → update value only
         if (existingByName[label]) {
           return fetch(`/ycode/api/color-variables/${existingByName[label]}`, {
             method: 'PUT',
@@ -145,6 +148,18 @@ export default function StudioThemeEditor() {
             body: JSON.stringify({ value: hexValue }),
           });
         }
+
+        // 2. Legacy Lumos / name exists → rename to Studio / and update value
+        const lumosLabel = label.replace(/^Studio \/ /, 'Lumos / ');
+        if (existingByName[lumosLabel]) {
+          return fetch(`/ycode/api/color-variables/${existingByName[lumosLabel]}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: label, value: hexValue }),
+          });
+        }
+
+        // 3. No existing entry → create
         return fetch('/ycode/api/color-variables', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -267,9 +282,6 @@ export default function StudioThemeEditor() {
    * so the bridge is always in sync with the Studio panel controls.
    */
   const generateSpacingBridgeCSS = useCallback((): string => {
-    // Unique full-name tokens → CSS variable.
-    // IMPORTANT: ordered most-specific → least-specific so that, if
-    // rules ever tied, the longer token still wins.
     const tokens: { token: string; cssVar: string }[] = [
       { token: 'space-3xs', cssVar: '--space-3xs' },
       { token: 'space-2xs', cssVar: '--space-2xs' },
@@ -280,16 +292,15 @@ export default function StudioThemeEditor() {
       { token: 'space-xl',  cssVar: '--space-xl'  },
       { token: 'space-2xl', cssVar: '--space-2xl' },
       { token: 'space-3xl', cssVar: '--space-3xl' },
+      { token: 'space-0',   cssVar: '--space-0'   },
     ];
 
-    // CSS utility prefix → CSS property (or shorthand).
-    // Use the special marker `:VAR` to splice the value into shorthand rules.
     const props: { prefix: string; property: string }[] = [
       { prefix: 'pt',  property: 'padding-top' },
       { prefix: 'pb',  property: 'padding-bottom' },
       { prefix: 'pl',  property: 'padding-left' },
       { prefix: 'pr',  property: 'padding-right' },
-      { prefix: 'px',  property: 'padding-left:VAR!important;padding-right' },  // shorthand trick
+      { prefix: 'px',  property: 'padding-left:VAR!important;padding-right' },
       { prefix: 'py',  property: 'padding-top:VAR!important;padding-bottom' },
       { prefix: 'mt',  property: 'margin-top' },
       { prefix: 'mb',  property: 'margin-bottom' },
@@ -301,38 +312,63 @@ export default function StudioThemeEditor() {
     ];
 
     const scope = ':where(body)';
+
+    // Build one rule string for a given selector + property + value
+    const rule = (sel: string, property: string, val: string): string => {
+      if (property.includes(':VAR')) {
+        const expanded = property.replace(':VAR', `:${val}`);
+        return `${sel}{${expanded}:${val}!important}`;
+      }
+      return `${sel}{${property}:${val}!important}`;
+    };
+
+    // Desktop selector: matches the class token WITHOUT any responsive prefix.
+    // Uses start-of-attribute OR space-preceded to avoid matching "max-lg:pt-space-m".
+    const desktopSel = (cls: string) =>
+      `:is(${scope} [class^="${cls}"],${scope} [class*=" ${cls}"])`;
+
+    // Responsive selector: simple substring match is safe here because the
+    // breakpoint prefix ("max-lg:", "md:", …) is unique enough.
+    const respSel = (bpPrefix: string, cls: string) =>
+      `${scope} [class*="${bpPrefix}${cls}"]`;
+
     const lines: string[] = [
-      '/* Studio Runtime Bridge v8.0 — auto-generated, do not edit */',
-      '/* Unique-token selectors: [class*="prop-space-X" i] — case-insensitive substring match */',
+      '/* Studio Runtime Bridge v9.1 — breakpoint-aware, auto-generated */',
+      ':root{--space-0:0px}',
     ];
 
+    // ── Desktop base rules ───────────────────────────────────────────────────
     for (const tok of tokens) {
-      lines.push(`/* ── ${tok.token.toUpperCase()} ── */`);
-      const val = `var(${tok.cssVar})`;
-
-      // 1. Bare token fallback: [class*="space-m" i] — catches ANY class
-      //    containing the token name, even if Ycode adopts a new prefix
-      //    convention in the future. Applies to every common box property
-      //    so we never miss a hit.
-      lines.push(
-        `${scope} [class*="${tok.token}" i]{` +
-        `--studio-${tok.token}:${val}!important` +
-        `}`
-      );
-
-      // 2. Prefixed combinations: [class*="mt-space-m" i] { margin-top: var(--space-m) !important }
-      //    These are the authoritative rules — they map each Ycode utility
-      //    prefix to its exact CSS property.
+      const val = tok.token === 'space-0' ? '0px' : `var(${tok.cssVar})`;
       for (const prop of props) {
-        const selector = `${scope} [class*="${prop.prefix}-${tok.token}" i]`;
-        if (prop.property.includes(':VAR')) {
-          const expanded = prop.property.replace(':VAR', `:${val}`);
-          lines.push(`${selector}{${expanded}:${val}!important}`);
-        } else {
-          lines.push(`${selector}{${prop.property}:${val}!important}`);
-        }
+        const cls = `${prop.prefix}-${tok.token}`;
+        lines.push(rule(desktopSel(cls), prop.property, val));
       }
     }
+
+    // ── Tablet overrides (max-width: 1024px) ─────────────────────────────────
+    lines.push('@media screen and (max-width:1024px){');
+    for (const tok of tokens) {
+      const val = tok.token === 'space-0' ? '0px' : `var(${tok.cssVar})`;
+      for (const prop of props) {
+        const cls = `${prop.prefix}-${tok.token}`;
+        const sel = `:is(${respSel('max-lg:', cls)},${respSel('md:', cls)})`;
+        lines.push(rule(sel, prop.property, val));
+      }
+    }
+    lines.push('}');
+
+    // ── Mobile overrides (max-width: 767px) ──────────────────────────────────
+    lines.push('@media screen and (max-width:767px){');
+    for (const tok of tokens) {
+      const val = tok.token === 'space-0' ? '0px' : `var(${tok.cssVar})`;
+      for (const prop of props) {
+        const cls = `${prop.prefix}-${tok.token}`;
+        const sel = `:is(${respSel('max-md:', cls)},${respSel('sm:', cls)})`;
+        lines.push(rule(sel, prop.property, val));
+      }
+    }
+    lines.push('}');
 
     return lines.join('\n');
   }, [spaceBase, spaceRatio, spaceVpMin, spaceVpMax]);
@@ -362,16 +398,22 @@ export default function StudioThemeEditor() {
         selector = `${scope} ${lvl.key}`;
       }
 
-      lines.push(`${selector} {`);
-      lines.push(`  font-weight: var(--${lvl.key}-font-weight) !important;`);
-      lines.push(`  line-height: var(--${lvl.key}-line-height) !important;`);
-      lines.push(`  letter-spacing: var(--${lvl.key}-letter-spacing) !important;`);
-      lines.push(`  margin-bottom: var(--${lvl.key}-margin-bottom) !important;`);
-      lines.push(`}`);
+      const fw = variables[`${lvl.key}-font-weight`]   || '600';
+      const lh = variables[`${lvl.key}-line-height`]   || '1.4';
+      const ls = variables[`${lvl.key}-letter-spacing`] || '0em';
+      const mb = variables[`${lvl.key}-margin-bottom`]  || '0rem';
+      lines.push(`${selector}{font-weight:${fw}!important;line-height:${lh}!important;letter-spacing:${ls}!important;margin-bottom:${mb}!important}`);
     });
 
     return lines.join('\n');
   }, [variables]);
+
+  // Stable refs so triggerIframeCSSReload always calls the latest generator
+  // even when invoked from a stale saveUpdates closure.
+  const spacingBridgeRef = useRef(generateSpacingBridgeCSS);
+  const typoBridgeRef    = useRef(generateTypographyBridgeCSS);
+  useEffect(() => { spacingBridgeRef.current = generateSpacingBridgeCSS; }, [generateSpacingBridgeCSS]);
+  useEffect(() => { typoBridgeRef.current    = generateTypographyBridgeCSS; }, [generateTypographyBridgeCSS]);
 
   /**
    * Mount / update the runtime bridge in both the host document
@@ -470,57 +512,39 @@ export default function StudioThemeEditor() {
    * our Runtime Bridge's substring selector `[class*="space-m" i]` expertly
    * intercepts it regardless of the prefix string.
    */
-  // Core upsert logic — no UI status, safe to call silently (mount, auto-sync)
-  const upsertSpacingTokens = async () => {
+  // Remove all non-color tokens previously pushed to Ycode color-variables (spacing, typo, legacy Lumos)
+  const cleanupSpacingFromYcode = async () => {
     const existing = await fetch('/ycode/api/color-variables').then(r => r.json());
-    const existingByName: Record<string, string> = {};
-    for (const v of (existing.data || [])) existingByName[v.name] = v.id;
-
-    const requests = SPACE_TOKENS.filter(token => token.key).map(token => {
-      const name       = `Studio / ${token.key}`;
-      const legacyName = `Studio / Space ${token.label}`;
-      const value      = `var(--${token.key})`;
-
-      if (existingByName[name]) {
-        return fetch(`/ycode/api/color-variables/${existingByName[name]}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, value }),
-        });
-      }
-      if (existingByName[legacyName]) {
-        return fetch(`/ycode/api/color-variables/${existingByName[legacyName]}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, value }),
-        });
-      }
-      if (existingByName[token.key]) {
-        return fetch(`/ycode/api/color-variables/${existingByName[token.key]}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, value }),
-        });
-      }
-      return fetch('/ycode/api/color-variables', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, value }),
-      });
+    const toDelete = (existing.data || []).filter((v: { id: string; name: string }) => {
+      const n = v.name;
+      return (
+        // Spacing tokens (current and legacy naming)
+        n.startsWith('Studio / space-') ||
+        n.startsWith('Studio / Space ') ||
+        // Typography tokens
+        n.startsWith('Studio / h1') || n.startsWith('Studio / h2') ||
+        n.startsWith('Studio / h3') || n.startsWith('Studio / h4') ||
+        n.startsWith('Studio / h5') || n.startsWith('Studio / h6') ||
+        n.startsWith('Studio / display') || n.startsWith('Studio / large') ||
+        n.startsWith('Studio / body') || n.startsWith('Studio / small') ||
+        // All legacy Lumos-prefixed tokens
+        n.startsWith('Lumos /') || n.startsWith('lumos /')
+      );
     });
-
-    await Promise.all(requests);
+    await Promise.all(toDelete.map((v: { id: string }) =>
+      fetch(`/ycode/api/color-variables/${v.id}`, { method: 'DELETE' })
+    ));
     await loadColorVariables();
   };
 
   const syncSpacingToYcode = async () => {
     setSpaceSyncStatus('syncing');
     try {
-      await upsertSpacingTokens();
+      await cleanupSpacingFromYcode();
       setSpaceSyncStatus('done');
       setTimeout(() => setSpaceSyncStatus('idle'), 3000);
     } catch (e) {
-      console.error('Studio: Failed to sync spacing', e);
+      console.error('Studio: Failed to clean spacing tokens', e);
       setSpaceSyncStatus('error');
       setTimeout(() => setSpaceSyncStatus('idle'), 3000);
     }
@@ -563,6 +587,7 @@ export default function StudioThemeEditor() {
 
       await Promise.all(requests);
       await loadColorVariables();
+      saveUpdates({});
       setTypographySyncStatus('done');
       setTimeout(() => setTypographySyncStatus('idle'), 3000);
     } catch (e) {
@@ -586,8 +611,6 @@ export default function StudioThemeEditor() {
       updates[token.key] = generateClamp(px);
     });
     saveUpdates(updates);
-    // Auto-upsert all spacing tokens into Ycode's color-variables DB
-    syncSpacingToYcode();
   };
 
   const triggerIframeCSSReload = async () => {
@@ -605,12 +628,10 @@ export default function StudioThemeEditor() {
 
           // Update the runtime style block (the actual mechanism used by Canvas.tsx)
           const styleEl = iframeDoc.getElementById('studio-runtime-css') as HTMLStyleElement | null;
-          if (styleEl) {
-            styleEl.textContent = css;
-          }
+          if (styleEl) styleEl.textContent = css;
 
-          // Also re-inject the runtime spacing bridge so it survives iframe reloads
-          const bridgeCSS = generateSpacingBridgeCSS();
+          // Re-inject bridges using refs — always fresh, never stale
+          const bridgeCSS = spacingBridgeRef.current();
           let bridgeEl = iframeDoc.getElementById('studio-runtime-bridge') as HTMLStyleElement | null;
           if (!bridgeEl) {
             bridgeEl = iframeDoc.createElement('style') as HTMLStyleElement;
@@ -619,8 +640,7 @@ export default function StudioThemeEditor() {
           }
           bridgeEl.textContent = bridgeCSS;
 
-          // Re-inject the runtime typography bridge
-          const typoCSS = generateTypographyBridgeCSS();
+          const typoCSS = typoBridgeRef.current();
           let typoEl = iframeDoc.getElementById('studio-runtime-typography') as HTMLStyleElement | null;
           if (!typoEl) {
             typoEl = iframeDoc.createElement('style') as HTMLStyleElement;
@@ -628,18 +648,6 @@ export default function StudioThemeEditor() {
             iframeDoc.head.appendChild(typoEl);
           }
           typoEl.textContent = typoCSS;
-          
-          console.log(`[Studio] Successfully injected Runtime Bridges into iframe (trigger reload)`);
-
-          // Also set CSS variables directly on #ybody for instant rendering
-          // without waiting for a full style sheet reload
-          const ybody = iframeDoc.getElementById('ybody');
-          if (ybody) {
-            const style = ybody.style;
-            Object.entries(variables).forEach(([key, val]) => {
-              if (val) style.setProperty(`--${key}`, val);
-            });
-          }
         } catch (e) {
           // Ignore cross-origin iframe errors
         }
@@ -1358,10 +1366,10 @@ export default function StudioThemeEditor() {
             })}
           </div>
 
-          {/* Sync to Ycode */}
+          {/* Cleanup stale spacing tokens from Ycode color-variables */}
           <div className="pt-3 border-t border-border">
             <p className="text-[10px] text-muted-foreground mb-2 leading-snug">
-              Register spacing tokens as CSS variables in the Ycode Style Panel.
+              Purge les tokens spacing, typographie et Lumos de la palette Ycode (nettoyage unique).
             </p>
             <button
               onClick={syncSpacingToYcode}
@@ -1385,10 +1393,10 @@ export default function StudioThemeEditor() {
                   />
                 </svg>
               )}
-              {spaceSyncStatus === 'idle'    && '⇄ Sync → Ycode Variables'}
-              {spaceSyncStatus === 'syncing' && 'Syncing…'}
-              {spaceSyncStatus === 'done'    && '✓ Tokens registered!'}
-              {spaceSyncStatus === 'error'   && '✗ Error — check console'}
+              {spaceSyncStatus === 'idle'    && '🧹 Purger tokens non-couleur Ycode'}
+              {spaceSyncStatus === 'syncing' && 'Suppression…'}
+              {spaceSyncStatus === 'done'    && '✓ Palette nettoyée'}
+              {spaceSyncStatus === 'error'   && '✗ Erreur — voir console'}
             </button>
           </div>
         </>

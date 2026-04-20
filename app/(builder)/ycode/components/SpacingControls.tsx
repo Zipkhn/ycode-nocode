@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, memo, useState } from 'react';
+import { useCallback, memo, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Icon from '@/components/ui/icon';
@@ -19,8 +19,25 @@ interface SpacingControlsProps {
   activeTextStyleKey?: string | null;
 }
 
+type SpacingProperty = 'marginTop' | 'marginRight' | 'marginBottom' | 'marginLeft' | 'paddingTop' | 'paddingRight' | 'paddingBottom' | 'paddingLeft';
+
+const STUDIO_TOKENS = [
+  { key: 'space-0',   label: '0'   },
+  { key: 'space-3xs', label: '3XS' },
+  { key: 'space-2xs', label: '2XS' },
+  { key: 'space-xs',  label: 'XS'  },
+  { key: 'space-s',   label: 'S'   },
+  { key: 'space-m',   label: 'M'   },
+  { key: 'space-l',   label: 'L'   },
+  { key: 'space-xl',  label: 'XL'  },
+  { key: 'space-2xl', label: '2XL' },
+  { key: 'space-3xl', label: '3XL' },
+] as const;
+
 const SpacingControls = memo(function SpacingControls({ layer, onLayerUpdate, activeTextStyleKey }: SpacingControlsProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [focusedField, setFocusedField] = useState<SpacingProperty>('paddingTop');
+  const focusedFieldRef = useRef<SpacingProperty>('paddingTop');
   const { activeBreakpoint, activeUIState } = useEditorStore();
   const { debouncedUpdateDesignProperty, getDesignProperty } = useDesignSync({
     layer,
@@ -122,7 +139,45 @@ const SpacingControls = memo(function SpacingControls({ layer, onLayerUpdate, ac
           paddingLeft: paddingLeftInput,
         }}
         onChange={handleChange}
+        onFocus={(property) => { focusedFieldRef.current = property; setFocusedField(property); }}
       />
+
+      {/* Studio spacing token strip */}
+      <div className="mt-2 pt-2 border-t border-border/60">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Studio tokens</span>
+          <span className="text-[9px] text-muted-foreground/60 italic">→ {focusedField}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {STUDIO_TOKENS.map(({ key, label }) => {
+            const currentValue = (() => {
+              const field = focusedFieldRef.current;
+              const map: Record<SpacingProperty, string> = {
+                marginTop: marginTopInput, marginRight: marginRightInput,
+                marginBottom: marginBottomInput, marginLeft: marginLeftInput,
+                paddingTop: paddingTopInput, paddingRight: paddingRightInput,
+                paddingBottom: paddingBottomInput, paddingLeft: paddingLeftInput,
+              };
+              return map[field];
+            })();
+            const isActive = currentValue === key;
+            return (
+              <button
+                key={key}
+                onClick={() => handleChange(focusedFieldRef.current, isActive ? '' : key)}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-medium transition-colors ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                }`}
+                title={`Appliquer ${key} à ${focusedFieldRef.current}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </SettingsPanel>
   );
 });

@@ -43,6 +43,168 @@ function cleanupCSS(content) {
 }
 
 /**
+ * Ensure --space-0: 0px is defined in the STUDIO_CORE section.
+ * Fixes any previous run that wrote unitless `0`.
+ */
+function ensureSpaceZeroVar(content) {
+  const CORE_END = '/* STUDIO_CORE_END */';
+  if (!content.includes(CORE_END)) return content;
+
+  // Remove any existing --space-0 declaration (wherever it lives)
+  content = content.replace(/\n?\s*--space-0:[^;]+;\n?/g, '\n');
+
+  // Inject before STUDIO_CORE_END
+  content = content.replace(CORE_END, `:root {\n  --space-0: 0px;\n}\n${CORE_END}`);
+  console.log('✅ --space-0: 0px ensured in STUDIO_CORE');
+  return content;
+}
+
+/**
+ * Regenerate the STUDIO_RUNTIME_BRIDGES section.
+ *
+ * Spacing bridge (v9.1): mirrors StudioThemeEditor.generateSpacingBridgeCSS —
+ *   desktop precise selectors + tablet @media (≤1024px) + mobile @media (≤767px).
+ *   space-0 emits literal 0px; all others reference var(--space-*).
+ *
+ * Typography bridge: reads current --*-font-weight etc. values already present
+ *   in the file (written by the Studio on last save), falls back to sane defaults.
+ *   Selector mapping mirrors StudioThemeEditor.generateTypographyBridgeCSS.
+ */
+function injectRuntimeBridges(content) {
+  // ── Spacing bridge ────────────────────────────────────────────────────────
+  const tokens = [
+    { token: 'space-3xs', cssVar: '--space-3xs' },
+    { token: 'space-2xs', cssVar: '--space-2xs' },
+    { token: 'space-xs',  cssVar: '--space-xs'  },
+    { token: 'space-s',   cssVar: '--space-s'   },
+    { token: 'space-m',   cssVar: '--space-m'   },
+    { token: 'space-l',   cssVar: '--space-l'   },
+    { token: 'space-xl',  cssVar: '--space-xl'  },
+    { token: 'space-2xl', cssVar: '--space-2xl' },
+    { token: 'space-3xl', cssVar: '--space-3xl' },
+    { token: 'space-0',   cssVar: '--space-0'   },
+  ];
+
+  const props = [
+    { prefix: 'pt',  property: 'padding-top' },
+    { prefix: 'pb',  property: 'padding-bottom' },
+    { prefix: 'pl',  property: 'padding-left' },
+    { prefix: 'pr',  property: 'padding-right' },
+    { prefix: 'px',  property: 'padding-left:VAR!important;padding-right' },
+    { prefix: 'py',  property: 'padding-top:VAR!important;padding-bottom' },
+    { prefix: 'mt',  property: 'margin-top' },
+    { prefix: 'mb',  property: 'margin-bottom' },
+    { prefix: 'ml',  property: 'margin-left' },
+    { prefix: 'mr',  property: 'margin-right' },
+    { prefix: 'mx',  property: 'margin-left:VAR!important;margin-right' },
+    { prefix: 'my',  property: 'margin-top:VAR!important;margin-bottom' },
+    { prefix: 'gap', property: 'gap' },
+  ];
+
+  const scope = ':where(body)';
+
+  const cssRule = (sel, property, val) => {
+    if (property.includes(':VAR')) {
+      const expanded = property.replace(':VAR', `:${val}`);
+      return `${sel}{${expanded}:${val}!important}`;
+    }
+    return `${sel}{${property}:${val}!important}`;
+  };
+
+  const desktopSel = (cls) =>
+    `:is(${scope} [class^="${cls}"],${scope} [class*=" ${cls}"])`;
+
+  const respSel = (bpPrefix, cls) =>
+    `${scope} [class*="${bpPrefix}${cls}"]`;
+
+  const spacingLines = [
+    '/* Studio Runtime Bridge v9.1 — breakpoint-aware, auto-generated */',
+    ':root{--space-0:0px}',
+  ];
+
+  for (const tok of tokens) {
+    const val = tok.token === 'space-0' ? '0px' : `var(${tok.cssVar})`;
+    for (const prop of props) {
+      const cls = `${prop.prefix}-${tok.token}`;
+      spacingLines.push(cssRule(desktopSel(cls), prop.property, val));
+    }
+  }
+
+  spacingLines.push('@media screen and (max-width:1024px){');
+  for (const tok of tokens) {
+    const val = tok.token === 'space-0' ? '0px' : `var(${tok.cssVar})`;
+    for (const prop of props) {
+      const cls = `${prop.prefix}-${tok.token}`;
+      const sel = `:is(${respSel('max-lg:', cls)},${respSel('md:', cls)})`;
+      spacingLines.push(cssRule(sel, prop.property, val));
+    }
+  }
+  spacingLines.push('}');
+
+  spacingLines.push('@media screen and (max-width:767px){');
+  for (const tok of tokens) {
+    const val = tok.token === 'space-0' ? '0px' : `var(${tok.cssVar})`;
+    for (const prop of props) {
+      const cls = `${prop.prefix}-${tok.token}`;
+      const sel = `:is(${respSel('max-md:', cls)},${respSel('sm:', cls)})`;
+      spacingLines.push(cssRule(sel, prop.property, val));
+    }
+  }
+  spacingLines.push('}');
+
+  // ── Typography bridge ─────────────────────────────────────────────────────
+  // Read current variable values from the file; fall back to defaults.
+  const readVar = (key, fallback) => {
+    const m = content.match(new RegExp(`--${key}:\\s*([^;]+);`));
+    return m ? m[1].trim() : fallback;
+  };
+
+  const TYPO_LEVELS = [
+    { key: 'display', selector: `${scope} .u-text-display` },
+    { key: 'h1',      selector: `${scope} h1` },
+    { key: 'h2',      selector: `${scope} h2` },
+    { key: 'h3',      selector: `${scope} h3` },
+    { key: 'h4',      selector: `${scope} h4` },
+    { key: 'h5',      selector: `${scope} h5` },
+    { key: 'h6',      selector: `${scope} h6` },
+    { key: 'large',   selector: `${scope} .u-text-large` },
+    { key: 'body',    selector: `${scope} p` },
+    { key: 'small',   selector: `${scope} .u-text-small` },
+  ];
+
+  const LINE_HEIGHT_DEFAULTS = {
+    display: '1.2', h1: '1.2', h2: '1.2', h3: '1.3',
+    h4: '1.4', h5: '1.4', h6: '1.5', large: '1.5', body: '1.5', small: '1.5',
+  };
+
+  const typoLines = ['/* Studio Runtime Typography Bridge v9.0 */'];
+  for (const lvl of TYPO_LEVELS) {
+    const fw = readVar(`${lvl.key}-font-weight`,   '600');
+    const lh = readVar(`${lvl.key}-line-height`,   LINE_HEIGHT_DEFAULTS[lvl.key] || '1.4');
+    const ls = readVar(`${lvl.key}-letter-spacing`, '0em');
+    const mb = readVar(`${lvl.key}-margin-bottom`,  '0rem');
+    typoLines.push(`${lvl.selector}{font-weight:${fw}!important;line-height:${lh}!important;letter-spacing:${ls}!important;margin-bottom:${mb}!important}`);
+  }
+
+  // ── Inject into file ──────────────────────────────────────────────────────
+  const BRIDGE_START = '/* STUDIO_RUNTIME_BRIDGES_START */';
+  const BRIDGE_END   = '/* STUDIO_RUNTIME_BRIDGES_END */';
+  const bridgeBlock  = `\n${BRIDGE_START}\n${spacingLines.join('\n')}\n\n${typoLines.join('\n')}\n${BRIDGE_END}\n`;
+
+  if (content.includes(BRIDGE_START) && content.includes(BRIDGE_END)) {
+    content = content.replace(
+      new RegExp(`${escapeRegex(BRIDGE_START)}[\\s\\S]*?${escapeRegex(BRIDGE_END)}`),
+      bridgeBlock.trimStart()
+    );
+  } else {
+    content = content.trimEnd() + '\n' + bridgeBlock;
+  }
+
+  console.log('✅ Runtime bridges regenerated (spacing v9.1 + typography)');
+  return content;
+}
+
+/**
  * Generate the u-col-span-* CSS and write it directly into public/global-theme.css
  * between the STUDIO_CORE_START and STUDIO_CORE_END markers.
  * No destructive regex — we simply replace the generated block each time.
@@ -269,7 +431,13 @@ ${buildResponsiveBreaks('sm\\:')}
     content = content.replace(RESP_END, `${responsiveBlock}${RESP_END}`);
   }
 
-  /* ── 6. Write public + sync to app ── */
+  /* ── 6. Ensure --space-0: 0px is in STUDIO_CORE ── */
+  content = ensureSpaceZeroVar(content);
+
+  /* ── 7. Regenerate runtime bridges ── */
+  content = injectRuntimeBridges(content);
+
+  /* ── 8. Write public + sync to app ── */
   fs.writeFileSync(publicThemePath, content, 'utf8');
   console.log('✅ public/global-theme.css updated');
 

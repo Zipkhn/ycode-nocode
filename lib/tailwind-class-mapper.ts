@@ -218,16 +218,16 @@ const CLASS_PROPERTY_MAP: Record<string, RegExp> = {
   gridTemplateRows: /^grid-rows-(\[.+\]|\d+|none|subgrid)$/,
 
   // Spacing
-  padding: /^p-(\[.+\]|\d+|px|0\.5|1\.5|2\.5|3\.5)$/,
-  paddingTop: /^pt-(\[.+\]|\d+|px|0\.5|1\.5|2\.5|3\.5)$/,
-  paddingRight: /^pr-(\[.+\]|\d+|px|0\.5|1\.5|2\.5|3\.5)$/,
-  paddingBottom: /^pb-(\[.+\]|\d+|px|0\.5|1\.5|2\.5|3\.5)$/,
-  paddingLeft: /^pl-(\[.+\]|\d+|px|0\.5|1\.5|2\.5|3\.5)$/,
-  margin: /^m-(\[.+\]|\d+|px|auto|0\.5|1\.5|2\.5|3\.5)$/,
-  marginTop: /^mt-(\[.+\]|\d+|px|auto|0\.5|1\.5|2\.5|3\.5)$/,
-  marginRight: /^mr-(\[.+\]|\d+|px|auto|0\.5|1\.5|2\.5|3\.5)$/,
-  marginBottom: /^mb-(\[.+\]|\d+|px|auto|0\.5|1\.5|2\.5|3\.5)$/,
-  marginLeft: /^ml-(\[.+\]|\d+|px|auto|0\.5|1\.5|2\.5|3\.5)$/,
+  padding: /^p-(\[.+\]|\d+|px|0\.5|1\.5|2\.5|3\.5|space-[a-z0-9-]+)$/,
+  paddingTop: /^pt-(\[.+\]|\d+|px|0\.5|1\.5|2\.5|3\.5|space-[a-z0-9-]+)$/,
+  paddingRight: /^pr-(\[.+\]|\d+|px|0\.5|1\.5|2\.5|3\.5|space-[a-z0-9-]+)$/,
+  paddingBottom: /^pb-(\[.+\]|\d+|px|0\.5|1\.5|2\.5|3\.5|space-[a-z0-9-]+)$/,
+  paddingLeft: /^pl-(\[.+\]|\d+|px|0\.5|1\.5|2\.5|3\.5|space-[a-z0-9-]+)$/,
+  margin: /^m-(\[.+\]|\d+|px|auto|0\.5|1\.5|2\.5|3\.5|space-[a-z0-9-]+)$/,
+  marginTop: /^mt-(\[.+\]|\d+|px|auto|0\.5|1\.5|2\.5|3\.5|space-[a-z0-9-]+)$/,
+  marginRight: /^mr-(\[.+\]|\d+|px|auto|0\.5|1\.5|2\.5|3\.5|space-[a-z0-9-]+)$/,
+  marginBottom: /^mb-(\[.+\]|\d+|px|auto|0\.5|1\.5|2\.5|3\.5|space-[a-z0-9-]+)$/,
+  marginLeft: /^ml-(\[.+\]|\d+|px|auto|0\.5|1\.5|2\.5|3\.5|space-[a-z0-9-]+)$/,
 
   // Sizing
   width: /^w-(\[.+\]|\d+\/\d+|\d+|px|auto|full|screen|min|max|fit)$/,

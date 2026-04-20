@@ -19,6 +19,7 @@ interface SpacingValues {
 interface MarginPaddingProps {
   values: SpacingValues;
   onChange: (property: keyof SpacingValues, value: string) => void;
+  onFocus?: (property: keyof SpacingValues) => void;
 }
 
 type Side = 'top' | 'right' | 'bottom' | 'left';
@@ -190,9 +191,11 @@ function BoxEdge({
 function SpacingInput({
   value,
   onChange,
+  onFocus,
 }: {
   value: string;
   onChange: (value: string) => void;
+  onFocus?: () => void;
   className?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -206,6 +209,7 @@ function SpacingInput({
       ref={inputRef}
       value={value}
       onChange={handleChange}
+      onFocus={onFocus}
       placeholder="0"
       className="text-center bg-transparent border-transparent px-0"
     />
@@ -265,7 +269,7 @@ function useModifierKeys() {
   return modifiers;
 }
 
-export default function MarginPadding({ values, onChange }: MarginPaddingProps) {
+export default function MarginPadding({ values, onChange, onFocus }: MarginPaddingProps) {
   const valuesRef = useRef(values);
   valuesRef.current = values;
   const onChangeRef = useRef(onChange);
@@ -428,30 +432,54 @@ export default function MarginPadding({ values, onChange }: MarginPaddingProps) 
 
       {/* Margin inputs */}
       <div className="col-start-3 row-start-1 justify-self-center self-center my-1.5 z-20">
-        <SpacingInput value={values.marginTop} onChange={handleMT} />
+        <SpacingInput
+          value={values.marginTop} onChange={handleMT}
+          onFocus={() => onFocus?.('marginTop')}
+        />
       </div>
       <div className="col-start-5 row-start-3 justify-self-center self-center mx-1 z-20">
-        <SpacingInput value={values.marginRight} onChange={handleMR} />
+        <SpacingInput
+          value={values.marginRight} onChange={handleMR}
+          onFocus={() => onFocus?.('marginRight')}
+        />
       </div>
       <div className="col-start-3 row-start-5 justify-self-center self-center my-1.5 z-20">
-        <SpacingInput value={values.marginBottom} onChange={handleMB} />
+        <SpacingInput
+          value={values.marginBottom} onChange={handleMB}
+          onFocus={() => onFocus?.('marginBottom')}
+        />
       </div>
       <div className="col-start-1 row-start-3 justify-self-center self-center mx-1 z-20">
-        <SpacingInput value={values.marginLeft} onChange={handleML} />
+        <SpacingInput
+          value={values.marginLeft} onChange={handleML}
+          onFocus={() => onFocus?.('marginLeft')}
+        />
       </div>
 
       {/* Padding inputs */}
       <div className="col-start-3 row-start-2 justify-self-center self-center mt-1.5 z-20">
-        <SpacingInput value={values.paddingTop} onChange={handlePT} />
+        <SpacingInput
+          value={values.paddingTop} onChange={handlePT}
+          onFocus={() => onFocus?.('paddingTop')}
+        />
       </div>
       <div className="col-start-4 row-start-3 justify-self-center self-center mr-1.5 z-20">
-        <SpacingInput value={values.paddingRight} onChange={handlePR} />
+        <SpacingInput
+          value={values.paddingRight} onChange={handlePR}
+          onFocus={() => onFocus?.('paddingRight')}
+        />
       </div>
       <div className="col-start-3 row-start-4 justify-self-center self-center mb-1.5 z-20">
-        <SpacingInput value={values.paddingBottom} onChange={handlePB} />
+        <SpacingInput
+          value={values.paddingBottom} onChange={handlePB}
+          onFocus={() => onFocus?.('paddingBottom')}
+        />
       </div>
       <div className="col-start-2 row-start-3 justify-self-center self-center ml-1.5 z-20">
-        <SpacingInput value={values.paddingLeft} onChange={handlePL} />
+        <SpacingInput
+          value={values.paddingLeft} onChange={handlePL}
+          onFocus={() => onFocus?.('paddingLeft')}
+        />
       </div>
 
       {/* Center content block */}
