@@ -950,6 +950,95 @@ export default function StudioThemeEditor() {
     );
   };
 
+  // ─── THEME SLOT (picks from color scale variables) ───────────────────────
+
+  const resolveThemeColor = (value: string): string => {
+    if (!value) return '#000000';
+    const m = value.match(/^var\(--(.+?)\)$/);
+    if (m) return variables[m[1]] || '#000000';
+    return value.startsWith('#') ? value.substring(0, 7) : '#000000';
+  };
+
+  const COLOR_GROUPS = [
+    { label: 'Primary',   prefix: 'primary'   },
+    { label: 'Secondary', prefix: 'secondary' },
+    { label: 'Grey',      prefix: 'grey'       },
+  ] as const;
+
+  const COLOR_STEPS = [900, 800, 700, 600, 500, 400, 300, 200, 100, 50] as const;
+
+  const renderThemeSlot = (label: string, key: string) => {
+    const storedValue = variables[key] || '';
+    const swatchColor = resolveThemeColor(storedValue);
+    const isVar = storedValue.startsWith('var(');
+    const selectedKey = isVar ? storedValue.match(/^var\(--(.+?)\)$/)?.[1] ?? '' : '__custom__';
+    const customHex = !isVar && storedValue.startsWith('#') ? storedValue.substring(0, 7) : '#000000';
+
+    const customColors = Object.keys(variables)
+      .filter(k => k.startsWith('color--custom--') && variables[k]?.startsWith('#'));
+
+    return (
+      <div className="mb-3">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <label className="text-xs text-muted-foreground w-1/3 truncate">{label}</label>
+          <div className="flex items-center gap-2 w-2/3">
+            <div
+              className="w-6 h-6 rounded border border-border shrink-0"
+              style={{ backgroundColor: swatchColor }}
+            />
+            <select
+              className="flex-1 min-w-0 bg-background border border-border rounded px-2 py-1 text-xs outline-none focus:border-ring"
+              value={selectedKey}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '__custom__') {
+                  handleChange(key, customHex);
+                } else {
+                  handleChange(key, `var(--${v})`);
+                }
+              }}
+            >
+              <option value="__custom__">Custom…</option>
+              {COLOR_GROUPS.map(({ label: gLabel, prefix }) => (
+                <optgroup key={prefix} label={gLabel}>
+                  {COLOR_STEPS.map(step => {
+                    const k = `color--${prefix}-${step}`;
+                    return variables[k] ? (
+                      <option key={k} value={k}>{gLabel} {step}</option>
+                    ) : null;
+                  })}
+                </optgroup>
+              ))}
+              {customColors.length > 0 && (
+                <optgroup label="Custom">
+                  {customColors.map(k => (
+                    <option key={k} value={k}>{k.replace('color--custom--', '')}</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
+        </div>
+        {selectedKey === '__custom__' && (
+          <div className="flex items-center gap-2 pl-[calc(33%+0.5rem)]">
+            <input
+              type="color"
+              className="w-6 h-6 p-0 border-border rounded cursor-pointer shrink-0"
+              value={customHex}
+              onChange={(e) => handleChange(key, e.target.value)}
+            />
+            <input
+              type="text"
+              className="flex-1 min-w-0 bg-background border border-border rounded px-2 py-1 text-xs outline-none focus:border-ring"
+              value={storedValue}
+              onChange={(e) => handleChange(key, e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderColorInput = (label: string, key: string) => {
     // Basic fix to extract hex from potential var() fallback or raw string 
     // Usually <input type="color"> requires 6-digit hex
@@ -1321,19 +1410,19 @@ export default function StudioThemeEditor() {
         <>
           <div className="mb-4">
             <h4 className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 text-zinc-800 mb-2 border border-zinc-200">LIGHT</h4>
-            {renderColorInput('Background', 'theme-light--background')}
-            {renderColorInput('Text Main', 'theme-light--text-main')}
-            {renderColorInput('Text Muted', 'theme-light--text-muted')}
-            {renderColorInput('Border', 'theme-light--border')}
-            {renderColorInput('Accent', 'theme-light--accent')}
+            {renderThemeSlot('Background', 'theme-light--background')}
+            {renderThemeSlot('Text Main', 'theme-light--text-main')}
+            {renderThemeSlot('Text Muted', 'theme-light--text-muted')}
+            {renderThemeSlot('Border', 'theme-light--border')}
+            {renderThemeSlot('Accent', 'theme-light--accent')}
           </div>
           <div className="mt-4 pt-4 border-t border-border">
             <h4 className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-900 text-zinc-100 mb-2 border border-zinc-700">DARK</h4>
-            {renderColorInput('Background', 'theme-dark--background')}
-            {renderColorInput('Text Main', 'theme-dark--text-main')}
-            {renderColorInput('Text Muted', 'theme-dark--text-muted')}
-            {renderColorInput('Border', 'theme-dark--border')}
-            {renderColorInput('Accent', 'theme-dark--accent')}
+            {renderThemeSlot('Background', 'theme-dark--background')}
+            {renderThemeSlot('Text Main', 'theme-dark--text-main')}
+            {renderThemeSlot('Text Muted', 'theme-dark--text-muted')}
+            {renderThemeSlot('Border', 'theme-dark--border')}
+            {renderThemeSlot('Accent', 'theme-dark--accent')}
           </div>
         </>
       ))}

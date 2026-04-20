@@ -80,6 +80,51 @@ function ensureColorScales(content) {
 }
 
 /**
+ * Fix stale theme variable references and ensure theme defaults use
+ * color scale variables (var(--color--*)) instead of old flat names.
+ * Non-destructive: only rewrites known stale values; user-set values are kept.
+ */
+function fixThemeVars(content) {
+  // Replace legacy flat references that no longer exist
+  content = content.replace(/var\(--color--primary\)/g, 'var(--color--primary-500)');
+  content = content.replace(/var\(--color--primary-dark\)/g, 'var(--color--primary-400)');
+  content = content.replace(/var\(--color--secondary\)/g, 'var(--color--secondary-500)');
+
+  // Ensure theme defaults exist with sensible color-scale values
+  const THEME_DEFAULTS = {
+    'theme-light--background': 'var(--color--grey-50)',
+    'theme-light--text-main':  'var(--color--grey-900)',
+    'theme-light--text-muted': 'var(--color--grey-600)',
+    'theme-light--border':     'var(--color--grey-200)',
+    'theme-light--accent':     'var(--color--primary-500)',
+    'theme-dark--background':  'var(--color--grey-900)',
+    'theme-dark--text-main':   'var(--color--grey-50)',
+    'theme-dark--text-muted':  'var(--color--grey-400)',
+    'theme-dark--border':      'var(--color--grey-800)',
+    'theme-dark--accent':      'var(--color--primary-400)',
+  };
+
+  const CORE_END = '/* STUDIO_CORE_END */';
+  if (!content.includes(CORE_END)) {
+    console.log('✅ Theme vars: legacy refs patched');
+    return content;
+  }
+
+  const missing = [];
+  for (const [key, val] of Object.entries(THEME_DEFAULTS)) {
+    if (!content.includes(`--${key}:`)) missing.push(`  --${key}: ${val};`);
+  }
+  if (missing.length > 0) {
+    const block = `\n/* --- THEME DEFAULTS (auto-injected) --- */\n:root {\n${missing.join('\n')}\n}\n`;
+    content = content.replace(CORE_END, `${block}${CORE_END}`);
+    console.log(`✅ Theme vars: injected ${missing.length} missing defaults`);
+  } else {
+    console.log('✅ Theme vars: all present, legacy refs patched');
+  }
+  return content;
+}
+
+/**
  * Ensure --space-0: 0px is defined in the STUDIO_CORE section.
  * Fixes any previous run that wrote unitless `0`.
  */
@@ -471,13 +516,16 @@ ${buildResponsiveBreaks('sm\\:')}
   /* ── 6. Ensure primary/secondary color scales in STUDIO_CORE ── */
   content = ensureColorScales(content);
 
-  /* ── 7. Ensure --space-0: 0px is in STUDIO_CORE ── */
+  /* ── 7. Fix stale theme var refs + ensure theme defaults ── */
+  content = fixThemeVars(content);
+
+  /* ── 8. Ensure --space-0: 0px is in STUDIO_CORE ── */
   content = ensureSpaceZeroVar(content);
 
-  /* ── 8. Regenerate runtime bridges ── */
+  /* ── 9. Regenerate runtime bridges ── */
   content = injectRuntimeBridges(content);
 
-  /* ── 9. Write public + sync to app ── */
+  /* ── 10. Write public + sync to app ── */
   fs.writeFileSync(publicThemePath, content, 'utf8');
   console.log('✅ public/global-theme.css updated');
 

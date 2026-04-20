@@ -127,18 +127,18 @@
   --color--grey-50:  #F7F7F7;
 
   /* --- 7. THEME VARIABLES (Light UI) --- */
-  --theme-light--background: #FFFFFF;
+  --theme-light--background: var(--color--secondary-700);
   --theme-light--text-main: #1A1A1A;
   --theme-light--text-muted: #666666;
   --theme-light--border: #E6E6E6;
-  --theme-light--accent: var(--color--primary);
+  --theme-light--accent: var(--color--primary-500);
   
   /* --- 8. THEME VARIABLES (Dark UI) --- */
   --theme-dark--background: #1A1A1A;
   --theme-dark--text-main: #FFFFFF;
   --theme-dark--text-muted: #B3B3B3;
   --theme-dark--border: #333333;
-  --theme-dark--accent: var(--color--primary-dark);
+  --theme-dark--accent: var(--color--primary-400);
   
   /* --- APPLIED THEME MACROS (Default) --- */
   --theme--background: var(--theme-light--background);
@@ -743,9 +743,6 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 }
 /* STUDIO_CORE_END */
 
-
-
-
 /* STUDIO_RUNTIME_BRIDGES_START */
 /* Studio Runtime Bridge v9.1 — breakpoint-aware, auto-generated */
 :root{--space-0:0px}
@@ -1145,7 +1142,6 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 }
 
 /* Studio Runtime Typography Bridge v9.0 */
-:where(body) { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 :where(body) .u-text-display{font-weight:400!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
 :where(body) h1{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
 :where(body) h2{font-weight:700!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
@@ -1157,8 +1153,5 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) p{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 :where(body) .u-text-small{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 /* STUDIO_RUNTIME_BRIDGES_END */
-
-
-
 
 
