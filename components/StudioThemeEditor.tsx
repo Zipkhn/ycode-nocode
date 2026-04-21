@@ -5,6 +5,19 @@ import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import { useFontsStore } from '@/stores/useFontsStore';
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
+
+/** Resolve a CSS var() chain to a hex string. Returns '' if unresolvable. */
+function resolveVarToHex(value: string, vars: Record<string, string>, depth = 0): string {
+  if (depth > 4 || !value) return '';
+  if (/^#[0-9a-f]{6}$/i.test(value)) return value;
+  const m = value.match(/^var\(--(.+?)\)$/);
+  if (!m) return '';
+  return resolveVarToHex(vars[m[1]] || '', vars, depth + 1);
+}
+
+/** Shared color scale steps — 900 → 50 */
+const COLOR_SCALE_STEPS = [900, 800, 700, 600, 500, 400, 300, 200, 100, 50] as const;
+
 // Debounce helper
 function useDebounce<T extends (...args: any[]) => void>(callback: T, delay: number) {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -122,15 +135,6 @@ export default function StudioThemeEditor() {
       const existingByName: Record<string, string> = {};
       for (const v of (existing.data || [])) existingByName[v.name] = v.id;
 
-      // Resolve a CSS var chain to a hex value (up to 4 levels deep)
-      const resolveToHex = (value: string, depth = 0): string => {
-        if (depth > 4 || !value) return '#000000';
-        if (/^#[0-9a-f]{6}$/i.test(value)) return value;
-        const m = value.match(/^var\(--(.+?)\)$/);
-        if (!m) return '#000000';
-        return resolveToHex(variables[m[1]] || '', depth + 1);
-      };
-
       const upsert = (label: string, hexValue: string) => {
         if (existingByName[label]) {
           return fetch(`/ycode/api/color-variables/${existingByName[label]}`, {
@@ -183,7 +187,7 @@ export default function StudioThemeEditor() {
         { label: 'Theme / Border',        sourceKey: 'theme-light--border'       },
       ];
       for (const { label, sourceKey } of themeTokens) {
-        const hexValue = resolveToHex(variables[sourceKey] || '');
+        const hexValue = resolveVarToHex(variables[sourceKey] || '', variables);
         await upsert(label, hexValue);
       }
 
@@ -204,7 +208,7 @@ export default function StudioThemeEditor() {
         for (const { label, darkKey } of THEME_TOKENS_MAP) {
           const uuid = uuidUpdates[labelToUuidKey(label)] ?? variables[labelToUuidKey(label)];
           if (!uuid) continue;
-          const darkHex = resolveHex(mergedVars[darkKey] || '');
+          const darkHex = resolveVarToHex(mergedVars[darkKey] || '', mergedVars);
           if (darkHex) darkOverrides.push(`  --${uuid}: ${darkHex};`);
         }
         const freshThemeDarkCSS = darkOverrides.length
@@ -481,25 +485,17 @@ export default function StudioThemeEditor() {
   const labelToUuidKey = (label: string) =>
     `__uuid--${label.replace(/\s*\/\s*/g, '-').replace(/\s+/g, '-').toLowerCase()}`;
 
-  const resolveHex = useCallback((value: string, depth = 0): string => {
-    if (depth > 4 || !value) return '';
-    if (/^#[0-9a-f]{6}$/i.test(value)) return value;
-    const m = value.match(/^var\(--(.+?)\)$/);
-    if (!m) return '';
-    return resolveHex(variables[m[1]] || '', depth + 1);
-  }, [variables]);
-
   const generateThemeDarkBridgeCSS = useCallback((): string => {
     const overrides: string[] = [];
     for (const { label, darkKey } of THEME_TOKENS_MAP) {
       const uuid = variables[labelToUuidKey(label)];
       if (!uuid) continue;
-      const darkHex = resolveHex(variables[darkKey] || '');
+      const darkHex = resolveVarToHex(variables[darkKey] || '', variables);
       if (darkHex) overrides.push(`  --${uuid}: ${darkHex};`);
     }
     if (!overrides.length) return '';
     return `/* Studio Theme Dark Bridge */\n.u-theme-dark {\n${overrides.join('\n')}\n}`;
-  }, [variables, resolveHex]);
+  }, [variables]);
 
   // Stable refs so triggerIframeCSSReload always calls the latest generator
   // even when invoked from a stale saveUpdates closure.
@@ -708,7 +704,7 @@ export default function StudioThemeEditor() {
     saveUpdates(updates);
   };
 
-  const triggerIframeCSSReload = async () => {
+  const triggerIframeCSSReload = useCallback(async () => {
     try {
       // Re-fetch the full CSS from the server (with cache buster)
       const response = await fetch(`/global-theme.css?v=${Date.now()}`);
@@ -761,7 +757,9 @@ export default function StudioThemeEditor() {
     } catch (e) {
       console.warn('Studio: Failed to reload iframe CSS', e);
     }
-  };
+    // Refs are stable — no deps needed; bridge generators accessed via refs
+   
+  }, []);
 
   const getCompleteBridgeCSS = useCallback(() => {
     const parts = [
@@ -994,8 +992,6 @@ export default function StudioThemeEditor() {
     saveUpdates(scale);
   };
 
-  const SCALE_STEPS = [900, 800, 700, 600, 500, 400, 300, 200, 100, 50] as const;
-
   const renderColorScaleSection = (title: string, prefix: string) => {
     const baseHex = variables[`color--${prefix}-500`] || '#5465FF';
     const hexVal = baseHex.startsWith('#') && baseHex.length >= 7 ? baseHex.substring(0, 7) : '#5465FF';
@@ -1029,7 +1025,7 @@ export default function StudioThemeEditor() {
         </div>
         {/* Swatch preview strip */}
         <div className="flex gap-0.5 mb-3 rounded overflow-hidden h-6">
-          {SCALE_STEPS.map(step => {
+          {COLOR_SCALE_STEPS.map(step => {
             const color = variables[`color--${prefix}-${step}`] || '#ccc';
             return (
               <div
@@ -1052,7 +1048,7 @@ export default function StudioThemeEditor() {
             Adjust individually
           </summary>
           <div className="mt-1">
-            {SCALE_STEPS.map(step => renderColorInput(String(step), `color--${prefix}-${step}`))}
+            {COLOR_SCALE_STEPS.map(step => renderColorInput(String(step), `color--${prefix}-${step}`))}
           </div>
         </details>
       </div>
@@ -1061,24 +1057,15 @@ export default function StudioThemeEditor() {
 
   // ─── THEME SLOT (picks from color scale variables) ───────────────────────
 
-  const resolveThemeColor = (value: string): string => {
-    if (!value) return '#000000';
-    const m = value.match(/^var\(--(.+?)\)$/);
-    if (m) return variables[m[1]] || '#000000';
-    return value.startsWith('#') ? value.substring(0, 7) : '#000000';
-  };
-
   const COLOR_GROUPS = [
     { label: 'Primary',   prefix: 'primary'   },
     { label: 'Secondary', prefix: 'secondary' },
     { label: 'Grey',      prefix: 'grey'       },
   ] as const;
 
-  const COLOR_STEPS = [900, 800, 700, 600, 500, 400, 300, 200, 100, 50] as const;
-
   const renderThemeSlot = (label: string, key: string) => {
     const storedValue = variables[key] || '';
-    const swatchColor = resolveThemeColor(storedValue);
+    const swatchColor = resolveVarToHex(storedValue, variables) || '#000000';
     const isVar = storedValue.startsWith('var(');
     const selectedKey = isVar ? storedValue.match(/^var\(--(.+?)\)$/)?.[1] ?? '' : '__custom__';
     const customHex = !isVar && storedValue.startsWith('#') ? storedValue.substring(0, 7) : '#000000';
@@ -1110,7 +1097,7 @@ export default function StudioThemeEditor() {
               <option value="__custom__">Custom…</option>
               {COLOR_GROUPS.map(({ label: gLabel, prefix }) => (
                 <optgroup key={prefix} label={gLabel}>
-                  {COLOR_STEPS.map(step => {
+                  {COLOR_SCALE_STEPS.map(step => {
                     const k = `color--${prefix}-${step}`;
                     return variables[k] ? (
                       <option key={k} value={k}>{gLabel} {step}</option>

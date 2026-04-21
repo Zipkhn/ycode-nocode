@@ -94,7 +94,29 @@ function fixThemeVars(content) {
   const THEME_BLOCK_END   = '/* STUDIO_THEME_END */';
   const CORE_END          = '/* STUDIO_CORE_END */';
 
-  const themeBlock = `${THEME_BLOCK_START}
+  // Canonical defaults — non-destructive (never overwrite user-set values)
+  const BACKING_DEFAULTS = {
+    'theme-light--background':   'var(--color--grey-50)',
+    'theme-light--text-main':    'var(--color--grey-900)',
+    'theme-light--text-heading': 'var(--color--grey-900)',
+    'theme-light--text-muted':   'var(--color--grey-600)',
+    'theme-light--border':       'var(--color--grey-200)',
+    'theme-light--accent':       'var(--color--primary-500)',
+    'theme-dark--background':    'var(--color--grey-900)',
+    'theme-dark--text-main':     'var(--color--grey-50)',
+    'theme-dark--text-heading':  'var(--color--grey-50)',
+    'theme-dark--text-muted':    'var(--color--grey-400)',
+    'theme-dark--border':        'var(--color--grey-800)',
+    'theme-dark--accent':        'var(--color--primary-400)',
+    'theme-bg':           'var(--theme-light--background)',
+    'theme-text-main':    'var(--theme-light--text-main)',
+    'theme-text-heading': 'var(--theme-light--text-heading)',
+    'theme-text-muted':   'var(--theme-light--text-muted)',
+    'theme-accent':       'var(--theme-light--accent)',
+    'theme-border':       'var(--theme-light--border)',
+  };
+
+  const FULL_THEME_BLOCK = `${THEME_BLOCK_START}
   /* --- 7. THEME BACKING VARS (Light) --- */
   --theme-light--background:    var(--color--grey-50);
   --theme-light--text-main:     var(--color--grey-900);
@@ -120,26 +142,33 @@ function fixThemeVars(content) {
   --theme-border:       var(--theme-light--border);
 ${THEME_BLOCK_END}`;
 
-  const darkBlock = `\n/* Dark inversion — add .u-theme-dark on any element to switch to dark palette */\n.u-theme-dark,\n.dark {\n  --theme-bg:           var(--theme-dark--background);\n  --theme-text-main:    var(--theme-dark--text-main);\n  --theme-text-heading: var(--theme-dark--text-heading);\n  --theme-text-muted:   var(--theme-dark--text-muted);\n  --theme-accent:       var(--theme-dark--accent);\n  --theme-border:       var(--theme-dark--border);\n}\n`;
+  const DARK_BLOCK = `\n/* Dark inversion — add .u-theme-dark on any element to switch to dark palette */\n.u-theme-dark,\n.dark {\n  --theme-bg:           var(--theme-dark--background);\n  --theme-text-main:    var(--theme-dark--text-main);\n  --theme-text-heading: var(--theme-dark--text-heading);\n  --theme-text-muted:   var(--theme-dark--text-muted);\n  --theme-accent:       var(--theme-dark--accent);\n  --theme-border:       var(--theme-dark--border);\n}\n`;
 
   if (content.includes(THEME_BLOCK_START) && content.includes(THEME_BLOCK_END)) {
-    // Regenerate in-place (preserves user-set backing values — only the token block is fixed)
-    // Don't overwrite backing vars the user may have changed via Studio; only add missing ones
-    console.log('✅ Theme vars: block present, legacy refs patched');
+    // Block exists — inject any missing vars non-destructively before THEME_BLOCK_END
+    const missing = [];
+    for (const [key, val] of Object.entries(BACKING_DEFAULTS)) {
+      if (!content.includes(`--${key}:`)) missing.push(`  --${key}: ${val};`);
+    }
+    if (missing.length > 0) {
+      content = content.replace(THEME_BLOCK_END, `:root {\n${missing.join('\n')}\n}\n${THEME_BLOCK_END}`);
+      console.log(`✅ Theme vars: block present, injected ${missing.length} missing vars`);
+    } else {
+      console.log('✅ Theme vars: block present and complete');
+    }
   } else if (content.includes(CORE_END)) {
-    // First run: inject the full theme block before STUDIO_CORE_END
-    content = content.replace(CORE_END, `${themeBlock}\n${CORE_END}`);
+    // First run — inject full block before STUDIO_CORE_END
+    content = content.replace(CORE_END, `${FULL_THEME_BLOCK}\n${CORE_END}`);
     console.log('✅ Theme vars: block injected');
   }
 
-  // Ensure .u-theme-dark block exists right after the :root closing
+  // Ensure .u-theme-dark inversion block exists after :root
   if (!content.includes('.u-theme-dark')) {
     content = content.replace(/\.dark\s*\{[\s\S]*?--theme-[^}]*\}/, '');
-    // Append dark block after STUDIO_CORE_END
-    content = content.replace(CORE_END, `${CORE_END}${darkBlock}`);
+    content = content.replace(CORE_END, `${CORE_END}${DARK_BLOCK}`);
     console.log('✅ Theme vars: .u-theme-dark block added');
   } else {
-    console.log('✅ Theme vars: .u-theme-dark already present');
+    console.log('✅ Theme vars: .u-theme-dark present');
   }
 
   return content;
