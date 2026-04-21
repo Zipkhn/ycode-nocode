@@ -53,15 +53,30 @@ export async function POST(request: Request) {
     // 2. Injecter les Bridges CSS de manière persistente pour la Production
     if (bridges && typeof bridges === 'string') {
       const bridgeStart = '/* STUDIO_RUNTIME_BRIDGES_START */';
-      const bridgeEnd = '/* STUDIO_RUNTIME_BRIDGES_END */';
-      const bridgeBlock = `\n${bridgeStart}\n${bridges}\n${bridgeEnd}\n`;
+      const bridgeEnd   = '/* STUDIO_RUNTIME_BRIDGES_END */';
+
+      // Preserve the theme dark bridge (contains Ycode UUIDs — only set by Sync)
+      // If the incoming bridges don't include it, carry it over from the existing section.
+      let finalBridges = bridges;
+      if (!bridges.includes('Studio Theme Dark Bridge')) {
+        const existingMatch = css.match(
+          new RegExp(`\\/\\* STUDIO_RUNTIME_BRIDGES_START \\*\\/([\\s\\S]*?)\\/\\* STUDIO_RUNTIME_BRIDGES_END \\*\\/`)
+        );
+        if (existingMatch) {
+          const themeDarkMatch = existingMatch[1].match(
+            /\/\* Studio Theme Dark Bridge \*\/[\s\S]*?\.u-theme-dark\s*\{[\s\S]*?\}/
+          );
+          if (themeDarkMatch) finalBridges = bridges + '\n\n' + themeDarkMatch[0];
+        }
+      }
+
+      const bridgeBlock = `\n${bridgeStart}\n${finalBridges}\n${bridgeEnd}\n`;
 
       if (css.includes(bridgeStart) && css.includes(bridgeEnd)) {
         const startIdx = css.indexOf(bridgeStart);
         const endIdx = css.indexOf(bridgeEnd) + bridgeEnd.length;
         css = css.substring(0, startIdx) + bridgeBlock + css.substring(endIdx);
       } else {
-        // Appending exactly to the end of file
         css = css.trimEnd() + '\n' + bridgeBlock;
       }
     }

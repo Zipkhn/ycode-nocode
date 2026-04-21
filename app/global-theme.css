@@ -749,7 +749,29 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :root {
   --space-0: 0px;
 }
+:root {
+  --__uuid--theme-bg: 42bd72cf-c7de-465c-9b31-4ef1e73a3c1c;
+}
+:root {
+  --__uuid--theme-text-main: a6001289-4d66-4729-844a-799a44e5c696;
+}
+:root {
+  --__uuid--theme-text-heading: 8b6a513e-934d-4ac9-ba7f-d464b9129d13;
+}
+:root {
+  --__uuid--theme-text-muted: 51534e8a-9368-464d-ae08-5a19f2678e94;
+}
+:root {
+  --__uuid--theme-accent: 3c4ecd93-04e9-4032-824c-afcc5bef487f;
+}
+:root {
+  --__uuid--theme-border: 84b41b3e-169f-48bb-b9cf-5c1629dd30b0;
+}
 /* STUDIO_CORE_END */
+
+
+
+
 
 /* STUDIO_RUNTIME_BRIDGES_START */
 /* Studio Runtime Bridge v9.1 — breakpoint-aware, auto-generated */
@@ -1150,6 +1172,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 }
 
 /* Studio Runtime Typography Bridge v9.0 */
+:where(body) { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 :where(body) .u-text-display{font-weight:400!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
 :where(body) h1{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
 :where(body) h2{font-weight:700!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
@@ -1171,5 +1194,9 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   --84b41b3e-169f-48bb-b9cf-5c1629dd30b0: #333333;
 }
 /* STUDIO_RUNTIME_BRIDGES_END */
+
+
+
+
 
 
