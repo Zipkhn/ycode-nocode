@@ -81,13 +81,15 @@ export async function POST(request: Request) {
       }
     }
 
-    await fs.writeFile(THEME_PATH, css, 'utf-8');
-    
-    // Also copy to app folder to trigger Next.js native Hot Reloading for the builder interface
-    try {
-      await fs.writeFile(APP_THEME_PATH, css, 'utf-8');
-    } catch(e) {
-      // App theme might not exist or be accessible, that's fine
+    // Only write if content actually changed — prevents noisy git diffs on every page load
+    const original = await fs.readFile(THEME_PATH, 'utf-8');
+    if (css !== original) {
+      await fs.writeFile(THEME_PATH, css, 'utf-8');
+      try {
+        await fs.writeFile(APP_THEME_PATH, css, 'utf-8');
+      } catch(e) {
+        // App theme might not exist or be accessible, that's fine
+      }
     }
 
     return NextResponse.json({ success: true });
