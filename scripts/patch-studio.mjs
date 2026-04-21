@@ -85,42 +85,63 @@ function ensureColorScales(content) {
  * Non-destructive: only rewrites known stale values; user-set values are kept.
  */
 function fixThemeVars(content) {
-  // Replace legacy flat references that no longer exist
-  content = content.replace(/var\(--color--primary\)/g, 'var(--color--primary-500)');
+  // Fix stale legacy flat references
+  content = content.replace(/var\(--color--primary\)/g,      'var(--color--primary-500)');
   content = content.replace(/var\(--color--primary-dark\)/g, 'var(--color--primary-400)');
-  content = content.replace(/var\(--color--secondary\)/g, 'var(--color--secondary-500)');
+  content = content.replace(/var\(--color--secondary\)/g,    'var(--color--secondary-500)');
 
-  // Ensure theme defaults exist with sensible color-scale values
-  const THEME_DEFAULTS = {
-    'theme-light--background': 'var(--color--grey-50)',
-    'theme-light--text-main':  'var(--color--grey-900)',
-    'theme-light--text-muted': 'var(--color--grey-600)',
-    'theme-light--border':     'var(--color--grey-200)',
-    'theme-light--accent':     'var(--color--primary-500)',
-    'theme-dark--background':  'var(--color--grey-900)',
-    'theme-dark--text-main':   'var(--color--grey-50)',
-    'theme-dark--text-muted':  'var(--color--grey-400)',
-    'theme-dark--border':      'var(--color--grey-800)',
-    'theme-dark--accent':      'var(--color--primary-400)',
-  };
+  const THEME_BLOCK_START = '/* STUDIO_THEME_START */';
+  const THEME_BLOCK_END   = '/* STUDIO_THEME_END */';
+  const CORE_END          = '/* STUDIO_CORE_END */';
 
-  const CORE_END = '/* STUDIO_CORE_END */';
-  if (!content.includes(CORE_END)) {
-    console.log('✅ Theme vars: legacy refs patched');
-    return content;
+  const themeBlock = `${THEME_BLOCK_START}
+  /* --- 7. THEME BACKING VARS (Light) --- */
+  --theme-light--background:    var(--color--grey-50);
+  --theme-light--text-main:     var(--color--grey-900);
+  --theme-light--text-heading:  var(--color--grey-900);
+  --theme-light--text-muted:    var(--color--grey-600);
+  --theme-light--border:        var(--color--grey-200);
+  --theme-light--accent:        var(--color--primary-500);
+
+  /* --- 8. THEME BACKING VARS (Dark) --- */
+  --theme-dark--background:     var(--color--grey-900);
+  --theme-dark--text-main:      var(--color--grey-50);
+  --theme-dark--text-heading:   var(--color--grey-50);
+  --theme-dark--text-muted:     var(--color--grey-400);
+  --theme-dark--border:         var(--color--grey-800);
+  --theme-dark--accent:         var(--color--primary-400);
+
+  /* --- 9. THEME TOKENS — use these in your design --- */
+  --theme-bg:           var(--theme-light--background);
+  --theme-text-main:    var(--theme-light--text-main);
+  --theme-text-heading: var(--theme-light--text-heading);
+  --theme-text-muted:   var(--theme-light--text-muted);
+  --theme-accent:       var(--theme-light--accent);
+  --theme-border:       var(--theme-light--border);
+${THEME_BLOCK_END}`;
+
+  const darkBlock = `\n/* Dark inversion — add .u-theme-dark on any element to switch to dark palette */\n.u-theme-dark,\n.dark {\n  --theme-bg:           var(--theme-dark--background);\n  --theme-text-main:    var(--theme-dark--text-main);\n  --theme-text-heading: var(--theme-dark--text-heading);\n  --theme-text-muted:   var(--theme-dark--text-muted);\n  --theme-accent:       var(--theme-dark--accent);\n  --theme-border:       var(--theme-dark--border);\n}\n`;
+
+  if (content.includes(THEME_BLOCK_START) && content.includes(THEME_BLOCK_END)) {
+    // Regenerate in-place (preserves user-set backing values — only the token block is fixed)
+    // Don't overwrite backing vars the user may have changed via Studio; only add missing ones
+    console.log('✅ Theme vars: block present, legacy refs patched');
+  } else if (content.includes(CORE_END)) {
+    // First run: inject the full theme block before STUDIO_CORE_END
+    content = content.replace(CORE_END, `${themeBlock}\n${CORE_END}`);
+    console.log('✅ Theme vars: block injected');
   }
 
-  const missing = [];
-  for (const [key, val] of Object.entries(THEME_DEFAULTS)) {
-    if (!content.includes(`--${key}:`)) missing.push(`  --${key}: ${val};`);
-  }
-  if (missing.length > 0) {
-    const block = `\n/* --- THEME DEFAULTS (auto-injected) --- */\n:root {\n${missing.join('\n')}\n}\n`;
-    content = content.replace(CORE_END, `${block}${CORE_END}`);
-    console.log(`✅ Theme vars: injected ${missing.length} missing defaults`);
+  // Ensure .u-theme-dark block exists right after the :root closing
+  if (!content.includes('.u-theme-dark')) {
+    content = content.replace(/\.dark\s*\{[\s\S]*?--theme-[^}]*\}/, '');
+    // Append dark block after STUDIO_CORE_END
+    content = content.replace(CORE_END, `${CORE_END}${darkBlock}`);
+    console.log('✅ Theme vars: .u-theme-dark block added');
   } else {
-    console.log('✅ Theme vars: all present, legacy refs patched');
+    console.log('✅ Theme vars: .u-theme-dark already present');
   }
+
   return content;
 }
 
@@ -268,10 +289,27 @@ function injectRuntimeBridges(content) {
     typoLines.push(`${lvl.selector}{font-weight:${fw}!important;line-height:${lh}!important;letter-spacing:${ls}!important;margin-bottom:${mb}!important}`);
   }
 
-  // ── Inject into file ──────────────────────────────────────────────────────
+  // ── Preserve runtime-only sections (theme dark bridge with UUIDs) ─────────
+  // These are written by the Studio sync and contain Ycode UUIDs — the patch
+  // script cannot regenerate them. Extract and re-inject them as-is.
   const BRIDGE_START = '/* STUDIO_RUNTIME_BRIDGES_START */';
   const BRIDGE_END   = '/* STUDIO_RUNTIME_BRIDGES_END */';
-  const bridgeBlock  = `\n${BRIDGE_START}\n${spacingLines.join('\n')}\n\n${typoLines.join('\n')}\n${BRIDGE_END}\n`;
+
+  let preservedThemeDark = '';
+  if (content.includes(BRIDGE_START) && content.includes(BRIDGE_END)) {
+    const existingBridgeMatch = content.match(
+      new RegExp(`${escapeRegex(BRIDGE_START)}([\\s\\S]*?)${escapeRegex(BRIDGE_END)}`)
+    );
+    if (existingBridgeMatch) {
+      const existingContent = existingBridgeMatch[1];
+      const themeDarkMatch = existingContent.match(
+        /\/\* Studio Theme Dark Bridge \*\/[\s\S]*?\.u-theme-dark\s*\{[\s\S]*?\}/
+      );
+      if (themeDarkMatch) preservedThemeDark = '\n\n' + themeDarkMatch[0];
+    }
+  }
+
+  const bridgeBlock = `\n${BRIDGE_START}\n${spacingLines.join('\n')}\n\n${typoLines.join('\n')}${preservedThemeDark}\n${BRIDGE_END}\n`;
 
   if (content.includes(BRIDGE_START) && content.includes(BRIDGE_END)) {
     content = content.replace(
@@ -282,7 +320,8 @@ function injectRuntimeBridges(content) {
     content = content.trimEnd() + '\n' + bridgeBlock;
   }
 
-  console.log('✅ Runtime bridges regenerated (spacing v9.1 + typography)');
+  const themeDarkMsg = preservedThemeDark ? ' + theme dark bridge preserved' : '';
+  console.log(`✅ Runtime bridges regenerated (spacing v9.1 + typography${themeDarkMsg})`);
   return content;
 }
 

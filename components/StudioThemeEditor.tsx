@@ -122,12 +122,34 @@ export default function StudioThemeEditor() {
       const existingByName: Record<string, string> = {};
       for (const v of (existing.data || [])) existingByName[v.name] = v.id;
 
-      // Dynamically build token list from ALL color-- keys in the theme
+      // Resolve a CSS var chain to a hex value (up to 4 levels deep)
+      const resolveToHex = (value: string, depth = 0): string => {
+        if (depth > 4 || !value) return '#000000';
+        if (/^#[0-9a-f]{6}$/i.test(value)) return value;
+        const m = value.match(/^var\(--(.+?)\)$/);
+        if (!m) return '#000000';
+        return resolveToHex(variables[m[1]] || '', depth + 1);
+      };
+
+      const upsert = (label: string, hexValue: string) => {
+        if (existingByName[label]) {
+          return fetch(`/ycode/api/color-variables/${existingByName[label]}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: hexValue }),
+          });
+        }
+        return fetch('/ycode/api/color-variables', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: label, value: hexValue }),
+        });
+      };
+
+      // ── 1. Color scale tokens (parallel) ──────────────────────────────────
       const colorTokens = Object.keys(variables)
         .filter(k => k.startsWith('color--') && variables[k]?.startsWith('#'))
         .map(key => {
-          // Build a human-readable label: "color--primary" → "Studio / Primary"
-          //                               "color--custom--brand-blue" → "Studio / Brand Blue"
           const slug = key
             .replace(/^color--custom--/, '')
             .replace(/^color--/, '')
@@ -136,20 +158,9 @@ export default function StudioThemeEditor() {
           return { key, label };
         });
 
-      // Fire all create/update/rename requests in parallel
-      const requests = colorTokens.map(({ key, label }) => {
+      const colorRequests = colorTokens.map(({ key, label }) => {
         const hexValue = variables[key];
-
-        // 1. Entry already has the correct Studio / name → update value only
-        if (existingByName[label]) {
-          return fetch(`/ycode/api/color-variables/${existingByName[label]}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ value: hexValue }),
-          });
-        }
-
-        // 2. Legacy Lumos / name exists → rename to Studio / and update value
+        // Legacy rename: Lumos / → Studio /
         const lumosLabel = label.replace(/^Studio \/ /, 'Lumos / ');
         if (existingByName[lumosLabel]) {
           return fetch(`/ycode/api/color-variables/${existingByName[lumosLabel]}`, {
@@ -158,16 +169,62 @@ export default function StudioThemeEditor() {
             body: JSON.stringify({ name: label, value: hexValue }),
           });
         }
+        return upsert(label, hexValue);
+      });
+      await Promise.all(colorRequests);
 
-        // 3. No existing entry → create
-        return fetch('/ycode/api/color-variables', {
+      // ── 2. Theme tokens (sequential — appear last = most recent in Ycode) ──
+      const themeTokens: { label: string; sourceKey: string }[] = [
+        { label: 'Theme / BG',           sourceKey: 'theme-light--background'   },
+        { label: 'Theme / Text Main',     sourceKey: 'theme-light--text-main'    },
+        { label: 'Theme / Text Heading',  sourceKey: 'theme-light--text-heading' },
+        { label: 'Theme / Text Muted',    sourceKey: 'theme-light--text-muted'   },
+        { label: 'Theme / Accent',        sourceKey: 'theme-light--accent'       },
+        { label: 'Theme / Border',        sourceKey: 'theme-light--border'       },
+      ];
+      for (const { label, sourceKey } of themeTokens) {
+        const hexValue = resolveToHex(variables[sourceKey] || '');
+        await upsert(label, hexValue);
+      }
+
+      // ── 3. Fetch back UUIDs and persist them for the dark bridge ──────────
+      const refreshed = await fetch('/ycode/api/color-variables').then(r => r.json());
+      const uuidUpdates: Record<string, string> = {};
+      for (const entry of (refreshed.data || [])) {
+        if (entry.name?.startsWith('Theme / ') && entry.id) {
+          uuidUpdates[labelToUuidKey(entry.name)] = entry.id;
+        }
+      }
+      if (Object.keys(uuidUpdates).length > 0) {
+        const mergedVars = { ...variables, ...uuidUpdates };
+        setVariables(mergedVars);
+
+        // Build the theme dark bridge with the fresh UUIDs (can't use stale closure)
+        const darkOverrides: string[] = [];
+        for (const { label, darkKey } of THEME_TOKENS_MAP) {
+          const uuid = uuidUpdates[labelToUuidKey(label)] ?? variables[labelToUuidKey(label)];
+          if (!uuid) continue;
+          const darkHex = resolveHex(mergedVars[darkKey] || '');
+          if (darkHex) darkOverrides.push(`  --${uuid}: ${darkHex};`);
+        }
+        const freshThemeDarkCSS = darkOverrides.length
+          ? `/* Studio Theme Dark Bridge */\n.u-theme-dark {\n${darkOverrides.join('\n')}\n}`
+          : '';
+
+        const bridges = [
+          generateSpacingBridgeCSS(),
+          generateTypographyBridgeCSS(),
+          freshThemeDarkCSS,
+        ].filter(Boolean).join('\n\n');
+
+        await fetch('/api/studio', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: label, value: hexValue }),
+          body: JSON.stringify({ updates: uuidUpdates, bridges }),
         });
-      });
 
-      await Promise.all(requests);
+        triggerIframeCSSReload();
+      }
 
       // Force Ycode's Style Panel to refresh its list without a page reload
       await loadColorVariables();
@@ -408,12 +465,50 @@ export default function StudioThemeEditor() {
     return lines.join('\n');
   }, [variables]);
 
+  // ─── THEME DARK BRIDGE ───────────────────────────────────────────────────
+  // Ycode generates bg-[color:var(--uuid)] where --uuid has a fixed hex.
+  // We override --uuid inside .u-theme-dark with the resolved dark value.
+
+  const THEME_TOKENS_MAP = [
+    { label: 'Theme / BG',           darkKey: 'theme-dark--background'   },
+    { label: 'Theme / Text Main',     darkKey: 'theme-dark--text-main'    },
+    { label: 'Theme / Text Heading',  darkKey: 'theme-dark--text-heading' },
+    { label: 'Theme / Text Muted',    darkKey: 'theme-dark--text-muted'   },
+    { label: 'Theme / Accent',        darkKey: 'theme-dark--accent'       },
+    { label: 'Theme / Border',        darkKey: 'theme-dark--border'       },
+  ] as const;
+
+  const labelToUuidKey = (label: string) =>
+    `__uuid--${label.replace(/\s*\/\s*/g, '-').replace(/\s+/g, '-').toLowerCase()}`;
+
+  const resolveHex = useCallback((value: string, depth = 0): string => {
+    if (depth > 4 || !value) return '';
+    if (/^#[0-9a-f]{6}$/i.test(value)) return value;
+    const m = value.match(/^var\(--(.+?)\)$/);
+    if (!m) return '';
+    return resolveHex(variables[m[1]] || '', depth + 1);
+  }, [variables]);
+
+  const generateThemeDarkBridgeCSS = useCallback((): string => {
+    const overrides: string[] = [];
+    for (const { label, darkKey } of THEME_TOKENS_MAP) {
+      const uuid = variables[labelToUuidKey(label)];
+      if (!uuid) continue;
+      const darkHex = resolveHex(variables[darkKey] || '');
+      if (darkHex) overrides.push(`  --${uuid}: ${darkHex};`);
+    }
+    if (!overrides.length) return '';
+    return `/* Studio Theme Dark Bridge */\n.u-theme-dark {\n${overrides.join('\n')}\n}`;
+  }, [variables, resolveHex]);
+
   // Stable refs so triggerIframeCSSReload always calls the latest generator
   // even when invoked from a stale saveUpdates closure.
-  const spacingBridgeRef = useRef(generateSpacingBridgeCSS);
-  const typoBridgeRef    = useRef(generateTypographyBridgeCSS);
-  useEffect(() => { spacingBridgeRef.current = generateSpacingBridgeCSS; }, [generateSpacingBridgeCSS]);
-  useEffect(() => { typoBridgeRef.current    = generateTypographyBridgeCSS; }, [generateTypographyBridgeCSS]);
+  const spacingBridgeRef   = useRef(generateSpacingBridgeCSS);
+  const typoBridgeRef      = useRef(generateTypographyBridgeCSS);
+  const themeDarkBridgeRef = useRef(generateThemeDarkBridgeCSS);
+  useEffect(() => { spacingBridgeRef.current   = generateSpacingBridgeCSS;   }, [generateSpacingBridgeCSS]);
+  useEffect(() => { typoBridgeRef.current      = generateTypographyBridgeCSS; }, [generateTypographyBridgeCSS]);
+  useEffect(() => { themeDarkBridgeRef.current = generateThemeDarkBridgeCSS;  }, [generateThemeDarkBridgeCSS]);
 
   /**
    * Mount / update the runtime bridge in both the host document
@@ -648,6 +743,17 @@ export default function StudioThemeEditor() {
             iframeDoc.head.appendChild(typoEl);
           }
           typoEl.textContent = typoCSS;
+
+          const themeDarkCSS = themeDarkBridgeRef.current();
+          if (themeDarkCSS) {
+            let themeEl = iframeDoc.getElementById('studio-runtime-theme-dark') as HTMLStyleElement | null;
+            if (!themeEl) {
+              themeEl = iframeDoc.createElement('style') as HTMLStyleElement;
+              themeEl.id = 'studio-runtime-theme-dark';
+              iframeDoc.head.appendChild(themeEl);
+            }
+            themeEl.textContent = themeDarkCSS;
+          }
         } catch (e) {
           // Ignore cross-origin iframe errors
         }
@@ -658,11 +764,14 @@ export default function StudioThemeEditor() {
   };
 
   const getCompleteBridgeCSS = useCallback(() => {
-    return [
+    const parts = [
       generateSpacingBridgeCSS(),
-      generateTypographyBridgeCSS()
-    ].join('\n\n');
-  }, [generateSpacingBridgeCSS, generateTypographyBridgeCSS]);
+      generateTypographyBridgeCSS(),
+    ];
+    const themeDark = generateThemeDarkBridgeCSS();
+    if (themeDark) parts.push(themeDark);
+    return parts.join('\n\n');
+  }, [generateSpacingBridgeCSS, generateTypographyBridgeCSS, generateThemeDarkBridgeCSS]);
 
   const saveUpdates = useCallback(async (updates: Record<string, string>) => {
     try {
@@ -1412,6 +1521,7 @@ export default function StudioThemeEditor() {
             <h4 className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-100 text-zinc-800 mb-2 border border-zinc-200">LIGHT</h4>
             {renderThemeSlot('Background', 'theme-light--background')}
             {renderThemeSlot('Text Main', 'theme-light--text-main')}
+            {renderThemeSlot('Text Heading', 'theme-light--text-heading')}
             {renderThemeSlot('Text Muted', 'theme-light--text-muted')}
             {renderThemeSlot('Border', 'theme-light--border')}
             {renderThemeSlot('Accent', 'theme-light--accent')}
@@ -1420,6 +1530,7 @@ export default function StudioThemeEditor() {
             <h4 className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-zinc-900 text-zinc-100 mb-2 border border-zinc-700">DARK</h4>
             {renderThemeSlot('Background', 'theme-dark--background')}
             {renderThemeSlot('Text Main', 'theme-dark--text-main')}
+            {renderThemeSlot('Text Heading', 'theme-dark--text-heading')}
             {renderThemeSlot('Text Muted', 'theme-dark--text-muted')}
             {renderThemeSlot('Border', 'theme-dark--border')}
             {renderThemeSlot('Accent', 'theme-dark--accent')}

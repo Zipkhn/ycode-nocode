@@ -126,34 +126,42 @@
   --color--grey-100: #E6E6E6;
   --color--grey-50:  #F7F7F7;
 
-  /* --- 7. THEME VARIABLES (Light UI) --- */
-  --theme-light--background: var(--color--secondary-700);
-  --theme-light--text-main: #1A1A1A;
-  --theme-light--text-muted: #666666;
-  --theme-light--border: #E6E6E6;
-  --theme-light--accent: var(--color--primary-500);
-  
-  /* --- 8. THEME VARIABLES (Dark UI) --- */
-  --theme-dark--background: #1A1A1A;
-  --theme-dark--text-main: #FFFFFF;
-  --theme-dark--text-muted: #B3B3B3;
-  --theme-dark--border: #333333;
-  --theme-dark--accent: var(--color--primary-400);
-  
-  /* --- APPLIED THEME MACROS (Default) --- */
-  --theme--background: var(--theme-light--background);
-  --theme--text-main: var(--theme-light--text-main);
-  --theme--text-muted: var(--theme-light--text-muted);
-  --theme--border: var(--theme-light--border);
-  --theme--accent: var(--theme-light--accent);
+/* STUDIO_THEME_START */
+  /* --- 7. THEME BACKING VARS (Light) --- */
+  --theme-light--background:    var(--color--primary-200);
+  --theme-light--text-main:     var(--color--primary-900);
+  --theme-light--text-heading:  var(--color--primary-500);
+  --theme-light--text-muted:    var(--color--grey-600);
+  --theme-light--border:        var(--color--grey-200);
+  --theme-light--accent:        var(--color--primary-500);
+
+  /* --- 8. THEME BACKING VARS (Dark) --- */
+  --theme-dark--background:     var(--color--primary-700);
+  --theme-dark--text-main:      var(--color--primary-50);
+  --theme-dark--text-heading:   var(--color--primary-300);
+  --theme-dark--text-muted:     var(--color--grey-400);
+  --theme-dark--border:         var(--color--grey-800);
+  --theme-dark--accent:         var(--color--primary-400);
+
+  /* --- 9. THEME TOKENS — use these in your design --- */
+  --theme-bg:           var(--theme-light--background);
+  --theme-text-main:    var(--theme-light--text-main);
+  --theme-text-heading: var(--theme-light--text-heading);
+  --theme-text-muted:   var(--theme-light--text-muted);
+  --theme-accent:       var(--theme-light--accent);
+  --theme-border:       var(--theme-light--border);
+/* STUDIO_THEME_END */
 }
 
+/* Dark inversion — add .u-theme-dark on any element to switch to dark palette */
+.u-theme-dark,
 .dark {
-  --theme--background: var(--theme-dark--background);
-  --theme--text-main: var(--theme-dark--text-main);
-  --theme--text-muted: var(--theme-dark--text-muted);
-  --theme--border: var(--theme-dark--border);
-  --theme--accent: var(--theme-dark--accent);
+  --theme-bg:           var(--theme-dark--background);
+  --theme-text-main:    var(--theme-dark--text-main);
+  --theme-text-heading: var(--theme-dark--text-heading);
+  --theme-text-muted:   var(--theme-dark--text-muted);
+  --theme-accent:       var(--theme-dark--accent);
+  --theme-border:       var(--theme-dark--border);
 }
 
   /* (Legacy Text Reset removed in favor of runtime bridge & level-specific styling) */
@@ -1152,6 +1160,16 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) .u-text-large{font-weight:600!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 :where(body) p{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 :where(body) .u-text-small{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
+
+/* Studio Theme Dark Bridge */
+.u-theme-dark {
+  --42bd72cf-c7de-465c-9b31-4ef1e73a3c1c: #2B3799;
+  --a6001289-4d66-4729-844a-799a44e5c696: #F0F3FF;
+  --8b6a513e-934d-4ac9-ba7f-d464b9129d13: #9DB4FF;
+  --51534e8a-9368-464d-ae08-5a19f2678e94: #999999;
+  --3c4ecd93-04e9-4032-824c-afcc5bef487f: #788BFF;
+  --84b41b3e-169f-48bb-b9cf-5c1629dd30b0: #333333;
+}
 /* STUDIO_RUNTIME_BRIDGES_END */
 
 
