@@ -221,14 +221,43 @@ export default function StudioThemeEditor() {
           freshThemeDarkCSS,
         ].filter(Boolean).join('\n\n');
 
+        // Collect all color scale variables (pending since last Sync)
+        const colorVarUpdates = Object.fromEntries(
+          Object.entries(mergedVars).filter(([k]) => k.startsWith('color--'))
+        );
+
         await fetch('/api/studio', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ updates: uuidUpdates, bridges }),
+          body: JSON.stringify({ updates: { ...colorVarUpdates, ...uuidUpdates }, bridges }),
         });
 
         triggerIframeCSSReload();
       }
+
+      // ── 4. Typography tokens (reuse refreshed data) ──────────────────────────
+      const existingByNameTypo: Record<string, string> = {};
+      for (const v of (refreshed.data || [])) existingByNameTypo[v.name] = v.id;
+      const typoRequests: Promise<unknown>[] = [];
+      TYPOGRAPHY_LEVELS.forEach(level => {
+        ['weight', 'line-height', 'letter-spacing', 'margin-bottom'].forEach(prop => {
+          const cssVarKey = `${level.key}-${prop}`;
+          const name = `Studio / ${cssVarKey}`;
+          const value = variables[cssVarKey] || 'inherit';
+          if (existingByNameTypo[name]) {
+            typoRequests.push(fetch(`/ycode/api/color-variables/${existingByNameTypo[name]}`, {
+              method: 'PUT', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, value }),
+            }));
+          } else {
+            typoRequests.push(fetch('/ycode/api/color-variables', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, value }),
+            }));
+          }
+        });
+      });
+      await Promise.all(typoRequests);
 
       // Force Ycode's Style Panel to refresh its list without a page reload
       await loadColorVariables();
@@ -989,7 +1018,7 @@ export default function StudioThemeEditor() {
     const scale = generateColorScale(baseHex, prefix);
     if (!Object.keys(scale).length) return;
     setVariables(prev => ({ ...prev, ...scale }));
-    saveUpdates(scale);
+    // Canvas updates on Sync only — no saveUpdates here
   };
 
   const renderColorScaleSection = (title: string, prefix: string) => {
@@ -1329,40 +1358,13 @@ export default function StudioThemeEditor() {
             </div>
           </div>
           
-          <div className="mt-4 pt-4 border-t border-border flex gap-2">
+          <div className="mt-4 pt-4 border-t border-border">
             <button
               onClick={resetTypographyToDefaults}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
                 bg-background border border-border hover:bg-muted"
             >
               ↺ Reset to System Defaults
-            </button>
-            <button
-              onClick={syncTypographyToYcode}
-              disabled={typographySyncStatus === 'syncing'}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
-                bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {typographySyncStatus === 'syncing' && (
-                <svg
-                  className="animate-spin w-3 h-3" viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <circle
-                    className="opacity-25" cx="12"
-                    cy="12" r="10"
-                    stroke="currentColor" strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75" fill="currentColor"
-                    d="M4 12a8 8 0 018-8v8z"
-                  />
-                </svg>
-              )}
-              {typographySyncStatus === 'idle' && '⇄ Sync Typo → Ycode'}
-              {typographySyncStatus === 'syncing' && 'Syncing…'}
-              {typographySyncStatus === 'done' && '✓ Synced'}
-              {typographySyncStatus === 'error' && 'Failed'}
             </button>
           </div>
 
@@ -1377,39 +1379,6 @@ export default function StudioThemeEditor() {
 
       {renderAccordion('Colors', 'colors', (
         <>
-          {/* Sync button to push Studio tokens into Ycode's native color palette */}
-          <div className="mb-4 pb-4 border-b border-border">
-            <p className="text-[10px] text-muted-foreground mb-2 leading-snug">
-              Push Studio tokens to the Ycode palette so they appear as CSS variables in the Style Panel.
-            </p>
-            <button
-              onClick={syncToYcodePalette}
-              disabled={syncStatus === 'syncing'}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
-                bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {syncStatus === 'syncing' && (
-                <svg
-                  className="animate-spin w-3 h-3" viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <circle
-                    className="opacity-25" cx="12"
-                    cy="12" r="10"
-                    stroke="currentColor" strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75" fill="currentColor"
-                    d="M4 12a8 8 0 018-8v8z"
-                  />
-                </svg>
-              )}
-              {syncStatus === 'idle' && '⇄ Sync → Ycode Palette'}
-              {syncStatus === 'syncing' && 'Syncing…'}
-              {syncStatus === 'done' && '✓ Synced!'}
-              {syncStatus === 'error' && '✗ Error — check console'}
-            </button>
-          </div>
 
           {renderColorScaleSection('Primary', 'primary')}
 
@@ -1692,37 +1661,21 @@ export default function StudioThemeEditor() {
             })}
           </div>
 
-          {/* Cleanup stale spacing tokens from Ycode color-variables */}
-          <div className="pt-3 border-t border-border">
-            <p className="text-[10px] text-muted-foreground mb-2 leading-snug">
-              Purge les tokens spacing, typographie et Lumos de la palette Ycode (nettoyage unique).
+          {/* Cleanup stale tokens — one-time utility */}
+          <div className="pt-3 border-t border-border/50 flex items-center justify-between gap-3">
+            <p className="text-[10px] text-muted-foreground leading-snug">
+              Supprimer les anciens tokens spacing / typo de la palette Ycode.
             </p>
             <button
               onClick={syncSpacingToYcode}
               disabled={spaceSyncStatus === 'syncing'}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors
-                bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors
+                border border-border text-muted-foreground hover:text-destructive hover:border-destructive disabled:opacity-40"
             >
-              {spaceSyncStatus === 'syncing' && (
-                <svg
-                  className="animate-spin w-3 h-3" viewBox="0 0 24 24"
-                  fill="none"
-                >
-                  <circle
-                    className="opacity-25" cx="12"
-                    cy="12" r="10"
-                    stroke="currentColor" strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75" fill="currentColor"
-                    d="M4 12a8 8 0 018-8v8z"
-                  />
-                </svg>
-              )}
-              {spaceSyncStatus === 'idle'    && '🧹 Purger tokens non-couleur Ycode'}
-              {spaceSyncStatus === 'syncing' && 'Suppression…'}
-              {spaceSyncStatus === 'done'    && '✓ Palette nettoyée'}
-              {spaceSyncStatus === 'error'   && '✗ Erreur — voir console'}
+              {spaceSyncStatus === 'idle'    && '🧹 Purge'}
+              {spaceSyncStatus === 'syncing' && '…'}
+              {spaceSyncStatus === 'done'    && '✓ Ok'}
+              {spaceSyncStatus === 'error'   && '✗'}
             </button>
           </div>
         </>
@@ -1759,13 +1712,42 @@ export default function StudioThemeEditor() {
               <div className="flex items-center gap-4">
                 <h2 className="text-2xl font-bold">Studio Design</h2>
               </div>
-              <button 
-                onClick={(e) => { e.stopPropagation(); setIsStudioOpen(false); }}
-                className="relative z-[100000] cursor-pointer w-10 h-10 flex items-center justify-center hover:bg-muted rounded-full text-lg font-medium transition-colors border border-border"
-                title="Fermer le Design Studio"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={syncToYcodePalette}
+                  disabled={syncStatus === 'syncing'}
+                  className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors
+                    bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {syncStatus === 'syncing' && (
+                    <svg
+                      className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        className="opacity-25" cx="12"
+                        cy="12" r="10"
+                        stroke="currentColor" strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8v8z"
+                      />
+                    </svg>
+                  )}
+                  {syncStatus === 'idle'    && '⇄ Sync → Ycode'}
+                  {syncStatus === 'syncing' && 'Syncing…'}
+                  {syncStatus === 'done'    && '✓ Synced!'}
+                  {syncStatus === 'error'   && '✗ Erreur'}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setIsStudioOpen(false); }}
+                  className="relative z-[100000] cursor-pointer w-10 h-10 flex items-center justify-center hover:bg-muted rounded-full text-lg font-medium transition-colors border border-border"
+                  title="Fermer le Design Studio"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto px-6 pb-6 isolate">
               <div className="max-w-5xl mx-auto pt-6 overflow-visible">
