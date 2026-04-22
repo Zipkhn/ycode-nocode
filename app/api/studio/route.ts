@@ -81,6 +81,12 @@ export async function POST(request: Request) {
       }
     }
 
+    // Safety: never write a file where the STUDIO_CORE section has been corrupted
+    if (!css.includes('/* STUDIO_CORE_START */') || !css.includes('/* STUDIO_CORE_END */')) {
+      console.error('[Studio] Aborting write: STUDIO_CORE section missing after processing');
+      return NextResponse.json({ error: 'STUDIO_CORE integrity check failed — write aborted' }, { status: 500 });
+    }
+
     // Only write if content actually changed — prevents noisy git diffs on every page load
     const original = await fs.readFile(THEME_PATH, 'utf-8');
     if (css !== original) {

@@ -104,16 +104,16 @@
   --color--primary-100: #E0E6FF;
   --color--primary-50:  #F0F3FF;
 
-  --color--secondary-900: #1A2E6E;
-  --color--secondary-800: #2B47A8;
-  --color--secondary-700: #4060CC;
-  --color--secondary-600: #5878E8;
-  --color--secondary-500: #20327e;
-  --color--secondary-400: #9DB4FF;
-  --color--secondary-300: #B8C8FF;
-  --color--secondary-200: #D1DCFF;
-  --color--secondary-100: #E8EEFF;
-  --color--secondary-50:  #F5F7FF;
+  --color--secondary-900: #2b1b08;
+  --color--secondary-800: #5b370d;
+  --color--secondary-700: #8e5310;
+  --color--secondary-600: #c5700f;
+  --color--secondary-500: #f58c14;
+  --color--secondary-400: #eba14c;
+  --color--secondary-300: #e6b67e;
+  --color--secondary-200: #e7cbab;
+  --color--secondary-100: #eee1d3;
+  --color--secondary-50:  #faf8f5;
   
   --color--grey-900: #1A1A1A;
   --color--grey-800: #333333;
@@ -131,17 +131,17 @@
   --theme-light--background:    var(--color--primary-200);
   --theme-light--text-main:     var(--color--primary-900);
   --theme-light--text-heading:  var(--color--primary-500);
-  --theme-light--text-muted:    var(--color--grey-600);
-  --theme-light--border:        var(--color--grey-200);
-  --theme-light--accent:        var(--color--primary-500);
+  --theme-light--text-muted:    var(--color--primary-400);
+  --theme-light--border:        var(--color--secondary-300);
+  --theme-light--accent:        var(--color--secondary-500);
 
   /* --- 8. THEME BACKING VARS (Dark) --- */
   --theme-dark--background:     var(--color--primary-700);
   --theme-dark--text-main:      var(--color--primary-50);
-  --theme-dark--text-heading:   var(--color--primary-300);
-  --theme-dark--text-muted:     var(--color--grey-400);
-  --theme-dark--border:         var(--color--grey-800);
-  --theme-dark--accent:         var(--color--primary-400);
+  --theme-dark--text-heading:   var(--color--primary-500);
+  --theme-dark--text-muted:     var(--color--primary-200);
+  --theme-dark--border:         var(--color--secondary-300);
+  --theme-dark--accent:         var(--color--secondary-400);
 
   /* --- 9. THEME TOKENS — use these in your design --- */
   --theme-bg:           var(--theme-light--background);
@@ -785,6 +785,56 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* STUDIO_RUNTIME_BRIDGES_START */
 /* Studio Runtime Bridge v9.1 — breakpoint-aware, auto-generated */
 :root{--space-0:0px}
@@ -1200,12 +1250,62 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 .u-theme-dark {
   --42bd72cf-c7de-465c-9b31-4ef1e73a3c1c: #2B3799;
   --a6001289-4d66-4729-844a-799a44e5c696: #F0F3FF;
-  --8b6a513e-934d-4ac9-ba7f-d464b9129d13: #9DB4FF;
-  --51534e8a-9368-464d-ae08-5a19f2678e94: #999999;
-  --3c4ecd93-04e9-4032-824c-afcc5bef487f: #788BFF;
-  --84b41b3e-169f-48bb-b9cf-5c1629dd30b0: #333333;
+  --8b6a513e-934d-4ac9-ba7f-d464b9129d13: #5465FF;
+  --51534e8a-9368-464d-ae08-5a19f2678e94: #C4D0FF;
+  --3c4ecd93-04e9-4032-824c-afcc5bef487f: #eba14c;
+  --84b41b3e-169f-48bb-b9cf-5c1629dd30b0: #e6b67e;
 }
 /* STUDIO_RUNTIME_BRIDGES_END */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
