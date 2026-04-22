@@ -18,6 +18,7 @@ import zapierLogo from './zapier/logo.svg';
 import makeLogo from './make/logo.svg';
 import mapboxLogo from './mapbox/logo.png';
 import googleMapsEmbedLogo from './google-maps-embed/logo.png';
+import n8nLogo from './n8n/logo.svg';
 
 // =============================================================================
 // Types
@@ -79,6 +80,14 @@ export const apps: AppDefinition[] = [
     logo: mailchimpLogo,
     categories: ['popular', 'email'],
     implemented: false,
+  },
+  {
+    id: 'n8n',
+    name: 'n8n',
+    description: 'Send form submissions to n8n workflows via webhooks with optional authentication.',
+    logo: n8nLogo,
+    categories: ['popular', 'automation'],
+    implemented: true,
   },
   {
     id: 'zapier',

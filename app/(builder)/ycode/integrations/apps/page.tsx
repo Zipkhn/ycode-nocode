@@ -44,6 +44,7 @@ import { useSettingsStore } from '@/stores/useSettingsStore';
 import { MAILERLITE_SUBSCRIBER_FIELDS } from '@/lib/apps/mailerlite/types';
 import type { MailerLiteConnection, MailerLiteFieldMapping } from '@/lib/apps/mailerlite/types';
 import AirtableSettings from './airtable-settings';
+import N8NSettings from './n8n-settings';
 
 // =============================================================================
 // Types
@@ -340,6 +341,8 @@ export default function AppsPage() {
       loadGroupsAndForms();
     } else if (appId === 'airtable') {
       // AirtableSettings handles its own loading
+    } else if (appId === 'n8n') {
+      // N8NSettings handles its own loading
     } else if (TOKEN_APP_CONFIGS[appId]) {
       loadTokenApp(appId);
     }
@@ -1085,6 +1088,13 @@ export default function AppsPage() {
                   closeAppSettings();
                   router.push(path);
                 }}
+              />
+            )}
+
+            {selectedAppId === 'n8n' && (
+              <N8NSettings
+                onDisconnect={() => updateAppStatus('n8n', false)}
+                onConnectionChange={(connected) => updateAppStatus('n8n', connected)}
               />
             )}
 

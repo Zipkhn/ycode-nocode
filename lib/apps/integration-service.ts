@@ -12,6 +12,8 @@
 import { getAppSettingValue } from '@/lib/repositories/appSettingsRepository';
 import { processFormSubmission } from '@/lib/apps/mailerlite';
 import type { MailerLiteConnection } from '@/lib/apps/mailerlite/types';
+import { processN8NConnections } from '@/lib/apps/n8n';
+import type { N8NConnection } from '@/lib/apps/n8n/types';
 
 /**
  * Process a form submission through all configured app integrations.
@@ -23,9 +25,29 @@ export async function processAppIntegrations(
   payload: Record<string, unknown>
 ): Promise<void> {
   try {
-    await processMailerLiteIntegration(formId, payload);
+    await Promise.allSettled([
+      processMailerLiteIntegration(formId, payload),
+      processN8NIntegration(formId, submissionId, payload),
+    ]);
   } catch (error) {
     console.error('[processAppIntegrations] Unexpected error:', error);
+  }
+}
+
+/**
+ * Process form submission for N8N integration
+ */
+async function processN8NIntegration(
+  formId: string,
+  submissionId: string,
+  payload: Record<string, unknown>
+): Promise<void> {
+  try {
+    const connections = await getAppSettingValue<N8NConnection[]>('n8n', 'connections');
+    if (!connections || connections.length === 0) return;
+    await processN8NConnections(connections, formId, submissionId, payload);
+  } catch (error) {
+    console.error('[N8N] Integration error:', error);
   }
 }
 
