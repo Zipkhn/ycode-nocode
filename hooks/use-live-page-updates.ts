@@ -24,13 +24,9 @@ interface UseLivePageUpdatesReturn {
 }
 
 export function useLivePageUpdates(): UseLivePageUpdatesReturn {
-  const { user } = useAuthStore();
-  const {
-    loadPages,
-    addPage,
-    updatePage,
-    removePage
-  } = usePagesStore();
+  const user = useAuthStore((state) => state.user);
+  const addPage = usePagesStore((state) => state.addPage);
+  const removePage = usePagesStore((state) => state.removePage);
   const updateUser = useCollaborationPresenceStore((state) => state.updateUser);
   const currentUserId = useCollaborationPresenceStore((state) => state.currentUserId);
 

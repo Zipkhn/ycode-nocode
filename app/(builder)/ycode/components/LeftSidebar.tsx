@@ -22,6 +22,7 @@ import { resetBindingsAfterMove } from '@/lib/layer-utils';
 
 // 5.5 Hooks
 import { useEditorUrl } from '@/hooks/use-editor-url';
+
 import type { EditorTab } from '@/hooks/use-editor-url';
 import { useLayerLocks } from '@/hooks/use-layer-locks';
 
@@ -82,7 +83,9 @@ const LeftSidebar = React.memo(function LeftSidebar({
 
   const activeTab = storeSidebarTab || sidebarTab;
 
-  const componentDrafts = useComponentsStore((state) => state.componentDrafts);
+  const editingComponentDraft = useComponentsStore((state) =>
+    editingComponentId ? state.componentDrafts[editingComponentId] ?? null : null
+  );
   const getComponentById = useComponentsStore((state) => state.getComponentById);
   const updateComponentDraft = useComponentsStore((state) => state.updateComponentDraft);
 
@@ -142,13 +145,13 @@ const LeftSidebar = React.memo(function LeftSidebar({
   const layersForCurrentPage = useMemo(() => {
     // If editing a component, show component layers instead
     if (editingComponentId) {
-      return componentDrafts[editingComponentId] || [];
+      return editingComponentDraft || [];
     }
 
     // Otherwise show page layers
     if (!currentPageId) return [];
     return currentDraft ? currentDraft.layers : [];
-  }, [editingComponentId, componentDrafts, currentPageId, currentDraft]);
+  }, [editingComponentId, editingComponentDraft, currentPageId, currentDraft]);
 
   // Handle layer reordering from drag & drop
   const handleLayersReorder = useCallback((newLayers: Layer[], movedLayerId?: string) => {

@@ -120,6 +120,7 @@ const RightSidebar = React.memo(function RightSidebar({
   selectedLayerId,
   onLayerUpdate,
 }: RightSidebarProps) {
+
   const { openComponent, urlState, updateQueryParams } = useEditorActions();
   const { routeType } = useEditorUrl();
 
@@ -231,8 +232,9 @@ const RightSidebar = React.memo(function RightSidebar({
     return [];
   }, [editingComponentId, componentDrafts, currentPageId, currentDraft]);
 
-  // Cached layer index for O(1) lookups
-  const layerIndexes = useMemo(() => getLayerIndexes(allLayers), [allLayers]);
+  const layerIndexes = useMemo(() => {
+    return getLayerIndexes(allLayers);
+  }, [allLayers]);
 
   const selectedLayer: Layer | null = useMemo(() => {
     if (!selectedLayerId) return null;

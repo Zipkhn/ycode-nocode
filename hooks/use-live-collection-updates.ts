@@ -43,7 +43,7 @@ export interface UseLiveCollectionUpdatesReturn {
 }
 
 export function useLiveCollectionUpdates(): UseLiveCollectionUpdatesReturn {
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const updateUser = useCollaborationPresenceStore((state) => state.updateUser);
   const currentUserId = useCollaborationPresenceStore((state) => state.currentUserId);
 

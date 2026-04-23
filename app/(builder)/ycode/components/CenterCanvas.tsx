@@ -583,6 +583,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   liveLayerUpdates,
   liveComponentUpdates,
 }: CenterCanvasProps) {
+
   const [showAddBlockPanel, setShowAddBlockPanel] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -633,7 +634,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const returnToPageId = useEditorStore((state) => state.returnToPageId);
   const currentPageCollectionItemId = useEditorStore((state) => state.currentPageCollectionItemId);
   const setCurrentPageCollectionItemId = useEditorStore((state) => state.setCurrentPageCollectionItemId);
-  const hoveredLayerId = useEditorStore((state) => state.hoveredLayerId);
   const setHoveredLayerId = useEditorStore((state) => state.setHoveredLayerId);
   const isPreviewMode = useEditorStore((state) => state.isPreviewMode);
   const activeSidebarTab = useEditorStore((state) => state.activeSidebarTab);
@@ -712,9 +712,16 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const referencedItems = useCollectionLayerStore((state) => state.referencedItems);
   const fetchReferencedCollectionItems = useCollectionLayerStore((state) => state.fetchReferencedCollectionItems);
 
+  const mergedCollectionItems = useMemo(
+    () => ({ ...collectionItemsFromStore, ...referencedItems }),
+    [collectionItemsFromStore, referencedItems],
+  );
+
   const { urlState, navigateToLayers, navigateToPage, navigateToPageEdit, updateQueryParams } = useEditorUrl();
   const components = useComponentsStore((state) => state.components);
-  const componentDrafts = useComponentsStore((state) => state.componentDrafts);
+  const editingComponentDraft = useComponentsStore((state) =>
+    editingComponentId ? state.componentDrafts[editingComponentId] ?? null : null
+  );
   const [collectionItems, setCollectionItems] = useState<Array<{ id: string; label: string }>>([]);
   const [collectionItemSearch, setCollectionItemSearch] = useState('');
 
@@ -1100,7 +1107,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const layers = useMemo(() => {
     // If editing a component, show component layers
     if (editingComponentId) {
-      return componentDrafts[editingComponentId] || [];
+      return editingComponentDraft || [];
     }
 
     // Otherwise show page layers
@@ -1109,7 +1116,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
     }
 
     return currentDraft ? currentDraft.layers : [];
-  }, [editingComponentId, componentDrafts, currentPageId, currentDraft]);
+  }, [editingComponentId, editingComponentDraft, currentPageId, currentDraft]);
 
   // Check if we're waiting for a draft to load (page selected but no draft yet)
   const isDraftLoading = useMemo(() => {
@@ -1261,16 +1268,15 @@ const CenterCanvas = React.memo(function CenterCanvas({
     // Get layers from either component draft or page draft
     let layersToSearch: Layer[] = [];
     if (editingComponentId) {
-      layersToSearch = componentDrafts[editingComponentId] || [];
+      layersToSearch = editingComponentDraft || [];
     } else {
       layersToSearch = currentDraft ? currentDraft.layers : [];
     }
 
     if (!layersToSearch.length) return null;
 
-    // Find parent collection layer
     return findParentCollectionLayer(layersToSearch, editingLayerId);
-  }, [editingLayerId, editingComponentId, componentDrafts, currentPageId, currentDraft]);
+  }, [editingLayerId, editingComponentId, editingComponentDraft, currentPageId, currentDraft]);
 
   // Build field groups for the canvas text editor's inline variable selection
   // Components are page-agnostic, so exclude dynamic page-collection fields when editing a component
@@ -1278,14 +1284,14 @@ const CenterCanvas = React.memo(function CenterCanvas({
     if (!editingLayerId) return undefined;
     let layers: Layer[] = [];
     if (editingComponentId) {
-      layers = componentDrafts[editingComponentId] || [];
+      layers = editingComponentDraft || [];
     } else if (currentPageId) {
       layers = currentDraft ? currentDraft.layers : [];
     }
     if (!layers.length) return undefined;
     const page = editingComponentId ? null : currentPage;
     return buildFieldGroupsForLayer(editingLayerId, layers, page, collectionFieldsFromStore, collectionsFromStore);
-  }, [editingLayerId, editingComponentId, componentDrafts, currentPageId, currentDraft, currentPage, collectionFieldsFromStore, collectionsFromStore]);
+  }, [editingLayerId, editingComponentId, editingComponentDraft, currentPageId, currentDraft, currentPage, collectionFieldsFromStore, collectionsFromStore]);
 
   const textFieldGroups = useMemo(
     () => filterFieldGroupsByType(fieldGroups, SIMPLE_TEXT_FIELD_TYPES),
@@ -1370,13 +1376,13 @@ const CenterCanvas = React.memo(function CenterCanvas({
 
   const handleCanvasLayerUpdate = useCallback((layerId: string, updates: Partial<Layer>) => {
     if (editingComponentId) {
-      const { updateComponentDraft } = useComponentsStore.getState();
-      const currentDraft = componentDrafts[editingComponentId] || [];
-      updateComponentDraft(editingComponentId, updateLayerProps(currentDraft, layerId, updates));
+      const { componentDrafts, updateComponentDraft } = useComponentsStore.getState();
+      const draft = componentDrafts[editingComponentId] || [];
+      updateComponentDraft(editingComponentId, updateLayerProps(draft, layerId, updates));
     } else if (currentPageId) {
       updateLayer(currentPageId, layerId, updates);
     }
-  }, [editingComponentId, componentDrafts, currentPageId, updateLayer]);
+  }, [editingComponentId, currentPageId, updateLayer]);
 
   const handleCanvasDeleteLayer = useCallback(() => {
     if (!selectedLayerId || !currentPageId) return;
@@ -1447,14 +1453,14 @@ const CenterCanvas = React.memo(function CenterCanvas({
     if (!richTextSheetLayerId || !currentPageId) return undefined;
     let layers: Layer[] = [];
     if (editingComponentId) {
-      layers = componentDrafts[editingComponentId] || [];
+      layers = editingComponentDraft || [];
     } else {
       layers = currentDraft ? currentDraft.layers : [];
     }
     if (!layers.length) return undefined;
     const page = editingComponentId ? null : currentPage;
     return buildFieldGroupsForLayer(richTextSheetLayerId, layers, page, collectionFieldsFromStore, collectionsFromStore);
-  }, [richTextSheetLayerId, editingComponentId, componentDrafts, currentPageId, currentDraft, currentPage, collectionFieldsFromStore, collectionsFromStore]);
+  }, [richTextSheetLayerId, editingComponentId, editingComponentDraft, currentPageId, currentDraft, currentPage, collectionFieldsFromStore, collectionsFromStore]);
 
   // Track the current value locally so the value prop always matches the editor's
   // internal state. This prevents the editor's sync effect from resetting content
@@ -1466,9 +1472,10 @@ const CenterCanvas = React.memo(function CenterCanvas({
       setRichTextSheetValue(null);
       return;
     }
-    const source = editingComponentId
-      ? componentDrafts[editingComponentId]
-      : currentDraft?.layers ?? null;
+    const compId = useEditorStore.getState().editingComponentId;
+    const source = compId
+      ? useComponentsStore.getState().componentDrafts[compId]
+      : usePagesStore.getState().draftsByPageId[currentPageId ?? '']?.layers ?? null;
     const layer = source ? findLayerById(source as Layer[], richTextSheetLayerId) : null;
     setRichTextSheetValue(getRichTextValue(layer?.variables));
   // Only re-derive when the sheet target layer changes, not on every draft update
@@ -1628,14 +1635,13 @@ const CenterCanvas = React.memo(function CenterCanvas({
     // Get layers from either component draft or page draft
     let layersToSearch: Layer[] = [];
     if (editingComponentId) {
-      layersToSearch = componentDrafts[editingComponentId] || [];
+      layersToSearch = editingComponentDraft || [];
     } else {
       layersToSearch = currentDraft ? currentDraft.layers : [];
     }
 
     if (!layersToSearch.length) return null;
 
-    // Recursive function to find parent of a layer
     const findParentId = (layers: Layer[], targetId: string, parentId: string | null = null): string | null | undefined => {
       for (const layer of layers) {
         if (layer.id === targetId) {
@@ -1648,18 +1654,17 @@ const CenterCanvas = React.memo(function CenterCanvas({
           }
         }
       }
-      return undefined; // Not found in this branch
+      return undefined;
     };
 
     const result = findParentId(layersToSearch, selectedLayerId);
     if (result === undefined) return null;
 
-    // Hide parent outline for slide layers (parent is just the slides wrapper)
     const selectedLayer = findLayerById(layersToSearch, selectedLayerId);
     if (selectedLayer?.name === 'slide') return null;
 
     return result;
-  }, [selectedLayerId, currentPageId, editingComponentId, componentDrafts, currentDraft]);
+  }, [selectedLayerId, currentPageId, editingComponentId, editingComponentDraft, currentDraft]);
 
   // Get selected layer name for drag preview
   const selectedLayerName = useMemo(() => {
@@ -2086,7 +2091,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
             let layersToSearch: Layer[] = [];
             if (editingLayerId) {
               if (editingComponentId) {
-                layersToSearch = componentDrafts[editingComponentId] || [];
+                layersToSearch = editingComponentDraft || [];
               } else if (currentPageId) {
                 layersToSearch = currentDraft ? currentDraft.layers : [];
               }
@@ -2311,7 +2316,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
             iframeElement={canvasIframeElement}
             containerElement={scrollContainerRef.current}
             selectedLayerId={selectedLayerId}
-            hoveredLayerId={hoveredLayerId}
             parentLayerId={parentLayerId}
             zoom={zoom}
             activeSublayerIndex={activeSublayerIndex}
@@ -2405,11 +2409,11 @@ const CenterCanvas = React.memo(function CenterCanvas({
                         layers={layers}
                         components={components}
                         selectedLayerId={selectedLayerId}
-                        hoveredLayerId={hoveredLayerId}
+                        hoveredLayerId={null}
                         breakpoint={viewportMode}
                         activeUIState={activeUIState}
                         editingComponentId={editingComponentId || null}
-                        collectionItems={{ ...collectionItemsFromStore, ...referencedItems }}
+                        collectionItems={mergedCollectionItems}
                         collectionFields={collectionFieldsFromStore}
                         pageCollectionItem={pageCollectionItem}
                         pageCollectionFields={pageCollectionFields}

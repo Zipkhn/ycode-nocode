@@ -28,6 +28,7 @@ import { useEditorStore } from '@/stores/useEditorStore';
 import { useLayerStylesStore } from '@/stores/useLayerStylesStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
+
 import { usePagesStore } from '@/stores/usePagesStore';
 import { useCollaborationPresenceStore, getResourceLockKey, RESOURCE_TYPES } from '@/stores/useCollaborationPresenceStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -177,7 +178,7 @@ const LayerRow = React.memo(function LayerRow({
   onRenameConfirm,
   onToggleVisibility,
 }: LayerRowProps) {
-  const getStyleById = useLayerStylesStore((state) => state.getStyleById);
+  // const getStyleById = useLayerStylesStore((state) => state.getStyleById);
   const getComponentById = useComponentsStore((state) => state.getComponentById);
   const collections = useCollectionsStore((state) => state.collections);
   const fieldsByCollectionId = useCollectionsStore((state) => state.fields);
@@ -189,9 +190,9 @@ const LayerRow = React.memo(function LayerRow({
   const interactionTargetLayerIds = useEditorStore((state) => state.interactionTargetLayerIds);
   const activeInteractionTriggerLayerId = useEditorStore((state) => state.activeInteractionTriggerLayerId);
   const activeInteractionTargetLayerIds = useEditorStore((state) => state.activeInteractionTargetLayerIds);
-  const setHoveredLayerId = useEditorStore((state) => state.setHoveredLayerId);
   const activeUIState = useEditorStore((state) => state.activeUIState);
   const isStateActive = activeUIState !== 'neutral';
+
   const { setNodeRef: setDropRef } = useDroppable({
     id: node.id,
   });
@@ -445,14 +446,6 @@ const LayerRow = React.memo(function LayerRow({
             !isDragActive && ''
           )}
           style={{ paddingLeft: `${node.depth * 14 + 8}px` }}
-          onMouseEnter={() => {
-            if (!isDragging) {
-              setHoveredLayerId(node.id);
-            }
-          }}
-          onMouseLeave={() => {
-            setHoveredLayerId(null);
-          }}
           onClick={(e) => {
             if (isRenaming) return;
             // Block click if layer is locked by another user
@@ -767,6 +760,7 @@ export default function LayersTree({
   liveLayerUpdates,
   liveComponentUpdates,
 }: LayersTreeProps) {
+
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'above' | 'below' | 'inside' | null>(null);
@@ -776,13 +770,21 @@ export default function LayersTree({
   const [shouldScrollToSelected, setShouldScrollToSelected] = useState(false);
 
   // Pull multi-select state and breakpoint from editor store
-  const { selectedLayerIds: storeSelectedLayerIds, lastSelectedLayerId, toggleSelection, selectRange, editingComponentId, activeBreakpoint, activeSublayerIndex: storeActiveSublayerIndex, activeTextStyleKey: storeActiveTextStyleKey, activeListItemIndex: storeActiveListItemIndex } = useEditorStore();
+  const storeSelectedLayerIds = useEditorStore((s) => s.selectedLayerIds);
+  const lastSelectedLayerId = useEditorStore((s) => s.lastSelectedLayerId);
+  const toggleSelection = useEditorStore((s) => s.toggleSelection);
+  const selectRange = useEditorStore((s) => s.selectRange);
+  const editingComponentId = useEditorStore((s) => s.editingComponentId);
+  const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
+  const storeActiveSublayerIndex = useEditorStore((s) => s.activeSublayerIndex);
+  const storeActiveTextStyleKey = useEditorStore((s) => s.activeTextStyleKey);
+  const storeActiveListItemIndex = useEditorStore((s) => s.activeListItemIndex);
 
-  // Get component by ID function for drag overlay
-  const { getComponentById } = useComponentsStore();
+  const getComponentById = useComponentsStore((s) => s.getComponentById);
 
-  // Get collections and fields from store
-  const { collections, fields: fieldsByCollectionId, items: collectionItems } = useCollectionsStore();
+  const collections = useCollectionsStore((s) => s.collections);
+  const fieldsByCollectionId = useCollectionsStore((s) => s.fields);
+  const collectionItems = useCollectionsStore((s) => s.items);
 
   // CMS data for resolving rich text sublayers from actual CMS item content
   const currentPageCollectionItemId = useEditorStore((state) => state.currentPageCollectionItemId);
@@ -1256,8 +1258,38 @@ export default function LayersTree({
     return () => clearTimeout(timeout);
   }, [shouldScrollToSelected, selectedLayerId, flattenedNodes, virtualizer]);
 
-  // Pull hover state management from editor store
-  const { setHoveredLayerId: setHoveredLayerIdFromStore } = useEditorStore();
+  const setHoveredLayerIdFromStore = useEditorStore((s) => s.setHoveredLayerId);
+
+  // Hover delegation via passive native listener — zero cost during mouseover
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
+    let hoverId: string | null = null;
+
+    const onOver = (e: MouseEvent) => {
+      const row = (e.target as HTMLElement).closest<HTMLElement>('[data-layer-id]');
+      const id = row?.dataset.layerId ?? null;
+      if (id !== hoverId) {
+        hoverId = id;
+        setHoveredLayerIdFromStore(id);
+      }
+    };
+
+    const onLeave = () => {
+      if (hoverId !== null) {
+        hoverId = null;
+        setHoveredLayerIdFromStore(null);
+      }
+    };
+
+    el.addEventListener('mouseover', onOver, { passive: true });
+    el.addEventListener('mouseleave', onLeave, { passive: true });
+    return () => {
+      el.removeEventListener('mouseover', onOver);
+      el.removeEventListener('mouseleave', onLeave);
+    };
+  }, [setHoveredLayerIdFromStore]);
 
   // Handle drag start
   const handleDragStart = useCallback((event: DragStartEvent) => {

@@ -4,9 +4,8 @@
 
 import { Layer, FieldVariable, CollectionVariable, CollectionItemWithValues, CollectionField, Component, ComponentVariable, Breakpoint, LayerVariables, DesignColorVariable, BoundColorStop } from '@/types';
 import { generateId } from '@/lib/utils';
-import { iconExists, IconProps } from '@/components/ui/icon';
+import { IconProps } from '@/components/ui/icon';
 import { getBlockIcon, getBlockName } from '@/lib/templates/blocks';
-import { isSliderLayerName } from '@/lib/templates/utilities';
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
 import { DEFAULT_TEXT_STYLES } from '@/lib/text-format-utils';
 import { getCmsFieldBinding } from '@/lib/tiptap-utils';
@@ -2406,15 +2405,12 @@ export function serializeLayers(
   components: Component[] = [],
   editingComponentVariables?: ComponentVariable[],
 ): { layers: Layer[]; componentMap: Record<string, string> } {
-  // First build the component map (before resolving)
   const componentMap = buildComponentMap(layers);
-
-  // Then resolve component instances
   const resolvedLayers = resolveComponentsInLayers(layers, components, editingComponentVariables);
+  const cloned = JSON.parse(JSON.stringify(resolvedLayers));
 
-  // Deep clone to avoid mutations
   return {
-    layers: JSON.parse(JSON.stringify(resolvedLayers)),
+    layers: cloned,
     componentMap,
   };
 }

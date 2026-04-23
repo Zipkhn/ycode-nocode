@@ -269,8 +269,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
 
   setSelectedLayerId: (id) => {
-    // Legacy support - also update selectedLayerIds
-    // Clear active text style and sublayer when changing layers
     set({
       selectedLayerId: id,
       selectedLayerIds: id ? [id] : [],
@@ -285,7 +283,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     if (typeof window !== 'undefined') {
       const pathname = window.location.pathname;
       const isLayerRoute = /^\/ycode\/(layers|pages|components)\//.test(pathname);
-      
+
       if (isLayerRoute) {
         updateUrlQueryParam('layer', id || null);
       }

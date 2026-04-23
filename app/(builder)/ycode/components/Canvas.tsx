@@ -248,7 +248,7 @@ function CanvasContent({
  * Canvas Component
  * Uses an embedded iframe with Tailwind Browser CDN for style generation
  */
-export default function Canvas({
+const Canvas = React.memo(function Canvas({
   layers,
   components,
   selectedLayerId,
@@ -287,6 +287,7 @@ export default function Canvas({
   zoom = 100,
   referenceViewportHeight,
 }: CanvasProps) {
+
   // Refs
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const rootRef = useRef<Root | null>(null);
@@ -537,8 +538,7 @@ export default function Canvas({
                              target.tagName === 'TEXTAREA' ||
                              target.isContentEditable;
 
-      // Delete/Backspace for layer deletion
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedLayerId && !isInputFocused) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && useEditorStore.getState().selectedLayerId && !isInputFocused) {
         e.preventDefault();
         onDeleteLayer?.();
         return;
@@ -623,7 +623,7 @@ export default function Canvas({
 
     doc.addEventListener('keydown', handleKeyDown);
     return () => doc.removeEventListener('keydown', handleKeyDown);
-  }, [iframeReady, selectedLayerId, onDeleteLayer, onResetZoom, onZoomIn, onZoomOut, onZoomToFit, onAutofit, onUndo, onRedo]);
+  }, [iframeReady, onDeleteLayer, onResetZoom, onZoomIn, onZoomOut, onZoomToFit, onAutofit, onUndo, onRedo]);
 
   // Handle any click inside the iframe (capture phase to run before stopPropagation)
   useEffect(() => {
@@ -795,4 +795,13 @@ export default function Canvas({
       tabIndex={-1}
     />
   );
-}
+}, (prev, next) => {
+  const keys = Object.keys(next) as Array<keyof CanvasProps>;
+  for (const key of keys) {
+    if (key === 'selectedLayerId' || key === 'hoveredLayerId') continue;
+    if (prev[key] !== next[key]) return false;
+  }
+  return true;
+});
+
+export default Canvas;

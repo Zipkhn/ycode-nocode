@@ -276,9 +276,28 @@ async function restoreInlinedComponents(
 }
 
 export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: ElementLibraryProps) {
-  const { addLayerFromTemplate, updateLayer, setDraftLayers, draftsByPageId, pages } = usePagesStore();
-  const { currentPageId, selectedLayerId, setSelectedLayerId, editingComponentId, activeBreakpoint, pushComponentNavigation, startCanvasDrag, endCanvasDrag } = useEditorStore();
-  const { components, componentDrafts, updateComponentDraft, deleteComponent, getDeletePreview, loadComponentDraft, getComponentById, loadComponents } = useComponentsStore();
+
+  const addLayerFromTemplate = usePagesStore((s) => s.addLayerFromTemplate);
+  const updateLayer = usePagesStore((s) => s.updateLayer);
+  const setDraftLayers = usePagesStore((s) => s.setDraftLayers);
+  const pages = usePagesStore((s) => s.pages);
+
+  const currentPageId = useEditorStore((s) => s.currentPageId);
+  const selectedLayerId = useEditorStore((s) => s.selectedLayerId);
+  const setSelectedLayerId = useEditorStore((s) => s.setSelectedLayerId);
+  const editingComponentId = useEditorStore((s) => s.editingComponentId);
+  const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
+  const pushComponentNavigation = useEditorStore((s) => s.pushComponentNavigation);
+  const startCanvasDrag = useEditorStore((s) => s.startCanvasDrag);
+  const endCanvasDrag = useEditorStore((s) => s.endCanvasDrag);
+
+  const components = useComponentsStore((s) => s.components);
+  const updateComponentDraft = useComponentsStore((s) => s.updateComponentDraft);
+  const deleteComponent = useComponentsStore((s) => s.deleteComponent);
+  const getDeletePreview = useComponentsStore((s) => s.getDeletePreview);
+  const loadComponentDraft = useComponentsStore((s) => s.loadComponentDraft);
+  const getComponentById = useComponentsStore((s) => s.getComponentById);
+  const loadComponents = useComponentsStore((s) => s.loadComponents);
   const { openComponent } = useEditorActions();
 
   // Delete component state
@@ -396,10 +415,9 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   const handleAddElement = (elementType: string) => {
     // If editing component, use component draft instead
     if (editingComponentId) {
-      const layers = componentDrafts[editingComponentId] || [];
+      const layers = useComponentsStore.getState().componentDrafts[editingComponentId] || [];
       const parentId = selectedLayerId || layers[0]?.id || 'body';
 
-      // Create new layer from template
       const template = getLayerFromTemplate(elementType);
       const displayName = getBlockName(elementType);
 
@@ -657,9 +675,8 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   };
 
   const handleAddLayout = async (layoutKey: string) => {
-    // If editing component, use component draft instead
     if (editingComponentId) {
-      const layers = componentDrafts[editingComponentId] || [];
+      const layers = useComponentsStore.getState().componentDrafts[editingComponentId] || [];
 
       // Get layout template first (we need it to check if it's a section)
       const layoutTemplate = getLayoutTemplate(layoutKey);
@@ -1183,7 +1200,7 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
         return;
       }
 
-      const layers = componentDrafts[editingComponentId] || [];
+      const layers = useComponentsStore.getState().componentDrafts[editingComponentId] || [];
       const parentId = selectedLayerId || layers[0]?.id;
       if (!parentId) return;
 

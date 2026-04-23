@@ -96,6 +96,7 @@ interface YCodeBuilderProps {
 }
 
 export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCodeBuilderProps) {
+
   const router = useRouter();
   const { routeType, resourceId, sidebarTab, navigateToLayers, navigateToCollection, navigateToCollections, navigateToComponent, urlState, updateQueryParams } = useEditorUrl();
 

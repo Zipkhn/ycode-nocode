@@ -20,8 +20,6 @@ interface SelectionOverlayProps {
   containerElement: HTMLElement | null;
   /** Currently selected layer ID */
   selectedLayerId: string | null;
-  /** Currently hovered layer ID */
-  hoveredLayerId: string | null;
   /** Parent layer ID (one level up from selected) */
   parentLayerId: string | null;
   /** Current zoom level (percentage) */
@@ -36,12 +34,12 @@ export function SelectionOverlay({
   iframeElement,
   containerElement,
   selectedLayerId,
-  hoveredLayerId,
   parentLayerId,
   zoom,
   activeSublayerIndex,
   activeListItemIndex,
 }: SelectionOverlayProps) {
+  const hoveredLayerId = useEditorStore((state) => state.hoveredLayerId);
   const activeUIState = useEditorStore((state) => state.activeUIState);
   const isStateActive = activeUIState !== 'neutral';
 

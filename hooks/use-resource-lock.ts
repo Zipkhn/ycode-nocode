@@ -32,7 +32,7 @@ export function useResourceLock({
   resourceType,
   channelName,
 }: UseResourceLockOptions): UseResourceLockReturn {
-  const { user } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
   const currentUserId = useCollaborationPresenceStore((state) => state.currentUserId);
   const currentUserColor = useCollaborationPresenceStore((state) => state.currentUserColor);
   const storeAcquireLock = useCollaborationPresenceStore((state) => state.acquireResourceLock);

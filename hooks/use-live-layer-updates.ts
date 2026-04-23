@@ -37,8 +37,7 @@ export interface UseLiveLayerUpdatesReturn {
 export function useLiveLayerUpdates(
   pageId: string | null
 ): UseLiveLayerUpdatesReturn {
-  const { user } = useAuthStore();
-  const { updateLayer, draftsByPageId } = usePagesStore();
+  const user = useAuthStore((state) => state.user);
   const updateUser = useCollaborationPresenceStore((state) => state.updateUser);
   const currentUserId = useCollaborationPresenceStore((state) => state.currentUserId);
 

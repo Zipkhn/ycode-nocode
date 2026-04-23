@@ -107,9 +107,11 @@ export const useRealtimeCursors = ({
   const channelRef = useRef<RealtimeChannel | null>(null)
     
   // Get collaboration state
-  const { updateUser, setConnectionStatus, setCurrentUser } = useCollaborationPresenceStore()
-  const { user } = useAuthStore()
-  const { selectedLayerId } = useEditorStore()
+  const updateUser = useCollaborationPresenceStore((s) => s.updateUser);
+  const setConnectionStatus = useCollaborationPresenceStore((s) => s.setConnectionStatus);
+  const setCurrentUser = useCollaborationPresenceStore((s) => s.setCurrentUser);
+  const user = useAuthStore((s) => s.user);
+  const selectedLayerId = useEditorStore((s) => s.selectedLayerId);
   
   // Ref to avoid stale closures and prevent channel reinitialization on user object reference changes
   const userRef = useRef(user)
