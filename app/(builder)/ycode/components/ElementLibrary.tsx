@@ -277,7 +277,7 @@ async function restoreInlinedComponents(
 
 export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: ElementLibraryProps) {
   const { addLayerFromTemplate, updateLayer, setDraftLayers, draftsByPageId, pages } = usePagesStore();
-  const { currentPageId, selectedLayerId, setSelectedLayerId, editingComponentId, activeBreakpoint, pushComponentNavigation, startCanvasDrag, endCanvasDrag } = useEditorStore();
+  const { currentPageId, selectedLayerId, setSelectedLayerId, editingComponentId, activeBreakpoint, pushComponentNavigation, startCanvasDrag, endCanvasDrag, cleanSlate, setCleanSlate } = useEditorStore();
   const { components, componentDrafts, updateComponentDraft, deleteComponent, getDeletePreview, loadComponentDraft, getComponentById, loadComponents } = useComponentsStore();
   const { openComponent } = useEditorActions();
 
@@ -1410,6 +1410,22 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
                 <TabsTrigger value="layouts">Layouts</TabsTrigger>
                 <TabsTrigger value="components">Components</TabsTrigger>
               </TabsList>
+            </div>
+
+            <div className="px-4 pb-0">
+              <button
+                onClick={() => setCleanSlate(!cleanSlate)}
+                className={cn(
+                  'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors',
+                  cleanSlate
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-muted-foreground hover:bg-muted'
+                )}
+                title="Clean Slate: add elements without default sizing and spacing classes"
+              >
+                <span className={cn('size-2 rounded-full shrink-0', cleanSlate ? 'bg-primary' : 'bg-muted-foreground/40')} />
+                Clean Slate
+              </button>
             </div>
 
             <hr className="mt-2 mb-0 mx-4 shrink-0" />

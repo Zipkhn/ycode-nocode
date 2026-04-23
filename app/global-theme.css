@@ -24,7 +24,7 @@
   );
 
   /* --- 3. TYPO SIZES (REM) --- */
-  --_typography---font-size--display-min: 5;    --_typography---font-size--display-max: 12;
+  --_typography---font-size--display-min: 5;    --_typography---font-size--display-max: 7;
   --_typography---font-size--h1-min: 2;         --_typography---font-size--h1-max: 5.7;
   --_typography---font-size--h2-min: 1.75;      --_typography---font-size--h2-max: 4.4;
   --_typography---font-size--h3-min: 1.5;       --_typography---font-size--h3-max: 2.5;
@@ -54,14 +54,14 @@
 
   --font-smoothing: antialiased;
 
-  --display-font-weight: 400; --display-line-height: 1.2; --display-letter-spacing: -0.02em; --display-margin-bottom: 0rem;
+  --display-font-weight: 600; --display-line-height: 1.2; --display-letter-spacing: -0.02em; --display-margin-bottom: 0rem;
   --h1-font-weight: 600; --h1-line-height: 1.2; --h1-letter-spacing: -0.02em; --h1-margin-bottom: 0rem;
   --h2-font-weight: 700; --h2-line-height: 1.2; --h2-letter-spacing: -0.02em; --h2-margin-bottom: 0rem;
   --h3-font-weight: 600; --h3-line-height: 1.3; --h3-letter-spacing: 0em; --h3-margin-bottom: 0rem;
   --h4-font-weight: 600; --h4-line-height: 1.4; --h4-letter-spacing: 0em; --h4-margin-bottom: 0rem;
   --h5-font-weight: 500; --h5-line-height: 1.4; --h5-letter-spacing: 0em; --h5-margin-bottom: 0rem;
   --h6-font-weight: 500; --h6-line-height: 1.5; --h6-letter-spacing: 0em; --h6-margin-bottom: 0rem;
-  --large-font-weight: 600; --large-line-height: 1.5; --large-letter-spacing: 0em; --large-margin-bottom: 0rem;
+  --large-font-weight: 500; --large-line-height: 1.5; --large-letter-spacing: 0em; --large-margin-bottom: 0rem;
   --body-font-weight: 400; --body-line-height: 1.5; --body-letter-spacing: 0em; --body-margin-bottom: 0rem;
   --small-font-weight: 400; --small-line-height: 1.5; --small-letter-spacing: 0em; --small-margin-bottom: 0rem;
 
@@ -837,6 +837,22 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /* STUDIO_RUNTIME_BRIDGES_START */
 /* Studio Runtime Bridge v9.1 — breakpoint-aware, auto-generated */
 :root{--space-0:0px}
@@ -1237,14 +1253,14 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 
 /* Studio Runtime Typography Bridge v9.0 */
 :where(body) { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-:where(body) .u-text-display{font-weight:400!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
+:where(body) .u-text-display{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
 :where(body) h1{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
 :where(body) h2{font-weight:700!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
 :where(body) h3{font-weight:600!important;line-height:1.3!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 :where(body) h4{font-weight:600!important;line-height:1.4!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 :where(body) h5{font-weight:500!important;line-height:1.4!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 :where(body) h6{font-weight:500!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
-:where(body) .u-text-large{font-weight:600!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
+:where(body) .u-text-large{font-weight:500!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 :where(body) p{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 :where(body) .u-text-small{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 
@@ -1258,6 +1274,22 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   --84b41b3e-169f-48bb-b9cf-5c1629dd30b0: #e6b67e;
 }
 /* STUDIO_RUNTIME_BRIDGES_END */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

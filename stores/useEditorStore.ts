@@ -85,6 +85,8 @@ interface EditorActions {
   setKeyboardShortcutsOpen: (open: boolean) => void;
   openCreateComponentDialog: (layerId: string, defaultName: string) => void;
   closeCreateComponentDialog: () => void;
+  cleanSlate: boolean;
+  setCleanSlate: (value: boolean) => void;
   // Canvas drag-and-drop actions (pointer-based)
   startCanvasDrag: (elementType: string, source: 'elements' | 'layouts' | 'components', elementName: string, initialPosition: DragPosition) => void;
   updateDragPosition: (position: DragPosition) => void;
@@ -223,6 +225,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     category: null,
   },
   keyboardShortcutsOpen: false,
+  cleanSlate: typeof window !== 'undefined' && localStorage.getItem('ycode_clean_slate') === 'true',
+  setCleanSlate: (value) => {
+    if (typeof window !== 'undefined') localStorage.setItem('ycode_clean_slate', String(value));
+    set({ cleanSlate: value });
+  },
   createComponentDialog: {
     open: false,
     layerId: null,

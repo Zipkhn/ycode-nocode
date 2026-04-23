@@ -25,6 +25,7 @@ import { getDescendantFolderIds, isHomepage, findHomepage, findNextSelection } f
 import { updateLayersWithStyle, detachStyleFromLayers } from '../lib/layer-style-utils';
 import { updateLayersWithComponent, detachComponentFromLayers } from '../lib/component-utils';
 import { useComponentsStore, triggerThumbnailGeneration } from './useComponentsStore';
+import { useEditorStore } from './useEditorStore';
 
 interface PagesState {
   pages: Page[];
@@ -675,6 +676,25 @@ export const usePagesStore = create<PagesStore>((set, get) => ({
     if (idMappings.size > 0) {
       newLayer = updateForAttributes(newLayer);
     }
+
+    // Clean Slate: strip opinionated sizing/spacing/typography defaults
+    if (useEditorStore.getState().cleanSlate) {
+      const CLEAN_SLATE: Record<string, { classes: string[]; designKeys?: string[] }> = {
+        container: { classes: ['max-w-[1280px]', 'w-[100%]', 'pl-[32px]', 'pr-[32px]'], designKeys: ['sizing', 'spacing'] },
+        heading:   { classes: ['text-[48px]', 'font-[700]', 'leading-[1.1]', 'tracking-[-0.01em]'], designKeys: ['typography'] },
+      };
+      const strip = CLEAN_SLATE[templateId];
+      if (strip) {
+        const classes = typeof newLayer.classes === 'string'
+          ? newLayer.classes.split(' ').filter(c => !strip.classes.includes(c)).join(' ')
+          : newLayer.classes;
+        const design = strip.designKeys && newLayer.design
+          ? Object.fromEntries(Object.entries(newLayer.design).filter(([k]) => !strip.designKeys!.includes(k)))
+          : newLayer.design;
+        newLayer = { ...newLayer, classes, design };
+      }
+    }
+
     const newLayerId = newLayer.id;
 
     // Detect if we're adding a Section layer
