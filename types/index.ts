@@ -36,6 +36,7 @@ export interface TypographyDesign {
   textAlign?: string;
   textTransform?: string;
   textDecoration?: string;
+  lineClamp?: string;
   textDecorationColor?: string;
   textDecorationThickness?: string;
   underlineOffset?: string;
@@ -68,6 +69,7 @@ export interface SizingDesign {
   minHeight?: string;
   maxWidth?: string;
   maxHeight?: string;
+  overflow?: string;
   aspectRatio?: string | null;
   objectFit?: string | null;
   gridColumnSpan?: string | null;
@@ -305,9 +307,9 @@ export interface InteractionTween {
 
 export type ApplyStyles = 'on-load' | 'on-trigger';
 
-export type TweenPropertyKey = 'x' | 'y' | 'rotation' | 'scale' | 'skewX' | 'skewY' | 'autoAlpha' | 'display';
+export type TweenPropertyKey = 'x' | 'y' | 'rotation' | 'scale' | 'skewX' | 'skewY' | 'autoAlpha' | 'display' | 'height';
 
-export type InteractionApplyStyles = Record<TweenPropertyKey, ApplyStyles>;
+export type InteractionApplyStyles = Partial<Record<TweenPropertyKey, ApplyStyles>>;
 
 export type TweenProperties = {
   [K in TweenPropertyKey]?: string | null;
@@ -407,6 +409,8 @@ export interface Layer {
   _layerDataMap?: Record<string, Record<string, string>>;
   // SSR-only property for master component ID (for translation lookups)
   _masterComponentId?: string;
+  // SSR-only property for original layer ID before instance-specific ID transform (for translation lookups)
+  _originalLayerId?: string;
   // SSR-only property for pagination metadata (when pagination is enabled)
   _paginationMeta?: CollectionPaginationMeta;
   // SSR-only property for dynamic inline styles from CMS color field bindings
@@ -425,6 +429,7 @@ export interface Layer {
     layerTemplate: Layer[];
     collectionLayerClasses?: string[];
     collectionLayerTag?: string;
+    isPublished?: boolean;
   };
 }
 

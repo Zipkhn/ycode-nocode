@@ -116,6 +116,18 @@ interface RightSidebarProps {
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
 }
 
+/**
+ * Recursively remove heading/text descendants from a layer subtree.
+ * Used when binding a slide to a multi-image field — the assets are typically
+ * the focus, so any leftover text/heading scaffolding is auto-pruned.
+ */
+function pruneTextDescendants(children: Layer[] | undefined): Layer[] {
+  if (!children?.length) return [];
+  return children
+    .filter(c => !isTextContentLayer(c))
+    .map(c => (c.children?.length ? { ...c, children: pruneTextDescendants(c.children) } : c));
+}
+
 const RightSidebar = React.memo(function RightSidebar({
   selectedLayerId,
   onLayerUpdate,
@@ -479,7 +491,10 @@ const RightSidebar = React.memo(function RightSidebar({
       case 'borders':
         // Border controls: hide for pure text elements (show for buttons and containers)
         // Show in text edit mode for block elements that need border styling (Separator, Image)
-        if (showTextStyleControls) return activeTextStyleKey === 'horizontalRule' || activeTextStyleKey === 'richTextImage';
+        if (showTextStyleControls) {
+          const borderStyleKeys = ['horizontalRule', 'richTextImage', 'table', 'tableHeader', 'tableCell', 'tableRow'];
+          return !!activeTextStyleKey && borderStyleKeys.includes(activeTextStyleKey);
+        }
         return !isTextLayer(layer) || isButtonLayer(layer);
 
       case 'effects':
@@ -1007,7 +1022,7 @@ const RightSidebar = React.memo(function RightSidebar({
       const selectedField = parentCollectionFields.find(f => f.id === value);
 
       if (selectedField && isMultipleAssetField(selectedField)) {
-        handleLayerUpdate(selectedLayerId, {
+        const updates: Partial<Layer> = {
           variables: {
             ...selectedLayer?.variables,
             collection: {
@@ -1018,7 +1033,13 @@ const RightSidebar = React.memo(function RightSidebar({
               source_field_source: 'collection',
             }
           }
-        });
+        };
+        // Slides bound to a multi-image field are typically image-only —
+        // strip any leftover heading/text scaffolding so the user starts clean.
+        if (selectedLayer.name === 'slide') {
+          updates.children = pruneTextDescendants(selectedLayer.children);
+        }
+        handleLayerUpdate(selectedLayerId, updates);
       } else if (selectedField?.reference_collection_id) {
         handleLayerUpdate(selectedLayerId, {
           variables: {
@@ -1098,10 +1119,15 @@ const RightSidebar = React.memo(function RightSidebar({
 
     if (!newCollectionVar) return;
 
-    // Update the collection source on the layer
-    handleLayerUpdate(selectedLayerId, {
-      variables: { ...selectedLayer?.variables, collection: newCollectionVar }
-    });
+    const updates: Partial<Layer> = {
+      variables: { ...selectedLayer?.variables, collection: newCollectionVar },
+    };
+    // Slides bound to a multi-image field are typically image-only —
+    // strip any leftover heading/text scaffolding so the user starts clean.
+    if (newCollectionVar.source_field_type === 'multi_asset' && selectedLayer.name === 'slide') {
+      updates.children = pruneTextDescendants(selectedLayer.children);
+    }
+    handleLayerUpdate(selectedLayerId, updates);
 
     resetChildBindings(selectedLayerId);
   };
@@ -2661,6 +2687,7 @@ const RightSidebar = React.memo(function RightSidebar({
               layer={selectedLayer}
               onLayerUpdate={handleLayerUpdate}
               allLayers={allLayers}
+              fieldGroups={fieldGroups}
             />
 
             <LightboxSettings

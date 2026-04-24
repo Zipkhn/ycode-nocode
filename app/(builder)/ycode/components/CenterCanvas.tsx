@@ -60,7 +60,8 @@ import { buildLocalizedSlugPath, buildLocalizedDynamicPageUrl } from '@/lib/page
 import { getTranslationValue } from '@/lib/localisation-utils';
 import { cn } from '@/lib/utils';
 import { getCollectionVariable, canDeleteLayer, findLayerById, findParentCollectionLayer, canLayerHaveLink, updateLayerProps, removeRichTextSublayer } from '@/lib/layer-utils';
-import { CANVAS_BORDER, CANVAS_PADDING } from '@/lib/canvas-utils';
+import { CANVAS_BORDER, CANVAS_PADDING, updateViewportOverrides } from '@/lib/canvas-utils';
+import { BREAKPOINTS } from '@/lib/breakpoint-utils';
 import { buildFieldGroupsForLayer, flattenFieldGroups, filterFieldGroupsByType, SIMPLE_TEXT_FIELD_TYPES } from '@/lib/collection-field-utils';
 import { buildFieldVariableData } from '@/lib/variable-format-utils';
 import { getRichTextValue } from '@/lib/tiptap-utils';
@@ -105,9 +106,13 @@ interface CenterCanvasProps {
   liveComponentUpdates?: UseLiveComponentUpdatesReturn | null;
 }
 
+// Viewport widths are derived from BREAKPOINTS to avoid sitting on exact
+// breakpoint boundaries where CSS zoom sub-pixel rounding can toggle styles.
+const MOBILE_MAX_WIDTH = BREAKPOINTS.find(bp => bp.value === 'mobile')!.maxWidth!;
+
 const viewportSizes: Record<ViewportMode, { width: string; label: string; icon: string }> = {
   desktop: { width: '1366px', label: 'Desktop', icon: '🖥️' },
-  tablet: { width: '768px', label: 'Tablet', icon: '📱' },
+  tablet: { width: `${MOBILE_MAX_WIDTH + 10}px`, label: 'Tablet', icon: '📱' },
   mobile: { width: '375px', label: 'Mobile', icon: '📱' },
 };
 
@@ -711,6 +716,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const components = useComponentsStore((state) => state.components);
   const componentDrafts = useComponentsStore((state) => state.componentDrafts);
   const [collectionItems, setCollectionItems] = useState<Array<{ id: string; label: string }>>([]);
+  const [collectionItemSearch, setCollectionItemSearch] = useState('');
 
   // Get editing component's variables for default value display
   // Depends on `components` array to react to variable changes
@@ -813,6 +819,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const previewContentWidth = parseInt(viewportSizes[viewportMode].width);
   const {
     zoom: previewZoom,
+    zoomMode: previewZoomMode,
     zoomIn: previewZoomIn,
     zoomOut: previewZoomOut,
     resetZoom: previewResetZoom,
@@ -821,7 +828,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   } = useZoom({
     containerRef: previewContainerRef,
     contentWidth: previewContentWidth,
-    contentHeight: previewContentHeight || previewContentWidth,
+    contentHeight: previewContentHeight || defaultCanvasHeight,
     minZoom: 10,
     maxZoom: 1000,
     zoomStep: 10,
@@ -833,40 +840,133 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const shouldCenter = zoom < zoomToFitLevel;
 
   // Calculate final iframe height - ensure it fills the visible canvas at any zoom level
-  // When zoomed out (e.g. 52%), the iframe must be taller so that scaled it still fills the canvas
-  // When switching viewports (Desktop → Phone), zoom changes and this recalculates automatically
+  // When zoomed in or at fit level, stretch the iframe so the scaled result fills the canvas.
+  // When zoomed out beyond fit, use content height directly — centering handles the gap.
   const finalIframeHeight = useMemo(() => {
-    // For component editing, use content-based height directly (don't force-fill container)
     if (editingComponentId) return iframeContentHeight;
-
     if (!containerHeight || zoom <= 0) return iframeContentHeight;
+    if (shouldCenter) return iframeContentHeight;
 
-    // Minimum iframe height so that scaled iframe fills the visible canvas area
     const minHeightForZoom = (containerHeight - CANVAS_PADDING) / (zoom / 100);
-
-    // Use the larger of: content height or minimum height for current zoom
     return Math.max(iframeContentHeight, minHeightForZoom);
-  }, [iframeContentHeight, containerHeight, zoom, editingComponentId]);
+  }, [iframeContentHeight, containerHeight, zoom, editingComponentId, shouldCenter]);
 
-  // Recalculate autofit when viewport/breakpoint changes
+  const previewObserverRef = useRef<ResizeObserver | null>(null);
+
+  /** Measure the preview iframe content and set up a ResizeObserver for re-measurement */
+  const setupPreviewMeasurement = useCallback(() => {
+    previewObserverRef.current?.disconnect();
+    previewObserverRef.current = null;
+
+    try {
+      const iframe = iframeRef.current;
+      const doc = iframe?.contentDocument;
+      if (!iframe || !doc?.body) return;
+
+      const wrapper = iframe.parentElement as HTMLElement | null;
+      const containerEl = previewContainerRef.current;
+      const refHeight = containerEl
+        ? containerEl.clientHeight - CANVAS_PADDING
+        : 0;
+
+      if (refHeight > 0) {
+        updateViewportOverrides(doc, refHeight);
+      }
+
+      let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const observeBodyChildren = () => {
+        Array.from(doc.body.children).forEach(el => {
+          if (el instanceof HTMLElement) observer.observe(el);
+        });
+      };
+
+      const observer = new ResizeObserver(() => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => remeasure(), 100);
+      });
+
+      const remeasure = () => {
+        try {
+          if (!wrapper) return;
+
+          const freshContainerEl = previewContainerRef.current;
+          const freshRefHeight = freshContainerEl
+            ? freshContainerEl.clientHeight - CANVAS_PADDING
+            : refHeight;
+
+          if (freshRefHeight <= 0) return;
+
+          updateViewportOverrides(doc, freshRefHeight);
+
+          // Disconnect observer before temporary style changes — setting
+          // body/html height to auto causes h-full children to resize,
+          // which fires the observer and creates a feedback loop.
+          observer.disconnect();
+
+          const prevBodyH = doc.body.style.height;
+          const prevHtmlH = doc.documentElement.style.height;
+          doc.body.style.height = 'auto';
+          doc.documentElement.style.height = 'auto';
+          void doc.body.offsetHeight;
+
+          const bodyScrollH = doc.body.scrollHeight;
+
+          doc.body.style.height = prevBodyH;
+          doc.documentElement.style.height = prevHtmlH;
+          void doc.body.offsetHeight;
+
+          observeBodyChildren();
+
+          if (bodyScrollH > 0) {
+            setPreviewContentHeight(bodyScrollH);
+          }
+        } catch { /* cross-origin */ }
+      };
+
+      remeasure();
+
+      const images = Array.from(doc.querySelectorAll('img'));
+      const pendingImages = images.filter(img => !img.complete);
+
+      if (pendingImages.length > 0) {
+        let remaining = pendingImages.length;
+        const onImageReady = () => {
+          remaining--;
+          if (remaining <= 0) remeasure();
+        };
+        pendingImages.forEach(img => {
+          img.addEventListener('load', onImageReady, { once: true });
+          img.addEventListener('error', onImageReady, { once: true });
+        });
+      }
+
+      observeBodyChildren();
+
+      previewObserverRef.current = observer;
+    } catch {
+      // Cross-origin — fall back to 0
+    }
+  }, []);
+
+  // Re-measure and recalculate zoom when viewport changes
   const prevViewportMode = useRef(viewportMode);
   useEffect(() => {
     if (prevViewportMode.current !== viewportMode) {
-      // Notify SelectionOverlay to hide outlines during viewport transition
       window.dispatchEvent(new CustomEvent('viewportChange'));
 
-      // Small delay to ensure container dimensions are updated
+      // Small delay to ensure container dimensions are updated after width change.
+      // useZoom auto-recalculates for the current mode (fit/autofit/custom) when
+      // content dimensions change, so we only need to re-measure here.
       setTimeout(() => {
         if (isPreviewMode) {
-          previewAutofit();
-        } else {
-          autofit();
+          setupPreviewMeasurement();
         }
       }, 50);
 
       prevViewportMode.current = viewportMode;
     }
-  }, [viewportMode, autofit, isPreviewMode, previewAutofit]);
+  }, [viewportMode, isPreviewMode, setupPreviewMeasurement]);
 
   // Scroll canvas to selected element if it's off-screen
   const prevCanvasLayerIdRef = useRef<string | null>(null);
@@ -1640,6 +1740,11 @@ const CenterCanvas = React.memo(function CenterCanvas({
     if (!iframe) return;
     setIsPreviewLoading(true);
     iframe.src = previewUrl;
+
+    return () => {
+      previewObserverRef.current?.disconnect();
+      previewObserverRef.current = null;
+    };
   }, [isPreviewMode, previewUrl]);
 
   // Autofit when entering preview mode (not on every breakpoint change)
@@ -1653,15 +1758,8 @@ const CenterCanvas = React.memo(function CenterCanvas({
 
   const handlePreviewLoad = useCallback(() => {
     setIsPreviewLoading(false);
-    try {
-      const doc = iframeRef.current?.contentDocument;
-      if (doc) {
-        setPreviewContentHeight(doc.documentElement.scrollHeight);
-      }
-    } catch {
-      // Cross-origin — fall back to 0
-    }
-  }, []);
+    setupPreviewMeasurement();
+  }, [setupPreviewMeasurement]);
 
   // Load collection items when dynamic page is selected
   useEffect(() => {
@@ -1849,7 +1947,13 @@ const CenterCanvas = React.memo(function CenterCanvas({
             {currentPage?.is_dynamic && collectionId && (
               <Select
                 value={currentPageCollectionItemId || ''}
-                onValueChange={setCurrentPageCollectionItemId}
+                onValueChange={(value) => {
+                  setCurrentPageCollectionItemId(value);
+                  setCollectionItemSearch('');
+                }}
+                onOpenChange={(open) => {
+                  if (!open) setCollectionItemSearch('');
+                }}
                 disabled={isLoadingItems || collectionItems.length === 0}
               >
                 <SelectTrigger className="w-24 justify-between" size="sm">
@@ -1872,18 +1976,31 @@ const CenterCanvas = React.memo(function CenterCanvas({
                   )}
                 </SelectTrigger>
 
-                <SelectContent>
-                  {collectionItems.length > 0 ? (
-                    collectionItems.map((item) => (
+                <SelectContent
+                  searchable
+                  searchValue={collectionItemSearch}
+                  onSearchChange={setCollectionItemSearch}
+                  searchPlaceholder="Search items..."
+                  align="start"
+                  className="w-72"
+                >
+                  {(() => {
+                    const filtered = collectionItems.filter(item =>
+                      item.label.toLowerCase().includes(collectionItemSearch.toLowerCase())
+                    );
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                          {collectionItemSearch ? 'No items found' : 'No items available'}
+                        </div>
+                      );
+                    }
+                    return filtered.map((item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.label}
                       </SelectItem>
-                    ))
-                  ) : (
-                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                      No items available
-                    </div>
-                  )}
+                    ));
+                  })()}
                 </SelectContent>
               </Select>
             )}
@@ -2176,7 +2293,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
       {/* Canvas Area */}
       <div
         ref={canvasContainerRef}
-        className="flex-1 relative overflow-hidden bg-neutral-50 dark:bg-neutral-950/80"
+        className="flex-1 relative overflow-hidden bg-neutral-50 dark:bg-neutral-950/80 select-none"
       >
         {/* Loading skeleton overlay when draft is being fetched */}
         {isDraftLoading && (
@@ -2321,6 +2438,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                         editingComponentVariables={editingComponentVariables}
                         disableEditorHiddenLayers={!!activeInteractionTriggerLayerId}
                         zoom={zoom}
+                        referenceViewportHeight={defaultCanvasHeight}
                       />
 
                       {/* Drop indicator overlay - subscribes to store directly */}
@@ -2579,11 +2697,15 @@ const CenterCanvas = React.memo(function CenterCanvas({
             </div>
           )}
           <div
-            className="bg-white shadow-3xl relative mx-auto"
+            className="bg-white shadow-3xl relative mx-auto my-auto"
             style={{
               zoom: previewZoom / 100,
-              width: viewportMode === 'desktop' ? '100%' : viewportSizes[viewportMode].width,
-              minWidth: viewportMode === 'desktop' ? viewportSizes[viewportMode].width : undefined,
+              width: viewportMode === 'desktop' && previewZoomMode === 'autofit'
+                ? '100%'
+                : viewportSizes[viewportMode].width,
+              minWidth: viewportMode === 'desktop' && previewZoomMode === 'autofit'
+                ? viewportSizes[viewportMode].width
+                : undefined,
               height: previewContentHeight > 0 ? `${previewContentHeight}px` : '100%',
               flexShrink: 0,
               transition: 'none',

@@ -118,6 +118,7 @@ export default function LinkSettings(props: LinkSettingsProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [collectionItems, setCollectionItems] = useState<CollectionItemWithValues[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
+  const [collectionItemSearch, setCollectionItemSearch] = useState('');
 
   // Stores
   const pages = usePagesStore((state) => state.pages);
@@ -892,13 +893,25 @@ export default function LinkSettings(props: LinkSettingsProps) {
               <div className={useStackedLayout ? '' : 'col-span-2'}>
                 <Select
                   value={collectionItemId || ''}
-                  onValueChange={handleCollectionItemChange}
+                  onValueChange={(value) => {
+                    handleCollectionItemChange(value);
+                    setCollectionItemSearch('');
+                  }}
+                  onOpenChange={(open) => {
+                    if (!open) setCollectionItemSearch('');
+                  }}
                   disabled={isLockedByOther || loadingItems}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder={loadingItems ? 'Loading...' : 'Select...'} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent
+                    searchable
+                    searchValue={collectionItemSearch}
+                    onSearchChange={setCollectionItemSearch}
+                    searchPlaceholder="Search items..."
+                    className="w-72"
+                  >
                     <LinkItemOptions
                       canUseCurrentPageItem={canUseCurrentPageItem}
                       canUseCurrentCollectionItem={canUseCurrentCollectionItem}
@@ -906,6 +919,7 @@ export default function LinkSettings(props: LinkSettingsProps) {
                       referenceItemOptions={referenceItemOptions}
                       collectionItems={collectionItems}
                       collectionFields={linkedPageCollectionFields}
+                      searchValue={collectionItemSearch}
                     />
                   </SelectContent>
                 </Select>

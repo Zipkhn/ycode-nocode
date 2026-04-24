@@ -18,6 +18,8 @@ interface CollectionItemSelectOptionsProps {
   collectionItems: CollectionItemWithValues[];
   /** Fields for the linked page's collection, used to derive display names */
   collectionFields: CollectionField[];
+  /** Optional search string to filter visible options by their display label */
+  searchValue?: string;
 }
 
 function getDisplayName(item: CollectionItemWithValues, collectionFields: CollectionField[]): string {
@@ -29,8 +31,12 @@ function getDisplayName(item: CollectionItemWithValues, collectionFields: Collec
 
 /**
  * Shared SelectContent items for CMS item pickers used in link settings.
- * Renders dynamic-resolution keywords ("Current page item", "Next item", …),
- * reference-field options, and the concrete item list.
+ * Renders dynamic-resolution keywords ("Current page item", "Current collection
+ * item", "Next item", "Previous item"), reference-field options, and the
+ * concrete item list.
+ *
+ * When `searchValue` is provided, options are filtered case-insensitively by
+ * their visible label.
  */
 export default function LinkItemOptions({
   canUseCurrentPageItem,
@@ -39,42 +45,63 @@ export default function LinkItemOptions({
   referenceItemOptions,
   collectionItems,
   collectionFields,
+  searchValue,
 }: CollectionItemSelectOptionsProps) {
+  const query = searchValue?.trim().toLowerCase() ?? '';
+  const matches = (label: string) => !query || label.toLowerCase().includes(query);
+
+  const showCurrentPageItem = canUseCurrentPageItem && matches('Current page item');
+  const showCurrentCollectionItem = canUseCurrentCollectionItem && matches('Current collection item');
+  const showPreviousItem = canUseNextPreviousItem && matches('Previous item');
+  const showNextItem = canUseNextPreviousItem && matches('Next item');
+  const filteredReferenceOptions = referenceItemOptions.filter(opt => matches(opt.label));
+  const filteredItems = collectionItems.filter(item => matches(getDisplayName(item, collectionFields)));
+
   const hasSpecialOptions =
-    canUseCurrentPageItem ||
-    canUseCurrentCollectionItem ||
-    canUseNextPreviousItem ||
-    referenceItemOptions.length > 0;
+    showCurrentPageItem ||
+    showCurrentCollectionItem ||
+    showPreviousItem ||
+    showNextItem ||
+    filteredReferenceOptions.length > 0;
+  const hasAnyResults = hasSpecialOptions || filteredItems.length > 0;
+
+  if (!hasAnyResults && query) {
+    return (
+      <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+        No items found
+      </div>
+    );
+  }
 
   return (
     <>
-      {canUseCurrentPageItem && (
+      {showCurrentPageItem && (
         <SelectItem value={COLLECTION_ITEM_KEYWORDS.CURRENT_PAGE}>
           <div className="flex items-center gap-2">Current page item</div>
         </SelectItem>
       )}
-      {canUseCurrentCollectionItem && (
+      {showCurrentCollectionItem && (
         <SelectItem value={COLLECTION_ITEM_KEYWORDS.CURRENT_COLLECTION}>
           <div className="flex items-center gap-2">Current collection item</div>
         </SelectItem>
       )}
-      {canUseNextPreviousItem && (
-        <>
-          <SelectItem value={COLLECTION_ITEM_KEYWORDS.PREVIOUS_ITEM}>
-            <div className="flex items-center gap-2">Previous item</div>
-          </SelectItem>
-          <SelectItem value={COLLECTION_ITEM_KEYWORDS.NEXT_ITEM}>
-            <div className="flex items-center gap-2">Next item</div>
-          </SelectItem>
-        </>
+      {showPreviousItem && (
+        <SelectItem value={COLLECTION_ITEM_KEYWORDS.PREVIOUS_ITEM}>
+          <div className="flex items-center gap-2">Previous item</div>
+        </SelectItem>
       )}
-      {referenceItemOptions.map((opt) => (
+      {showNextItem && (
+        <SelectItem value={COLLECTION_ITEM_KEYWORDS.NEXT_ITEM}>
+          <div className="flex items-center gap-2">Next item</div>
+        </SelectItem>
+      )}
+      {filteredReferenceOptions.map((opt) => (
         <SelectItem key={opt.value} value={opt.value}>
           <div className="flex items-center gap-2">{opt.label}</div>
         </SelectItem>
       ))}
-      {hasSpecialOptions && <SelectSeparator />}
-      {collectionItems.map((item) => (
+      {hasSpecialOptions && filteredItems.length > 0 && <SelectSeparator />}
+      {filteredItems.map((item) => (
         <SelectItem key={item.id} value={item.id}>
           {getDisplayName(item, collectionFields)}
         </SelectItem>

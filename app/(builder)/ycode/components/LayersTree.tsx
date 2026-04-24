@@ -870,41 +870,42 @@ export default function LayersTree({
               if (rawValue) cmsContent = rawValue;
             }
             const contentSubs = getRichTextSublayers(node.layer, cmsContent);
-            contentSubs.forEach((sub) => {
-              const contentSubId = `${node.id}__sub_${subIdx}`;
-              const hasMarkChildren = sub.children && sub.children.length > 0;
 
+            const pushSublayer = (sub: typeof contentSubs[number], parentId: string, depth: number, idSuffix: string) => {
+              const hasChildren = !!(sub.children && sub.children.length > 0);
+              const id = `${parentId}${idSuffix}`;
               withSublayers.push({
-                id: contentSubId,
+                id,
                 layer: node.layer,
-                depth: node.depth + 1,
-                parentId: node.id,
+                depth,
+                parentId,
                 index: subIdx,
-                collapsed: hasMarkChildren ? collapsedIds.has(contentSubId) : undefined,
-                canHaveChildren: !!hasMarkChildren,
+                collapsed: hasChildren ? collapsedIds.has(id) : undefined,
+                canHaveChildren: hasChildren,
                 sublayer: sub,
               });
               subIdx++;
 
-              // Nest child sublayers (list items, inline marks) under expanded content blocks
-              if (hasMarkChildren && !collapsedIds.has(contentSubId)) {
-                let itemIdx = 0;
-                sub.children!.forEach((childSub) => {
-                  const childId = childSub.kind === 'listItem'
-                    ? `${contentSubId}__item_${itemIdx++}`
-                    : `${contentSubId}__mark_${childSub.styleKey}`;
-                  withSublayers.push({
-                    id: childId,
-                    layer: node.layer,
-                    depth: node.depth + 2,
-                    parentId: contentSubId,
-                    index: subIdx,
-                    canHaveChildren: false,
-                    sublayer: childSub,
-                  });
-                  subIdx++;
+              if (hasChildren && !collapsedIds.has(id)) {
+                let listItemCounter = 0;
+                sub.children!.forEach((childSub, childIdx) => {
+                  let childSuffix: string;
+                  if (childSub.kind === 'listItem') {
+                    childSuffix = `__item_${listItemCounter++}`;
+                  } else if (childSub.type === 'tableRow') {
+                    childSuffix = `__row_${childIdx}`;
+                  } else if (childSub.type === 'tableCell' || childSub.type === 'tableHeader') {
+                    childSuffix = `__cell_${childIdx}`;
+                  } else {
+                    childSuffix = `__mark_${childSub.styleKey}`;
+                  }
+                  pushSublayer(childSub, id, depth + 1, childSuffix);
                 });
               }
+            };
+
+            contentSubs.forEach((sub) => {
+              pushSublayer(sub, node.id, node.depth + 1, `__sub_${subIdx}`);
             });
           }
 

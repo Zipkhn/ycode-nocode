@@ -264,6 +264,45 @@
   @apply border-t border-border my-4;
 }
 
+.rich-text-editor-full.ProseMirror .tableWrapper {
+  @apply overflow-x-auto max-w-full min-w-0 my-2;
+  width: 100%;
+}
+
+.rich-text-editor-full.ProseMirror table {
+  @apply w-full border-separate border-spacing-0 border border-border rounded-lg overflow-hidden;
+}
+
+.rich-text-editor-full.ProseMirror th,
+.rich-text-editor-full.ProseMirror td {
+  @apply px-2 py-1.5 text-left align-top min-w-[80px];
+}
+
+.rich-text-editor-full.ProseMirror tr + tr td,
+.rich-text-editor-full.ProseMirror tr + tr th {
+  @apply border-t border-border;
+}
+
+.rich-text-editor-full.ProseMirror td + td,
+.rich-text-editor-full.ProseMirror td + th,
+.rich-text-editor-full.ProseMirror th + td,
+.rich-text-editor-full.ProseMirror th + th {
+  @apply border-l border-border;
+}
+
+.rich-text-editor-full.ProseMirror th {
+  @apply bg-muted font-semibold;
+}
+
+.rich-text-editor-full.ProseMirror th p,
+.rich-text-editor-full.ProseMirror td p {
+  @apply m-0;
+}
+
+.rich-text-editor-full.ProseMirror .selectedCell {
+  @apply bg-accent/50;
+}
+
 /* Custom dropdown chevron for select elements (native arrow removed by form reset) */
 #ybody select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");

@@ -19,6 +19,7 @@ interface FilterableCollectionProps {
   layerTemplate: Layer[];
   collectionLayerClasses?: string[];
   collectionLayerTag?: string;
+  isPublished?: boolean;
 }
 
 const FC_FILTERED_ATTR = 'data-fc-filtered';
@@ -37,6 +38,7 @@ export default function FilterableCollection({
   layerTemplate,
   collectionLayerClasses,
   collectionLayerTag,
+  isPublished = true,
 }: FilterableCollectionProps) {
   const markerRef = useRef<HTMLSpanElement>(null);
   const ssrChildrenRef = useRef<Element[]>([]);
@@ -185,9 +187,10 @@ export default function FilterableCollection({
           if (inputValue && inputValue.includes(',')) {
             const checkedValues = inputValue.split(',').filter(Boolean);
             if (checkedValues.length > 0) {
+              const arrayOperators = ['is_one_of', 'is_not_one_of', 'contains_all_of', 'contains_exactly'];
               activeInGroup.push({
                 fieldId: condition.fieldId,
-                operator: 'is_one_of',
+                operator: arrayOperators.includes(condition.operator) ? condition.operator : 'is_one_of',
                 value: JSON.stringify(checkedValues),
                 fieldType: condition.fieldType,
               });
@@ -529,7 +532,7 @@ export default function FilterableCollection({
         sortOrder: effectiveSortOrder,
         limit,
         offset,
-        published: true,
+        published: isPublished,
         collectionLayerClasses,
         collectionLayerTag,
       }),
@@ -582,7 +585,7 @@ export default function FilterableCollection({
           abortRef.current = null;
         }
       });
-  }, [collectionId, collectionLayerId, layerTemplate, effectiveSortBy, effectiveSortOrder, limit, paginationMode, updateEmptyStateElements, injectFilteredHTML, collectionLayerClasses, collectionLayerTag]);
+  }, [collectionId, collectionLayerId, layerTemplate, effectiveSortBy, effectiveSortOrder, limit, paginationMode, updateEmptyStateElements, injectFilteredHTML, collectionLayerClasses, collectionLayerTag, isPublished]);
 
   const fetchFilteredRef = useRef(fetchFiltered);
   useEffect(() => { fetchFilteredRef.current = fetchFiltered; }, [fetchFiltered]);

@@ -257,6 +257,7 @@ const CLASS_PROPERTY_MAP: Record<string, RegExp> = {
   textDecorationColor: /^decoration-\[.+\](\/\d+)?$/,
   textDecorationThickness: /^decoration-(\d+|auto|from-font|\[(?!#|rgb|hsl).+\])$/,
   underlineOffset: /^underline-offset-.+$/,
+  lineClamp: /^line-clamp-(none|\d+|\[.+\])$/,
   // Updated to match partial arbitrary values like text-r, text-re, text-red (not just complete text-[#FF0000])
   // Excludes fontSize named values, text-align values, and text-wrap utilities
   // Includes opacity modifier: text-[#cc8d8d]/59
@@ -278,7 +279,7 @@ const CLASS_PROPERTY_MAP: Record<string, RegExp> = {
   borderBottomWidth: /^border-b(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
   borderLeftWidth: /^border-l(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
   borderStyle: /^border-(solid|dashed|dotted|double|hidden|none)$/,
-  borderColor: /^border-(?!(?:solid|dashed|dotted|double|hidden|none)$)(?!t-|r-|b-|l-|x-|y-)((\w+)(-\d+)?|\[(?:#|rgb|color:var).+\])(\/\d+)?$/,
+  borderColor: /^border-(?!(?:solid|dashed|dotted|double|hidden|none|collapse|separate)$)(?!t-|r-|b-|l-|x-|y-|spacing)((\w+)(-\d+)?|\[(?:#|rgb|color:var).+\])(\/\d+)?$/,
   borderRadius: /^rounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full|-\[.+\])?$/,
   borderTopLeftRadius: /^rounded-tl(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full|-\[.+\])?$/,
   borderTopRightRadius: /^rounded-tr(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full|-\[.+\])?$/,
@@ -607,6 +608,10 @@ export function propertyToClass(
         return formatMeasurementClass(value, 'decoration');
       case 'underlineOffset':
         return formatMeasurementClass(value, 'underline-offset');
+      case 'lineClamp':
+        if (value === 'none') return 'line-clamp-none';
+        if (/^\d+$/.test(value)) return `line-clamp-${value}`;
+        return `line-clamp-[${value}]`;
       case 'color':
         // Check if value is a gradient (linear-gradient or radial-gradient)
         if (value.includes('gradient(')) {
@@ -1275,6 +1280,16 @@ export function classesToDesign(classes: string | string[]): Layer['design'] {
       if (value) design.typography!.underlineOffset = value;
     }
 
+    // Line Clamp
+    if (cls === 'line-clamp-none') {
+      design.typography!.lineClamp = 'none';
+    } else if (/^line-clamp-\d+$/.test(cls)) {
+      design.typography!.lineClamp = cls.slice('line-clamp-'.length);
+    } else if (cls.startsWith('line-clamp-[')) {
+      const value = extractArbitraryValue(cls);
+      if (value) design.typography!.lineClamp = value;
+    }
+
     // Line Height
     if (cls.startsWith('leading-[')) {
       const value = extractArbitraryValue(cls);
@@ -1443,6 +1458,14 @@ export function classesToDesign(classes: string | string[]): Layer['design'] {
       const match = cls.match(/^row-span-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/);
       if (match) {
         design.sizing!.gridRowSpan = match[1];
+      }
+    }
+
+    // Overflow
+    if (cls.startsWith('overflow-')) {
+      const match = cls.match(/^overflow-(visible|hidden|clip|scroll|auto|x-visible|x-hidden|x-clip|x-scroll|x-auto|y-visible|y-hidden|y-clip|y-scroll|y-auto)$/);
+      if (match) {
+        design.sizing!.overflow = match[1];
       }
     }
 
