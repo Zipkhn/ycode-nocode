@@ -453,6 +453,9 @@ export interface LayerVariables {
     src?: AssetVariable | VideoVariable | FieldVariable | DynamicTextVariable; // Static Asset ID | Video provider + ID (YouTube) | Field Variable | Dynamic Text (URL that allows inline variables)
     poster?: AssetVariable | FieldVariable; // Poster image (asset or field variable)
   };
+  lottie?: {
+    src: AssetVariable | DynamicTextVariable; // JSON asset or external URL
+  };
   iframe?: {
     src: DynamicTextVariable; // Embed URL (allow inline variables)
   };

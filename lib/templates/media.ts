@@ -97,6 +97,36 @@ export const mediaTemplates: Record<string, BlockTemplate> = {
     }
   },
 
+  lottie: {
+    icon: 'zap',
+    name: 'Lottie',
+    template: {
+      name: 'lottie',
+      classes: ['w-full', 'h-auto', 'aspect-square'],
+      attributes: {
+        lottieLoop: true,
+        lottieAutoplay: true,
+        lottieSpeed: 1,
+      },
+      design: {
+        sizing: {
+          isActive: true,
+          width: '100%',
+          height: 'auto',
+          aspectRatio: '[1/1]',
+        }
+      },
+      variables: {
+        lottie: {
+          src: {
+            type: 'asset',
+            data: { asset_id: null }
+          }
+        }
+      }
+    }
+  },
+
   audio: {
     icon: 'audio',
     name: 'Audio',

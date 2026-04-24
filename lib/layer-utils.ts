@@ -1589,6 +1589,7 @@ const LAYER_NAME_TO_HTML_TAG: Record<string, string> = {
   icon: 'span',
   video: 'video',
   audio: 'audio',
+  lottie: 'div',
 
   // Structure (valid HTML tags — pass through via fallback)
   // div, section, form, button, hr, iframe, input, textarea, select

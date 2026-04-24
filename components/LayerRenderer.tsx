@@ -50,6 +50,9 @@ import { generateLinkHref, resolveLinkAttrs, type LinkResolutionContext } from '
 import { collectEditorHiddenLayerIds, type HiddenLayerInfo } from '@/lib/animation-utils';
 import AnimationInitializer from '@/components/AnimationInitializer';
 import { transformLayerIdsForInstance, resolveVariableLinks } from '@/lib/resolve-components';
+import dynamic from 'next/dynamic';
+
+const DynamicLottiePlayer = dynamic(() => import('@/components/LottiePlayer'), { ssr: false });
 
 import type { DesignColorVariable } from '@/types';
 
@@ -2332,7 +2335,42 @@ const LayerItem: React.FC<{
       );
     }
 
-    // Handle Code Embed layers - Framer-style iframe isolation
+    if (layer.name === 'lottie') {
+      const { lottieLoop: _ll, lottieAutoplay: _la, lottieSpeed: _ls, lottieReverse: _lr, lottieRenderer: _lrend, lottieUseCustomDuration: _lucd, lottieDuration: _ld, ...lottieSafeProps } = elementProps as any;
+
+      const lottieSrc = (() => {
+        const src = layer.variables?.lottie?.src;
+        if (!src) return null;
+        if (isAssetVariable(src)) {
+          const assetId = getAssetId(src);
+          return assetId ? (assetsById[assetId]?.public_url || getAsset(assetId)?.public_url || null) : null;
+        }
+        if (isDynamicTextVariable(src)) return getDynamicTextContent(src) || null;
+        return null;
+      })();
+
+      return (
+        <div {...lottieSafeProps} suppressHydrationWarning>
+          {lottieSrc ? (
+            <DynamicLottiePlayer
+              src={lottieSrc}
+              loop={layer.attributes?.lottieLoop !== false}
+              autoplay={layer.attributes?.lottieAutoplay !== false}
+              speed={typeof layer.attributes?.lottieSpeed === 'number' ? layer.attributes.lottieSpeed : 1}
+              reverse={!!layer.attributes?.lottieReverse}
+              renderer={(layer.attributes?.lottieRenderer as 'svg' | 'canvas') || 'svg'}
+              useCustomDuration={!!layer.attributes?.lottieUseCustomDuration}
+              duration={typeof layer.attributes?.lottieDuration === 'number' ? layer.attributes.lottieDuration : 1000}
+            />
+          ) : isEditMode ? (
+            <div className="flex items-center justify-center w-full h-full bg-muted text-muted-foreground text-xs min-h-12">
+              Lottie — no source
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+
     if (layer.name === 'htmlEmbed') {
       return (
         <iframe

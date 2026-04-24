@@ -43,6 +43,7 @@ import ConditionalVisibilitySettings from './ConditionalVisibilitySettings';
 import ImageSettings, { type ImageSettingsValue } from './ImageSettings';
 import VideoSettings, { type VideoSettingsValue } from './VideoSettings';
 import AudioSettings, { type AudioSettingsValue } from './AudioSettings';
+import LottieSettings from './LottieSettings';
 import IconSettings, { type IconSettingsValue } from './IconSettings';
 import FormSettings from './FormSettings';
 import FilterSettings from './FilterSettings';
@@ -453,8 +454,9 @@ const RightSidebar = React.memo(function RightSidebar({
       case 'layout':
         // In text style mode, hide layout controls
         if (showTextStyleControls) return false;
-        // Layout controls: show for containers, hide for text-only and image elements
+        // Layout controls: show for containers, hide for text-only, image, and lottie elements
         if (isImageLayer(layer)) return false;
+        if (layer.name === 'lottie') return false;
         return !isTextLayer(layer) || isButtonLayer(layer);
 
       case 'spacing':
@@ -2692,6 +2694,11 @@ const RightSidebar = React.memo(function RightSidebar({
               allFields={fields}
               collections={collections}
               onOpenVariablesDialog={openVariablesDialog}
+            />
+
+            <LottieSettings
+              layer={selectedLayer}
+              onLayerUpdate={handleLayerUpdate}
             />
 
             <IconSettings
