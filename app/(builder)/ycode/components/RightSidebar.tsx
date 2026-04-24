@@ -11,7 +11,6 @@ import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 
 // 2. External libraries
 import debounce from 'lodash.debounce';
-
 // 3. ShadCN UI
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -112,14 +111,13 @@ import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface RightSidebarProps {
-  selectedLayerId: string | null;
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
 }
 
 const RightSidebar = React.memo(function RightSidebar({
-  selectedLayerId,
   onLayerUpdate,
 }: RightSidebarProps) {
+  const selectedLayerId = useEditorStore((state) => state.selectedLayerId);
 
   const { openComponent, urlState, updateQueryParams } = useEditorActions();
   const { routeType } = useEditorUrl();

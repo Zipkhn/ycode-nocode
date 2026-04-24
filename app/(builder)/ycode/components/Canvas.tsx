@@ -56,8 +56,6 @@ interface CanvasProps {
   pageCollectionFields?: CollectionField[];
   /** Assets map */
   assets: Record<string, Asset>;
-  /** Collection layer data by layer ID */
-  collectionLayerData: Record<string, CollectionItemWithValues[]>;
   /** Page ID */
   pageId: string;
   /** Callback when a layer is clicked */
@@ -261,7 +259,6 @@ const Canvas = React.memo(function Canvas({
   pageCollectionItem,
   pageCollectionFields,
   assets,
-  collectionLayerData,
   pageId,
   onLayerClick,
   onLayerUpdate,
@@ -287,7 +284,6 @@ const Canvas = React.memo(function Canvas({
   zoom = 100,
   referenceViewportHeight,
 }: CanvasProps) {
-
   // Refs
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const rootRef = useRef<Root | null>(null);
@@ -304,8 +300,11 @@ const Canvas = React.memo(function Canvas({
   }, [layers, components, editingComponentVariables]);
 
   // Enrich page collection item data with reference field dotted keys
-  // so variables like "refFieldId.targetFieldId" resolve on canvas
-  const enrichedPageCollectionItemData = useMemo(() => {
+  // so variables like "refFieldId.targetFieldId" resolve on canvas.
+  // Stabilize the reference: collectionItems gets a new ref whenever ANY collection changes,
+  // but this output only depends on the page's specific collection — prevent unnecessary
+  // root.render() calls in the iframe which are very expensive (~2-3s per full re-render).
+  const enrichedPageCollectionItemDataRaw = useMemo(() => {
     const values = pageCollectionItem?.values;
     if (!values || !pageCollectionFields?.length) return values || null;
     return resolveReferenceFieldsSync(
@@ -315,6 +314,17 @@ const Canvas = React.memo(function Canvas({
       collectionFields
     );
   }, [pageCollectionItem?.values, pageCollectionFields, collectionItems, collectionFields]);
+
+  const enrichedPageCollectionItemDataRef = useRef(enrichedPageCollectionItemDataRaw);
+  const enrichedPageCollectionItemDataKeyRef = useRef('');
+  const enrichedPageCollectionItemData = useMemo(() => {
+    const key = JSON.stringify(enrichedPageCollectionItemDataRaw);
+    if (key !== enrichedPageCollectionItemDataKeyRef.current) {
+      enrichedPageCollectionItemDataKeyRef.current = key;
+      enrichedPageCollectionItemDataRef.current = enrichedPageCollectionItemDataRaw;
+    }
+    return enrichedPageCollectionItemDataRef.current;
+  }, [enrichedPageCollectionItemDataRaw]);
 
   // Collect layer IDs that should be hidden on canvas (display: hidden with on-load)
   const editorHiddenLayerIds = useMemo(() => {

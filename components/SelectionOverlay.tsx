@@ -12,7 +12,6 @@
 
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useEditorStore } from '@/stores/useEditorStore';
-
 interface SelectionOverlayProps {
   /** Reference to the canvas iframe element */
   iframeElement: HTMLIFrameElement | null;
@@ -39,7 +38,7 @@ export function SelectionOverlay({
   activeSublayerIndex,
   activeListItemIndex,
 }: SelectionOverlayProps) {
-  const hoveredLayerId = useEditorStore((state) => state.hoveredLayerId);
+  const hoveredLayerIdRef = useRef(useEditorStore.getState().hoveredLayerId);
   const activeUIState = useEditorStore((state) => state.activeUIState);
   const isStateActive = activeUIState !== 'neutral';
 
@@ -159,8 +158,8 @@ export function SelectionOverlay({
     if (!skipSolidBorders) {
       updateOutline(selectedContainerRef.current, selectedLayerId, iframeDoc, iframeElement, containerElement, scale, SELECTED_OUTLINE_CLASS, activeSublayerIndex, activeListItemIndex);
 
-      // Update hovered outline (only if different from selected)
-      const effectiveHoveredId = hoveredLayerId !== selectedLayerId ? hoveredLayerId : null;
+      const hovered = hoveredLayerIdRef.current;
+      const effectiveHoveredId = hovered !== selectedLayerId ? hovered : null;
       updateOutline(hoveredContainerRef.current, effectiveHoveredId, iframeDoc, iframeElement, containerElement, scale, HOVERED_OUTLINE_CLASS);
     }
 
@@ -169,11 +168,21 @@ export function SelectionOverlay({
       ? selectedLayerId
       : (parentLayerId !== selectedLayerId ? parentLayerId : null);
     updateOutline(parentContainerRef.current, effectiveParentId, iframeDoc, iframeElement, containerElement, scale, PARENT_OUTLINE_CLASS);
-  }, [iframeElement, containerElement, selectedLayerId, hoveredLayerId, parentLayerId, zoom, updateOutline, hideAllOutlines, activeSublayerIndex, activeListItemIndex]);
+  }, [iframeElement, containerElement, selectedLayerId, parentLayerId, zoom, updateOutline, hideAllOutlines, activeSublayerIndex, activeListItemIndex, SELECTED_OUTLINE_CLASS, HOVERED_OUTLINE_CLASS, PARENT_OUTLINE_CLASS]);
 
   // Initial update and updates when IDs change
   useEffect(() => {
     updateAllOutlines();
+  }, [updateAllOutlines]);
+
+  // Subscribe to hoveredLayerId changes without re-rendering
+  useEffect(() => {
+    return useEditorStore.subscribe((state) => {
+      if (state.hoveredLayerId !== hoveredLayerIdRef.current) {
+        hoveredLayerIdRef.current = state.hoveredLayerId;
+        updateAllOutlines();
+      }
+    });
   }, [updateAllOutlines]);
 
   // Set up scroll/resize/mutation listeners
@@ -322,4 +331,4 @@ export function SelectionOverlay({
   );
 }
 
-export default SelectionOverlay;
+export default React.memo(SelectionOverlay);

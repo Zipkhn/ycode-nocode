@@ -34,8 +34,6 @@ import type { UseLiveLayerUpdatesReturn } from '@/hooks/use-live-layer-updates';
 import type { UseLiveComponentUpdatesReturn } from '@/hooks/use-live-component-updates';
 
 interface LeftSidebarProps {
-  selectedLayerId: string | null;
-  selectedLayerIds?: string[]; // New multi-select support
   onLayerSelect: (layerId: string | null) => void;
   currentPageId: string | null;
   onPageSelect: (pageId: string) => void;
@@ -44,14 +42,14 @@ interface LeftSidebarProps {
 }
 
 const LeftSidebar = React.memo(function LeftSidebar({
-  selectedLayerId,
-  selectedLayerIds,
   onLayerSelect,
   currentPageId,
   onPageSelect,
   liveLayerUpdates,
   liveComponentUpdates,
 }: LeftSidebarProps) {
+  const selectedLayerId = useEditorStore((state) => state.selectedLayerId);
+
   const { sidebarTab } = useEditorUrl();
   const [showElementLibrary, setShowElementLibrary] = useState(false);
   const [assetMessage, setAssetMessage] = useState<string | null>(null);
@@ -346,8 +344,6 @@ const LeftSidebar = React.memo(function LeftSidebar({
                 ) : (
                   <LayersTree
                     layers={layersForCurrentPage}
-                    selectedLayerId={selectedLayerId}
-                    selectedLayerIds={selectedLayerIds}
                     onLayerSelect={handleLayerSelect}
                     onReorder={handleLayersReorder}
                     pageId={currentPageId || ''}

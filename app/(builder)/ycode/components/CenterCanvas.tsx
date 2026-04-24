@@ -95,7 +95,6 @@ import { useCanvasDropDetection } from '@/hooks/use-canvas-drop-detection';
 import { useCanvasSiblingReorder } from '@/hooks/use-canvas-sibling-reorder';
 
 interface CenterCanvasProps {
-  selectedLayerId: string | null;
   currentPageId: string | null;
   viewportMode: ViewportMode;
   setViewportMode: (mode: ViewportMode) => void;
@@ -573,7 +572,6 @@ function CanvasSiblingReorderOverlay({
 }
 
 const CenterCanvas = React.memo(function CenterCanvas({
-  selectedLayerId,
   currentPageId,
   viewportMode,
   setViewportMode,
@@ -583,6 +581,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   liveLayerUpdates,
   liveComponentUpdates,
 }: CenterCanvasProps) {
+  const selectedLayerId = useEditorStore((state) => state.selectedLayerId);
 
   const [showAddBlockPanel, setShowAddBlockPanel] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -708,7 +707,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const collectionFieldsFromStore = useCollectionsStore((state) => state.fields);
 
   // Collection layer store for independent layer data
-  const collectionLayerData = useCollectionLayerStore((state) => state.layerData);
   const referencedItems = useCollectionLayerStore((state) => state.referencedItems);
   const fetchReferencedCollectionItems = useCollectionLayerStore((state) => state.fetchReferencedCollectionItems);
 
@@ -2418,7 +2416,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
                         pageCollectionItem={pageCollectionItem}
                         pageCollectionFields={pageCollectionFields}
                         assets={assetsMap}
-                        collectionLayerData={collectionLayerData}
                         pageId={currentPageId || ''}
                         onLayerClick={handleCanvasLayerClick}
                         onLayerUpdate={handleCanvasLayerUpdate}

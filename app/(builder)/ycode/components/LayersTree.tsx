@@ -100,15 +100,104 @@ function getLayerDisplayLabel(
   return getLayerName(layer, context, breakpoint);
 }
 
+interface LayerTreeStoreValues {
+  getComponentById: ReturnType<typeof useComponentsStore.getState>['getComponentById'];
+  collections: ReturnType<typeof useCollectionsStore.getState>['collections'];
+  fieldsByCollectionId: ReturnType<typeof useCollectionsStore.getState>['fields'];
+  selectLayerWithSublayer: ReturnType<typeof useEditorStore.getState>['selectLayerWithSublayer'];
+  editingComponentId: string | null;
+  interactionTriggerLayerIds: string[];
+  interactionTargetLayerIds: string[];
+  activeInteractionTriggerLayerId: string | null;
+  activeInteractionTargetLayerIds: string[];
+  activeUIState: string;
+}
+
+const LayerTreeStoreContext = React.createContext<LayerTreeStoreValues>(null!);
+
 interface LayersTreeProps {
   layers: Layer[];
-  selectedLayerId: string | null;
-  selectedLayerIds?: string[]; // New multi-select support
   onLayerSelect: (layerId: string) => void;
   onReorder: (newLayers: Layer[], movedLayerId?: string) => void;
   pageId: string;
   liveLayerUpdates?: UseLiveLayerUpdatesReturn | null;
   liveComponentUpdates?: UseLiveComponentUpdatesReturn | null;
+}
+
+const ROW_HEIGHT = 32;
+
+interface DndInfo {
+  attributes: Record<string, unknown>;
+  listeners: Record<string, unknown>;
+  setRowElement: (el: HTMLDivElement | null) => void;
+}
+
+const DndInfoContext = React.createContext<React.MutableRefObject<DndInfo>>(null!);
+
+interface VirtualLayerRowProps {
+  nodeId: string;
+  isRenaming: boolean;
+  translateY: number;
+  children: React.ReactNode;
+}
+
+/**
+ * Wrapper that owns dnd-kit hooks so the inner memoized LayerRow
+ * is shielded from DndContext re-renders. Passes dnd info via a
+ * stable ref context so LayerRow can apply it to its content div.
+ */
+function VirtualLayerRow({ nodeId, isRenaming, translateY, children }: VirtualLayerRowProps) {
+  const { setNodeRef: setDropRef } = useDroppable({ id: nodeId });
+  const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({
+    id: nodeId,
+    disabled: isRenaming,
+  });
+
+  const elementRef = useRef<HTMLDivElement | null>(null);
+  const dragRefFn = useRef(setDragRef);
+  const dropRefFn = useRef(setDropRef);
+  dragRefFn.current = setDragRef;
+  dropRefFn.current = setDropRef;
+
+  // Stable ref callback — identity never changes
+  const setRowElement = useCallback((el: HTMLDivElement | null) => {
+    elementRef.current = el;
+    dragRefFn.current(el);
+    dropRefFn.current(el);
+  }, []);
+
+  const dndInfoRef = useRef<DndInfo>({
+    attributes: attributes as unknown as Record<string, unknown>,
+    listeners: listeners as unknown as Record<string, unknown>,
+    setRowElement,
+  });
+  dndInfoRef.current.attributes = attributes as unknown as Record<string, unknown>;
+  dndInfoRef.current.listeners = listeners as unknown as Record<string, unknown>;
+
+  // Re-register DOM element when dnd-kit ref setters change
+  useLayoutEffect(() => {
+    if (elementRef.current) {
+      setDragRef(elementRef.current);
+      setDropRef(elementRef.current);
+    }
+  }, [setDragRef, setDropRef]);
+
+  return (
+    <DndInfoContext.Provider value={dndInfoRef}>
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: ROW_HEIGHT,
+          transform: `translateY(${translateY}px)`,
+        }}
+      >
+        {children}
+      </div>
+    </DndInfoContext.Provider>
+  );
 }
 
 interface LayerRowProps {
@@ -122,12 +211,11 @@ interface LayerRowProps {
   isDragging: boolean;
   isDragActive: boolean;
   dropPosition: 'above' | 'below' | 'inside' | null;
-  highlightedDepths: Set<number>;
+  highlightedDepths: string;
   onSelect: (id: string) => void;
   onMultiSelect: (id: string, modifiers: { meta: boolean; shift: boolean }) => void;
   onToggle: (id: string) => void;
   pageId: string;
-  selectedLayerId: string | null;
   liveLayerUpdates?: UseLiveLayerUpdatesReturn | null;
   liveComponentUpdates?: UseLiveComponentUpdatesReturn | null;
   activeBreakpoint: Breakpoint;
@@ -169,7 +257,6 @@ const LayerRow = React.memo(function LayerRow({
   onMultiSelect,
   onToggle,
   pageId,
-  selectedLayerId,
   liveLayerUpdates,
   liveComponentUpdates,
   activeBreakpoint,
@@ -178,29 +265,22 @@ const LayerRow = React.memo(function LayerRow({
   onRenameConfirm,
   onToggleVisibility,
 }: LayerRowProps) {
-  // const getStyleById = useLayerStylesStore((state) => state.getStyleById);
-  const getComponentById = useComponentsStore((state) => state.getComponentById);
-  const collections = useCollectionsStore((state) => state.collections);
-  const fieldsByCollectionId = useCollectionsStore((state) => state.fields);
-
-  // Use selective subscriptions to avoid re-renders when unrelated state changes
-  const selectLayerWithSublayer = useEditorStore((state) => state.selectLayerWithSublayer);
-  const editingComponentId = useEditorStore((state) => state.editingComponentId);
-  const interactionTriggerLayerIds = useEditorStore((state) => state.interactionTriggerLayerIds);
-  const interactionTargetLayerIds = useEditorStore((state) => state.interactionTargetLayerIds);
-  const activeInteractionTriggerLayerId = useEditorStore((state) => state.activeInteractionTriggerLayerId);
-  const activeInteractionTargetLayerIds = useEditorStore((state) => state.activeInteractionTargetLayerIds);
-  const activeUIState = useEditorStore((state) => state.activeUIState);
+  const {
+    getComponentById,
+    collections,
+    fieldsByCollectionId,
+    selectLayerWithSublayer,
+    editingComponentId,
+    interactionTriggerLayerIds,
+    interactionTargetLayerIds,
+    activeInteractionTriggerLayerId,
+    activeInteractionTargetLayerIds,
+    activeUIState,
+  } = React.useContext(LayerTreeStoreContext);
   const isStateActive = activeUIState !== 'neutral';
 
-  const { setNodeRef: setDropRef } = useDroppable({
-    id: node.id,
-  });
-
-  const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({
-    id: node.id,
-    disabled: isRenaming,
-  });
+  const dndInfo = React.useContext(DndInfoContext);
+  const { attributes, listeners, setRowElement } = dndInfo.current;
 
   const renameInputRef = React.useRef<HTMLInputElement>(null);
   const renameReadyRef = React.useRef(false);
@@ -227,12 +307,6 @@ const LayerRow = React.memo(function LayerRow({
       renameReadyRef.current = false;
     }
   }, [isRenaming]);
-
-  // Combine refs for drag and drop
-  const setRefs = (element: HTMLDivElement | null) => {
-    setDragRef(element);
-    setDropRef(element);
-  };
 
   const hasChildren = node.layer.children && node.layer.children.length > 0;
   const isCollapsed = node.collapsed || false;
@@ -370,7 +444,6 @@ const LayerRow = React.memo(function LayerRow({
       pageId={pageId}
       isLocked={isLocked}
       onLayerSelect={onSelect}
-      selectedLayerId={selectedLayerId}
       liveLayerUpdates={liveLayerUpdates}
       liveComponentUpdates={liveComponentUpdates}
       editingComponentId={editingComponentId}
@@ -380,7 +453,7 @@ const LayerRow = React.memo(function LayerRow({
         {node.depth > 0 && (
           <>
             {Array.from({ length: node.depth }).map((_, i) => {
-              const shouldHighlight = (isSelected || isChildOfSelected) && highlightedDepths.has(i);
+              const shouldHighlight = (isSelected || isChildOfSelected) && highlightedDepths.includes(`,${i},`);
               return (
                 <div
                   key={i}
@@ -413,7 +486,7 @@ const LayerRow = React.memo(function LayerRow({
 
         {/* Main Row */}
         <div
-          ref={setRefs}
+          ref={setRowElement}
           {...(isRenaming ? {} : attributes)}
           {...(isRenaming ? {} : listeners)}
           data-drag-active={isDragActive}
@@ -448,13 +521,11 @@ const LayerRow = React.memo(function LayerRow({
           style={{ paddingLeft: `${node.depth * 14 + 8}px` }}
           onClick={(e) => {
             if (isRenaming) return;
-            // Block click if layer is locked by another user
             if (isLockedByOther) {
               e.stopPropagation();
               e.preventDefault();
               return;
             }
-            // Normal click: Select only this layer
             onSelect(node.id);
           }}
         >
@@ -752,15 +823,12 @@ function setLayersOpen(layers: Layer[], idsToOpen: Set<string>): Layer[] {
 // Main LayersTree Component
 export default function LayersTree({
   layers,
-  selectedLayerId,
-  selectedLayerIds: propSelectedLayerIds,
   onLayerSelect,
   onReorder,
   pageId,
   liveLayerUpdates,
   liveComponentUpdates,
 }: LayersTreeProps) {
-
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'above' | 'below' | 'inside' | null>(null);
@@ -769,9 +837,9 @@ export default function LayersTree({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [shouldScrollToSelected, setShouldScrollToSelected] = useState(false);
 
-  // Pull multi-select state and breakpoint from editor store
+  // Pull selection and breakpoint from editor store
+  const selectedLayerId = useEditorStore((s) => s.selectedLayerId);
   const storeSelectedLayerIds = useEditorStore((s) => s.selectedLayerIds);
-  const lastSelectedLayerId = useEditorStore((s) => s.lastSelectedLayerId);
   const toggleSelection = useEditorStore((s) => s.toggleSelection);
   const selectRange = useEditorStore((s) => s.selectRange);
   const editingComponentId = useEditorStore((s) => s.editingComponentId);
@@ -779,12 +847,37 @@ export default function LayersTree({
   const storeActiveSublayerIndex = useEditorStore((s) => s.activeSublayerIndex);
   const storeActiveTextStyleKey = useEditorStore((s) => s.activeTextStyleKey);
   const storeActiveListItemIndex = useEditorStore((s) => s.activeListItemIndex);
+  const selectLayerWithSublayer = useEditorStore((s) => s.selectLayerWithSublayer);
+  const interactionTriggerLayerIds = useEditorStore((s) => s.interactionTriggerLayerIds);
+  const interactionTargetLayerIds = useEditorStore((s) => s.interactionTargetLayerIds);
+  const activeInteractionTriggerLayerId = useEditorStore((s) => s.activeInteractionTriggerLayerId);
+  const activeInteractionTargetLayerIds = useEditorStore((s) => s.activeInteractionTargetLayerIds);
+  const activeUIState = useEditorStore((s) => s.activeUIState);
 
   const getComponentById = useComponentsStore((s) => s.getComponentById);
 
   const collections = useCollectionsStore((s) => s.collections);
   const fieldsByCollectionId = useCollectionsStore((s) => s.fields);
   const collectionItems = useCollectionsStore((s) => s.items);
+
+  const layerTreeStoreValues = useMemo<LayerTreeStoreValues>(() => ({
+    getComponentById,
+    collections,
+    fieldsByCollectionId,
+    selectLayerWithSublayer,
+    editingComponentId,
+    interactionTriggerLayerIds,
+    interactionTargetLayerIds,
+    activeInteractionTriggerLayerId,
+    activeInteractionTargetLayerIds,
+    activeUIState,
+  }), [
+    getComponentById, collections, fieldsByCollectionId,
+    selectLayerWithSublayer, editingComponentId,
+    interactionTriggerLayerIds, interactionTargetLayerIds,
+    activeInteractionTriggerLayerId, activeInteractionTargetLayerIds,
+    activeUIState,
+  ]);
 
   // CMS data for resolving rich text sublayers from actual CMS item content
   const currentPageCollectionItemId = useEditorStore((state) => state.currentPageCollectionItemId);
@@ -799,8 +892,7 @@ export default function LayersTree({
     return item?.values ?? null;
   }, [pageCollectionId, currentPageCollectionItemId, collectionItems]);
 
-  // Use prop or store state (prop takes precedence for compatibility)
-  const selectedLayerIds = propSelectedLayerIds ?? storeSelectedLayerIds;
+  const selectedLayerIds = storeSelectedLayerIds;
 
   // Flatten the tree for rendering (sorted by CSS order on responsive breakpoints)
   const flattenedNodes = useMemo(
@@ -937,17 +1029,17 @@ export default function LayersTree({
 
   // Calculate which depth levels should be highlighted (selected containers)
   const highlightedDepths = useMemo(() => {
-    const depths = new Set<number>();
+    const depths: number[] = [];
     const selectedIds = selectedLayerId ? [selectedLayerId, ...selectedLayerIds] : selectedLayerIds;
 
     selectedIds.forEach(id => {
       const node = flattenedNodes.find(n => n.id === id);
-      if (node && node.canHaveChildren) {
-        depths.add(node.depth);
+      if (node && node.canHaveChildren && !depths.includes(node.depth)) {
+        depths.push(node.depth);
       }
     });
 
-    return depths;
+    return `,${depths.join(',')},`;
   }, [flattenedNodes, selectedLayerId, selectedLayerIds]);
 
   // Get the currently active node being dragged
@@ -1022,22 +1114,19 @@ export default function LayersTree({
     })
   );
 
-  // Multi-select click handler
   const handleMultiSelect = useCallback((id: string, modifiers: { meta: boolean; shift: boolean }) => {
     if (id === 'body') {
-      // Body layer can't be multi-selected
       onLayerSelect(id);
       return;
     }
 
     if (modifiers.meta) {
-      // Cmd/Ctrl+Click: Toggle selection
       toggleSelection(id);
-    } else if (modifiers.shift && lastSelectedLayerId) {
-      // Shift+Click: Select range
-      selectRange(lastSelectedLayerId, id, flattenedNodes);
+    } else if (modifiers.shift) {
+      const lastId = useEditorStore.getState().lastSelectedLayerId;
+      if (lastId) selectRange(lastId, id, flattenedNodes);
     }
-  }, [toggleSelection, selectRange, lastSelectedLayerId, flattenedNodes, onLayerSelect]);
+  }, [toggleSelection, selectRange, flattenedNodes, onLayerSelect]);
 
   // Sync collapsedIds state when layers change (from external updates)
   useEffect(() => {
@@ -1202,7 +1291,6 @@ export default function LayersTree({
     }
   }, []);
 
-  const ROW_HEIGHT = 32;
   const virtualizer = useVirtualizer({
     count: flattenedNodes.length,
     getScrollElement: () => scrollContainerRef.current,
@@ -1816,7 +1904,6 @@ export default function LayersTree({
     [onLayerSelect]
   );
 
-  // Pre-compute selection-related data for all nodes (avoids expensive calculations in render loop)
   const nodeSelectionData = useMemo(() => {
     const selectedIdsSet = new Set(selectedLayerIds);
     if (selectedLayerId) selectedIdsSet.add(selectedLayerId);
@@ -1935,6 +2022,7 @@ export default function LayersTree({
   }, [flattenedNodes, selectedLayerIds, selectedLayerId, collapsedIds, storeActiveSublayerIndex, storeActiveTextStyleKey, storeActiveListItemIndex]);
 
   return (
+    <LayerTreeStoreContext.Provider value={layerTreeStoreValues}>
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
@@ -1949,16 +2037,11 @@ export default function LayersTree({
           const selectionData = nodeSelectionData.get(node.id)!;
 
           return (
-            <div
+            <VirtualLayerRow
               key={node.id}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: ROW_HEIGHT,
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
+              nodeId={node.id}
+              isRenaming={renamingLayerId === node.id}
+              translateY={virtualRow.start}
             >
               <LayerRow
                 node={node}
@@ -1976,7 +2059,6 @@ export default function LayersTree({
                 onMultiSelect={handleMultiSelect}
                 onToggle={handleToggle}
                 pageId={pageId}
-                selectedLayerId={selectedLayerId}
                 liveLayerUpdates={liveLayerUpdates}
                 liveComponentUpdates={liveComponentUpdates}
                 activeBreakpoint={activeBreakpoint}
@@ -1985,7 +2067,7 @@ export default function LayersTree({
                 onRenameConfirm={handleRenameConfirm}
                 onToggleVisibility={handleToggleVisibility}
               />
-            </div>
+            </VirtualLayerRow>
           );
         })}
 
@@ -2041,6 +2123,7 @@ export default function LayersTree({
       </DragOverlay>
       <div className="min-h-10" />
     </DndContext>
+    </LayerTreeStoreContext.Provider>
   );
 }
 

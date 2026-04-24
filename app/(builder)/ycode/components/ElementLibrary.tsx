@@ -8,7 +8,6 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
@@ -276,7 +275,6 @@ async function restoreInlinedComponents(
 }
 
 export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: ElementLibraryProps) {
-
   const addLayerFromTemplate = usePagesStore((s) => s.addLayerFromTemplate);
   const updateLayer = usePagesStore((s) => s.updateLayer);
   const setDraftLayers = usePagesStore((s) => s.setDraftLayers);

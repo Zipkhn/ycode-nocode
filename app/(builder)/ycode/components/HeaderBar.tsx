@@ -80,7 +80,6 @@ export default function HeaderBar({
   onPublishSuccess,
   isSettingsRoute = false,
 }: HeaderBarProps) {
-
   const router = useRouter();
   const pathname = usePathname();
   const pageDropdownRef = useRef<HTMLDivElement>(null);
