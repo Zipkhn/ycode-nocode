@@ -867,15 +867,34 @@ export default function StudioThemeEditor() {
    
   }, []);
 
+  // ─── RADIUS & BORDER-WIDTH BRIDGE ────────────────────────────────────────────
+  // Ycode generates "rounded-radius-small" when the user types "radius-small"
+  // in the sidebar border-radius field. These rules map that class to the token.
+  const generateRadiusBridgeCSS = useCallback((): string => {
+    const scope = ':where(body)';
+    const lines: string[] = ['/* Studio Radius Bridge */'];
+    const tokens = [
+      { cls: 'radius-small', var: '--radius--small' },
+      { cls: 'radius-main',  var: '--radius--main'  },
+      { cls: 'radius-round', var: '--radius--round' },
+    ];
+    for (const { cls, var: cssVar } of tokens) {
+      const sel = `${scope} [class*="rounded-${cls}"]`;
+      lines.push(`${sel}{border-radius:var(${cssVar})!important}`);
+    }
+    return lines.join('\n');
+  }, []);
+
   const getCompleteBridgeCSS = useCallback(() => {
     const parts = [
       generateSpacingBridgeCSS(),
       generateTypographyBridgeCSS(),
+      generateRadiusBridgeCSS(),
     ];
     const themeDark = generateThemeDarkBridgeCSS();
     if (themeDark) parts.push(themeDark);
     return parts.join('\n\n');
-  }, [generateSpacingBridgeCSS, generateTypographyBridgeCSS, generateThemeDarkBridgeCSS]);
+  }, [generateSpacingBridgeCSS, generateTypographyBridgeCSS, generateRadiusBridgeCSS, generateThemeDarkBridgeCSS]);
 
   // ─── FIGMA / W3C DESIGN TOKENS — EXPORT + IMPORT ────────────────────────────
   //
@@ -2127,6 +2146,8 @@ export default function StudioThemeEditor() {
           <div
             className="w-[92vw] h-[90vh] max-w-none bg-background border border-border rounded-xl shadow-2xl flex flex-col relative pointer-events-auto cursor-default"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            onKeyUp={(e) => e.stopPropagation()}
           >
             <div className="flex-none flex justify-between items-center px-6 py-4 border-b border-border bg-card">
               <div className="flex items-center gap-4">

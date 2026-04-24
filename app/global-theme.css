@@ -1172,6 +1172,11 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 :where(body) p{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 :where(body) .u-text-small{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
 
+/* Studio Radius Bridge */
+:where(body) [class*="rounded-radius-small"]{border-radius:var(--radius--small)!important}
+:where(body) [class*="rounded-radius-main"]{border-radius:var(--radius--main)!important}
+:where(body) [class*="rounded-radius-round"]{border-radius:var(--radius--round)!important}
+
 /* Studio Theme Dark Bridge */
 .u-theme-dark {
   --42bd72cf-c7de-465c-9b31-4ef1e73a3c1c: #2B3799;
