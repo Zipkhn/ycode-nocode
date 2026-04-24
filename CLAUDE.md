@@ -2,73 +2,38 @@
 
 > **ALWAYS refer to files in `.claude/memory/` for preferences and project context before starting a task. Update these files when significant decisions are made.**
 
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
-
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
-
 ## 0. Context & Memory (PRIORITY)
+- **Consult first:** Read `.claude/memory/Context.md` (state/stack) and `.claude/memory/Memory.md` (style/decisions).
+- **Self-Evolution:** Update `.claude/memory/Memory.md` after any major change or new preference.
+- **Laconic Mode:** Be extremely brief. No pleasantries. No "Certainly!", "I understand", or "Here is the code". Provide the solution directly.
 
-**Before any action, consult the local memory vault:**
-- Read `.claude/memory/Context.md` to understand the project's current state and stack.
-- Read `.claude/memory/Memory.md` to respect my personal coding style and past decisions.
-- **Self-Evolution:** After completing a task, if a new preference or a major decision is made, you MUST update `.claude/memory/Memory.md`.
-- 
-## 1. Think Before Coding
+## 1. Token Efficiency (Cost Optimization)
+- **No Repetition:** Never restate my instructions.
+- **Dry Output:** If code is self-explanatory, provide **zero** commentary.
+- **Brief Planning:** Use ultra-short bullet points for plans (max 5 words per step).
+- **Minimal Diffs:** Use surgical line edits. Avoid reprinting large blocks of unchanged code.
+- **Caveman Logic:** If a one-sentence explanation suffices, do not write a paragraph.
 
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
+## 2. Think Before Coding
+- **Don't assume.** Surface tradeoffs and ask clarifying questions *before* writing code.
+- If multiple interpretations exist, present them briefly.
+- If a simpler approach exists, push back.
 
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+## 3. Simplicity First
+- **Minimum code** that solves the problem. No speculative features or abstractions.
+- No "flexibility" that wasn't requested.
+- If you can do it in 50 lines instead of 200, rewrite it.
 
-## 2. Simplicity First
+## 4. Surgical Changes
+- **Touch only what you must.** Match existing style perfectly.
+- Do not "improve" or "refactor" adjacent code unless explicitly asked.
+- Remove orphans (imports/vars) created by YOUR changes only.
 
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+## 5. Goal-Driven Execution
+- Define success criteria and verify (tests or manual checks).
+- For multi-step tasks, follow this format:
+  1. [Task] -> [Check]
+  2. [Task] -> [Check]
 
 ---
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+**Status:** Efficiency-focused. Fewer tokens, fewer mistakes, surgical precision.

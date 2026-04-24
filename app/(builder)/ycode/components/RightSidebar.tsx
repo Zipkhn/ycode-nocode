@@ -1790,7 +1790,7 @@ const RightSidebar = React.memo(function RightSidebar({
           </TabsList>
         </div>
 
-        <hr className="mt-4" />
+        <hr className="mt-2" />
 
         {/* Design tab */}
         <TabsContent value="design" className="flex-1 flex flex-col divide-y data-[state=inactive]:hidden mt-0 overflow-hidden">

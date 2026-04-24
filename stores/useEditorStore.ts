@@ -5,6 +5,7 @@ import { EditorState, UIState } from '../types';
 import type { Layer, Breakpoint, Asset, AssetCategoryFilter } from '../types';
 import { useCanvasTextEditorStore } from './useCanvasTextEditorStore';
 import { updateUrlQueryParam } from '@/hooks/use-editor-url';
+import { setDefaultMeasurementUnit } from '@/lib/tailwind-class-mapper';
 
 interface HistoryEntry {
   pageId: string;
@@ -87,6 +88,8 @@ interface EditorActions {
   closeCreateComponentDialog: () => void;
   cleanSlate: boolean;
   setCleanSlate: (value: boolean) => void;
+  defaultUnit: string;
+  setDefaultUnit: (unit: string) => void;
   // Canvas drag-and-drop actions (pointer-based)
   startCanvasDrag: (elementType: string, source: 'elements' | 'layouts' | 'components', elementName: string, initialPosition: DragPosition) => void;
   updateDragPosition: (position: DragPosition) => void;
@@ -229,6 +232,16 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   setCleanSlate: (value) => {
     if (typeof window !== 'undefined') localStorage.setItem('ycode_clean_slate', String(value));
     set({ cleanSlate: value });
+  },
+  defaultUnit: (() => {
+    const saved = typeof window !== 'undefined' ? (localStorage.getItem('ycode_default_unit') || 'px') : 'px';
+    setDefaultMeasurementUnit(saved);
+    return saved;
+  })(),
+  setDefaultUnit: (unit) => {
+    if (typeof window !== 'undefined') localStorage.setItem('ycode_default_unit', unit);
+    setDefaultMeasurementUnit(unit);
+    set({ defaultUnit: unit });
   },
   createComponentDialog: {
     open: false,

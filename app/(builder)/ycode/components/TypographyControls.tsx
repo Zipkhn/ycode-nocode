@@ -3,20 +3,18 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useDesignSync } from '@/hooks/use-design-sync';
-import { useControlledInput } from '@/hooks/use-controlled-input';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useFontsStore } from '@/stores/useFontsStore';
-import { extractMeasurementValue } from '@/lib/measurement-utils';
 import { removeSpaces } from '@/lib/utils';
+import { MeasurementInput } from './MeasurementInput';
 import { getFontAvailableWeights, FONT_WEIGHTS } from '@/lib/font-utils';
 import { buildBgImgVarName } from '@/lib/tailwind-class-mapper';
 import { isTextContentLayer } from '@/lib/layer-utils';
@@ -74,30 +72,6 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
   // Detect if text transform is active
   const hasTransform = textTransform !== 'none' && textTransform !== '';
 
-  // Custom extractor for letter spacing (strips 'em' as default unit, like fontSize strips 'px')
-  const extractLetterSpacingValue = (value: string): string => {
-    if (!value) return '';
-
-    // Special values that don't need processing
-    const specialValues = ['auto', 'normal'];
-    if (specialValues.includes(value)) return value;
-
-    // Strip 'em' unit (default for letter spacing)
-    // Keep all other units like px, rem, %, etc.
-    if (value.endsWith('em')) {
-      return value.slice(0, -2);
-    }
-
-    return value;
-  };
-
-  // Local controlled inputs (prevents repopulation bug)
-  const [fontSizeInput, setFontSizeInput] = useControlledInput(fontSize, extractMeasurementValue);
-  const [letterSpacingInput, setLetterSpacingInput] = useControlledInput(letterSpacing, extractLetterSpacingValue);
-  const [lineHeightInput, setLineHeightInput] = useControlledInput(lineHeight);
-  const [decorationThicknessInput, setDecorationThicknessInput] = useControlledInput(textDecorationThickness, extractMeasurementValue);
-  const [underlineOffsetInput, setUnderlineOffsetInput] = useControlledInput(underlineOffset, extractMeasurementValue);
-
   // Map numeric font weights to named values
   const fontWeightMap: Record<string, string> = {
     '100': 'thin',
@@ -138,11 +112,8 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
     updateDesignProperty('typography', 'fontWeight', numericWeight);
   };
 
-  // Handle font size change (debounced for text input)
   const handleFontSizeChange = (value: string) => {
-    setFontSizeInput(value); // Update local state immediately (spaces auto-stripped by hook)
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('typography', 'fontSize', sanitized || null);
+    debouncedUpdateDesignProperty('typography', 'fontSize', value || null);
   };
 
   // Handle text align change (immediate - button toggle)
@@ -150,32 +121,12 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
     updateDesignProperty('typography', 'textAlign', value);
   };
 
-  // Handle letter spacing change (debounced for text input)
   const handleLetterSpacingChange = (value: string) => {
-    setLetterSpacingInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('typography', 'letterSpacing', sanitized || null);
+    debouncedUpdateDesignProperty('typography', 'letterSpacing', value || null);
   };
 
-  // Handle letter spacing stepper (round to 1 decimal to avoid floating point noise)
-  const handleLetterSpacingStepper = (value: string) => {
-    const num = parseFloat(value);
-    const rounded = !isNaN(num) ? String(Math.round(num * 10) / 10) : value;
-    handleLetterSpacingChange(rounded);
-  };
-
-  // Handle line height change (debounced for text input)
   const handleLineHeightChange = (value: string) => {
-    setLineHeightInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('typography', 'lineHeight', sanitized || null);
-  };
-
-  // Handle line height stepper (round to 1 decimal to avoid floating point noise)
-  const handleLineHeightStepper = (value: string) => {
-    const num = parseFloat(value);
-    const rounded = !isNaN(num) ? String(Math.round(num * 10) / 10) : value;
-    handleLineHeightChange(rounded);
+    debouncedUpdateDesignProperty('typography', 'lineHeight', value || null);
   };
 
   // Debounced handler for keyboard-typed hex values
@@ -234,18 +185,12 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
     updateDesignProperty('typography', 'textDecorationColor', sanitized || null);
   };
 
-  // Handle decoration thickness change (debounced for text input)
   const handleDecorationThicknessChange = (value: string) => {
-    setDecorationThicknessInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('typography', 'textDecorationThickness', sanitized || null);
+    debouncedUpdateDesignProperty('typography', 'textDecorationThickness', value || null);
   };
 
-  // Handle underline offset change (debounced for text input)
   const handleUnderlineOffsetChange = (value: string) => {
-    setUnderlineOffsetInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('typography', 'underlineOffset', sanitized || null);
+    debouncedUpdateDesignProperty('typography', 'underlineOffset', value || null);
   };
 
   // Check if the layer is an icon or text-content element
@@ -379,14 +324,10 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
             <div className="grid grid-cols-3">
               <Label variant="muted">Size</Label>
               <div className="col-span-2 *:w-full">
-                <InputGroup>
-                  <InputGroupInput
-                    value={fontSizeInput}
-                    onChange={(e) => handleFontSizeChange(e.target.value)}
-                    stepper
-                    min="0"
-                  />
-                </InputGroup>
+                <MeasurementInput
+                  value={fontSize} onChange={handleFontSizeChange}
+                  className="w-full"
+                />
               </div>
             </div>
           </>
@@ -490,14 +431,9 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
                     </Tooltip>
                   </div>
                 </InputGroupAddon>
-                <InputGroupInput
-                  className="pr-0!"
-                  value={letterSpacingInput}
-                  onChange={(e) => handleLetterSpacingChange(e.target.value)}
-                  onStepperChange={handleLetterSpacingStepper}
-                  stepper
-                  step="0.1"
-                  min="0"
+                <MeasurementInput
+                  value={letterSpacing} onChange={handleLetterSpacingChange}
+                  className="flex-1"
                 />
               </InputGroup>
               <InputGroup>
@@ -513,14 +449,9 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
                     </Tooltip>
                   </div>
                 </InputGroupAddon>
-                <InputGroupInput
-                  className="pr-0!"
-                  value={lineHeightInput}
-                  onChange={(e) => handleLineHeightChange(e.target.value)}
-                  onStepperChange={handleLineHeightStepper}
-                  stepper
-                  step="0.1"
-                  min="0"
+                <MeasurementInput
+                  value={lineHeight} onChange={handleLineHeightChange}
+                  className="flex-1"
                 />
               </InputGroup>
             </div>
@@ -550,13 +481,9 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
                     <div className="grid grid-cols-3 items-start">
                       <Label variant="muted" className="h-8">Offset</Label>
                       <div className="col-span-2">
-                        <Input
-                          stepper
-                          min="0"
-                          step="1"
-                          value={underlineOffsetInput}
-                          onChange={(e) => handleUnderlineOffsetChange(e.target.value)}
-                          placeholder="2"
+                        <MeasurementInput
+                          value={underlineOffset} onChange={handleUnderlineOffsetChange}
+                          placeholder="2" className="w-full"
                         />
                       </div>
                     </div>
@@ -564,13 +491,9 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
                     <div className="grid grid-cols-3 items-start">
                       <Label variant="muted" className="h-8">Thickness</Label>
                       <div className="col-span-2">
-                        <Input
-                          stepper
-                          min="0"
-                          step="1"
-                          value={decorationThicknessInput}
-                          onChange={(e) => handleDecorationThicknessChange(e.target.value)}
-                          placeholder="1"
+                        <MeasurementInput
+                          value={textDecorationThickness} onChange={handleDecorationThicknessChange}
+                          placeholder="1" className="w-full"
                         />
                       </div>
                     </div>

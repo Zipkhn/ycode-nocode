@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useCallback, memo } from 'react';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,13 +16,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useDesignSync } from '@/hooks/use-design-sync';
-import { useControlledInputs } from '@/hooks/use-controlled-input';
 import { useModeToggle } from '@/hooks/use-mode-toggle';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
-import { extractMeasurementValue } from '@/lib/measurement-utils';
 import { cn, removeSpaces } from '@/lib/utils';
 import ColorPropertyField from './ColorPropertyField';
+import { MeasurementInput } from './MeasurementInput';
 import type { Collection, CollectionField, Layer } from '@/types';
 import type { FieldGroup } from '@/lib/collection-field-utils';
 
@@ -110,39 +108,6 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
   const outlineOffset = getDesignProperty('borders', 'outlineOffset') || '';
   const hasOutline = !!(outlineWidth || outlineColor || designBorders?.outlineWidth || designBorders?.outlineColor);
 
-  // Local controlled inputs (prevents repopulation bug)
-  const inputs = useControlledInputs({
-    borderRadius,
-    borderTopLeftRadius,
-    borderTopRightRadius,
-    borderBottomRightRadius,
-    borderBottomLeftRadius,
-    borderWidth,
-    borderTopWidth,
-    borderRightWidth,
-    borderBottomWidth,
-    borderLeftWidth,
-    divideX,
-    divideY,
-    outlineWidth,
-    outlineOffset,
-  }, extractMeasurementValue);
-
-  const [borderRadiusInput, setBorderRadiusInput] = inputs.borderRadius;
-  const [borderTopLeftRadiusInput, setBorderTopLeftRadiusInput] = inputs.borderTopLeftRadius;
-  const [borderTopRightRadiusInput, setBorderTopRightRadiusInput] = inputs.borderTopRightRadius;
-  const [borderBottomRightRadiusInput, setBorderBottomRightRadiusInput] = inputs.borderBottomRightRadius;
-  const [borderBottomLeftRadiusInput, setBorderBottomLeftRadiusInput] = inputs.borderBottomLeftRadius;
-  const [borderWidthInput, setBorderWidthInput] = inputs.borderWidth;
-  const [borderTopWidthInput, setBorderTopWidthInput] = inputs.borderTopWidth;
-  const [borderRightWidthInput, setBorderRightWidthInput] = inputs.borderRightWidth;
-  const [borderBottomWidthInput, setBorderBottomWidthInput] = inputs.borderBottomWidth;
-  const [borderLeftWidthInput, setBorderLeftWidthInput] = inputs.borderLeftWidth;
-  const [divideXInput, setDivideXInput] = inputs.divideX;
-  const [divideYInput, setDivideYInput] = inputs.divideY;
-  const [outlineWidthInput, setOutlineWidthInput] = inputs.outlineWidth;
-  const [outlineOffsetInput, setOutlineOffsetInput] = inputs.outlineOffset;
-
   // Use mode toggle hooks for radius and width
   const radiusModeToggle = useModeToggle({
     category: 'borders',
@@ -166,62 +131,44 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
     getStoredMode: () => (layer?.design?.borders as Record<string, unknown>)?.borderWidthMode as 'all' | 'individual' | null,
   });
 
-  // Handle radius changes (debounced for text input)
   const handleRadiusChange = (value: string) => {
-    setBorderRadiusInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'borderRadius', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'borderRadius', value || null);
   };
 
   const handleTopLeftRadiusChange = (value: string) => {
-    setBorderTopLeftRadiusInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'borderTopLeftRadius', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'borderTopLeftRadius', value || null);
   };
 
   const handleTopRightRadiusChange = (value: string) => {
-    setBorderTopRightRadiusInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'borderTopRightRadius', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'borderTopRightRadius', value || null);
   };
 
   const handleBottomRightRadiusChange = (value: string) => {
-    setBorderBottomRightRadiusInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'borderBottomRightRadius', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'borderBottomRightRadius', value || null);
   };
 
   const handleBottomLeftRadiusChange = (value: string) => {
-    setBorderBottomLeftRadiusInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'borderBottomLeftRadius', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'borderBottomLeftRadius', value || null);
   };
 
-  // Handle border width changes (debounced for text input)
   const handleBorderWidthChange = (value: string) => {
-    setBorderWidthInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'borderWidth', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'borderWidth', value || null);
   };
 
   const handleTopWidthChange = (value: string) => {
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'borderTopWidth', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'borderTopWidth', value || null);
   };
 
   const handleRightWidthChange = (value: string) => {
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'borderRightWidth', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'borderRightWidth', value || null);
   };
 
   const handleBottomWidthChange = (value: string) => {
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'borderBottomWidth', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'borderBottomWidth', value || null);
   };
 
   const handleLeftWidthChange = (value: string) => {
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'borderLeftWidth', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'borderLeftWidth', value || null);
   };
 
   // Handle border style change (immediate - dropdown selection)
@@ -264,15 +211,11 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
   };
 
   const handleDivideXChange = (value: string) => {
-    setDivideXInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'divideX', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'divideX', value || null);
   };
 
   const handleDivideYChange = (value: string) => {
-    setDivideYInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'divideY', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'divideY', value || null);
   };
 
   const handleDivideStyleChange = (value: string) => {
@@ -307,9 +250,7 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
   };
 
   const handleOutlineWidthChange = (value: string) => {
-    setOutlineWidthInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'outlineWidth', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'outlineWidth', value || null);
   };
 
   const handleOutlineColorChange = (value: string) => {
@@ -323,9 +264,7 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
   };
 
   const handleOutlineOffsetChange = (value: string) => {
-    setOutlineOffsetInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('borders', 'outlineOffset', sanitized || null);
+    debouncedUpdateDesignProperty('borders', 'outlineOffset', value || null);
   };
 
   const handleAddOutline = () => {
@@ -375,15 +314,12 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
         <div className="grid grid-cols-3 items-start">
           <Label variant="muted" className="h-8">Radius</Label>
           <div className="col-span-2 flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <Input
-                stepper
-                min="0"
-                step="1"
-                className="flex-1"
+            <div className="flex items-center gap-2 min-w-0">
+              <MeasurementInput
+                className="flex-1 min-w-0"
                 disabled={radiusModeToggle.mode === 'individual'}
-                value={borderRadiusInput}
-                onChange={(e) => handleRadiusChange(e.target.value)}
+                value={borderRadius}
+                onChange={handleRadiusChange}
                 placeholder="0"
               />
               <Button
@@ -400,52 +336,36 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
                   <InputGroupAddon>
                     <Icon name="borderTopLeft" className="size-3" />
                   </InputGroupAddon>
-                  <InputGroupInput
-                    stepper
-                    min="0"
-                    step="1"
-                    value={borderTopLeftRadiusInput}
-                    onChange={(e) => handleTopLeftRadiusChange(e.target.value)}
-                    placeholder="0"
+                  <MeasurementInput
+                    value={borderTopLeftRadius} onChange={handleTopLeftRadiusChange}
+                    placeholder="0" className="flex-1"
                   />
                 </InputGroup>
                 <InputGroup>
                   <InputGroupAddon>
                     <Icon name="borderTopLeft" className="size-3 rotate-90" />
                   </InputGroupAddon>
-                  <InputGroupInput
-                    stepper
-                    min="0"
-                    step="1"
-                    value={borderTopRightRadiusInput}
-                    onChange={(e) => handleTopRightRadiusChange(e.target.value)}
-                    placeholder="0"
+                  <MeasurementInput
+                    value={borderTopRightRadius} onChange={handleTopRightRadiusChange}
+                    placeholder="0" className="flex-1"
                   />
                 </InputGroup>
                 <InputGroup>
                   <InputGroupAddon>
                     <Icon name="borderTopLeft" className="size-3 rotate-270" />
                   </InputGroupAddon>
-                  <InputGroupInput
-                    stepper
-                    min="0"
-                    step="1"
-                    value={borderBottomLeftRadiusInput}
-                    onChange={(e) => handleBottomLeftRadiusChange(e.target.value)}
-                    placeholder="0"
+                  <MeasurementInput
+                    value={borderBottomLeftRadius} onChange={handleBottomLeftRadiusChange}
+                    placeholder="0" className="flex-1"
                   />
                 </InputGroup>
                 <InputGroup>
                   <InputGroupAddon>
                     <Icon name="borderTopLeft" className="size-3 rotate-180" />
                   </InputGroupAddon>
-                  <InputGroupInput
-                    stepper
-                    min="0"
-                    step="1"
-                    value={borderBottomRightRadiusInput}
-                    onChange={(e) => handleBottomRightRadiusChange(e.target.value)}
-                    placeholder="0"
+                  <MeasurementInput
+                    value={borderBottomRightRadius} onChange={handleBottomRightRadiusChange}
+                    placeholder="0" className="flex-1"
                   />
                 </InputGroup>
               </div>
@@ -504,14 +424,11 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
                     <Label variant="muted" className="h-8">Width</Label>
                     <div className="col-span-2 flex flex-col gap-2">
                       <div className="flex items-center gap-2">
-                        <Input
-                          stepper
-                          min="0"
-                          step="1"
+                        <MeasurementInput
                           className="flex-1"
                           disabled={widthModeToggle.mode === 'individual'}
-                          value={borderWidthInput}
-                          onChange={(e) => handleBorderWidthChange(e.target.value)}
+                          value={borderWidth}
+                          onChange={handleBorderWidthChange}
                           placeholder="1"
                         />
                         <Button
@@ -525,46 +442,30 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
                       {widthModeToggle.mode === 'individual' && (
                           <div className="grid grid-cols-2 gap-2">
                             <div className="flex flex-col items-start gap-1">
-                              <Input
-                                stepper
-                                min="0"
-                                step="1"
-                                value={borderTopWidthInput}
-                                onChange={(e) => handleTopWidthChange(e.target.value)}
-                                placeholder="1"
+                              <MeasurementInput
+                                value={borderTopWidth} onChange={handleTopWidthChange}
+                                placeholder="1" className="w-full"
                               />
                               <Label className="text-[8px]!" variant="muted">Top</Label>
                             </div>
                             <div className="flex flex-col items-center gap-1">
-                              <Input
-                                stepper
-                                min="0"
-                                step="1"
-                                value={borderRightWidthInput}
-                                onChange={(e) => handleRightWidthChange(e.target.value)}
-                                placeholder="1"
+                              <MeasurementInput
+                                value={borderRightWidth} onChange={handleRightWidthChange}
+                                placeholder="1" className="w-full"
                               />
                               <Label className="text-[8px]!" variant="muted">Right</Label>
                             </div>
                             <div className="flex flex-col items-center gap-1">
-                              <Input
-                                stepper
-                                min="0"
-                                step="1"
-                                value={borderBottomWidthInput}
-                                onChange={(e) => handleBottomWidthChange(e.target.value)}
-                                placeholder="1"
+                              <MeasurementInput
+                                value={borderBottomWidth} onChange={handleBottomWidthChange}
+                                placeholder="1" className="w-full"
                               />
                               <Label className="text-[8px]!" variant="muted">Bottom</Label>
                             </div>
                             <div className="flex flex-col items-center gap-1">
-                              <Input
-                                stepper
-                                min="0"
-                                step="1"
-                                value={borderLeftWidthInput}
-                                onChange={(e) => handleLeftWidthChange(e.target.value)}
-                                placeholder="1"
+                              <MeasurementInput
+                                value={borderLeftWidth} onChange={handleLeftWidthChange}
+                                placeholder="1" className="w-full"
                               />
                               <Label className="text-[8px]!" variant="muted">Left</Label>
                             </div>
@@ -649,13 +550,9 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
                               </Tooltip>
                             </div>
                           </InputGroupAddon>
-                          <InputGroupInput
-                            stepper
-                            min="0"
-                            step="1"
-                            value={divideYInput}
-                            onChange={(e) => handleDivideYChange(e.target.value)}
-                            placeholder="0"
+                          <MeasurementInput
+                            value={divideY} onChange={handleDivideYChange}
+                            placeholder="0" className="flex-1"
                           />
                         </InputGroup>
                         <InputGroup>
@@ -671,13 +568,9 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
                               </Tooltip>
                             </div>
                           </InputGroupAddon>
-                          <InputGroupInput
-                            stepper
-                            min="0"
-                            step="1"
-                            value={divideXInput}
-                            onChange={(e) => handleDivideXChange(e.target.value)}
-                            placeholder="0"
+                          <MeasurementInput
+                            value={divideX} onChange={handleDivideXChange}
+                            placeholder="0" className="flex-1"
                           />
                         </InputGroup>
                       </div>
@@ -757,13 +650,9 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
                     <div className="grid grid-cols-3">
                       <Label variant="muted">Width</Label>
                       <div className="col-span-2">
-                        <Input
-                          stepper
-                          min="0"
-                          step="1"
-                          value={outlineWidthInput}
-                          onChange={(e) => handleOutlineWidthChange(e.target.value)}
-                          placeholder="1"
+                        <MeasurementInput
+                          value={outlineWidth} onChange={handleOutlineWidthChange}
+                          placeholder="1" className="w-full"
                         />
                       </div>
                     </div>
@@ -787,12 +676,9 @@ const BorderControls = memo(function BorderControls({ layer, onLayerUpdate, acti
                     <div className="grid grid-cols-3">
                       <Label variant="muted">Offset</Label>
                       <div className="col-span-2">
-                        <Input
-                          stepper
-                          step="1"
-                          value={outlineOffsetInput}
-                          onChange={(e) => handleOutlineOffsetChange(e.target.value)}
-                          placeholder="0"
+                        <MeasurementInput
+                          value={outlineOffset} onChange={handleOutlineOffsetChange}
+                          placeholder="0" className="w-full"
                         />
                       </div>
                     </div>

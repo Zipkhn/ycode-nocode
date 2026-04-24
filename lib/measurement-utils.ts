@@ -1,35 +1,30 @@
 /**
  * Measurement Utilities
- * 
+ *
  * Helpers for handling CSS measurement values (px, rem, em, %, etc.)
  */
 
+import { getDefaultMeasurementUnit } from './tailwind-class-mapper';
+
 /**
- * Extract value from design property for display in inputs
- * Strips 'px' unit only (since it's the default), keeps all other units
- * 
- * @param value - The stored value (e.g., "100px", "10rem", "50%")
- * @returns Value for display in input (e.g., "100", "10rem", "50%")
- * 
- * @example
- * extractMeasurementValue("100px") // "100"
- * extractMeasurementValue("10rem") // "10rem"
- * extractMeasurementValue("50%") // "50%"
- * extractMeasurementValue("auto") // "auto"
+ * Extract value from design property for display in inputs.
+ * Strips the current default unit suffix so the input shows a bare number.
  */
 export function extractMeasurementValue(value: string): string {
   if (!value) return '';
-  
-  // Special values that don't need processing
+
   const specialValues = ['auto', 'full', 'screen', 'fit', 'min', 'max'];
   if (specialValues.includes(value)) return value;
-  
-  // Strip 'px' unit only (for easy editing)
-  // Keep all other units like rem, em, %, vw, vh, etc.
+
+  const unit = getDefaultMeasurementUnit();
+  if (unit && value.endsWith(unit)) {
+    return value.slice(0, -unit.length);
+  }
+  // Fallback: always strip 'px' for backward compat when unit is different
   if (value.endsWith('px')) {
     return value.slice(0, -2);
   }
-  
+
   return value;
 }
 

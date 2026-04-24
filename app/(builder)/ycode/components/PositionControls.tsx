@@ -1,18 +1,16 @@
 'use client';
 
-import { useState, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
 import { Slider } from '@/components/ui/slider';
 import Icon from '@/components/ui/icon';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useDesignSync } from '@/hooks/use-design-sync';
-import { useControlledInputs } from '@/hooks/use-controlled-input';
 import { useEditorStore } from '@/stores/useEditorStore';
-import { extractMeasurementValue } from '@/lib/measurement-utils';
-import { removeSpaces } from '@/lib/utils';
+import { MeasurementInput } from './MeasurementInput';
 import type { Layer } from '@/types';
 
 interface PositionControlsProps {
@@ -40,85 +38,40 @@ const PositionControls = memo(function PositionControls({ layer, onLayerUpdate }
   // Only show position inputs for fixed, absolute, or sticky
   const showPositionInputs = position === 'fixed' || position === 'absolute' || position === 'sticky';
 
-  // Local controlled inputs (prevents repopulation bug)
-  const inputs = useControlledInputs({
-    top,
-    right,
-    bottom,
-    left,
-    zIndex,
-  }, extractMeasurementValue);
+  const [zIndexLocal, setZIndexLocal] = useState(zIndex);
 
-  const [topInput, setTopInput] = inputs.top;
-  const [rightInput, setRightInput] = inputs.right;
-  const [bottomInput, setBottomInput] = inputs.bottom;
-  const [leftInput, setLeftInput] = inputs.left;
-  const [zIndexInput, setZIndexInput] = inputs.zIndex;
+  useEffect(() => {
+    setZIndexLocal(zIndex);
+  }, [zIndex]);
 
-  // Handle position change (immediate - dropdown selection)
   const handlePositionChange = (value: string) => {
     updateDesignProperty('positioning', 'position', value);
   };
 
-  // Handle top change (debounced for text input)
   const handleTopChange = (value: string) => {
-    setTopInput(value);
-    if (value === 'auto') {
-      debouncedUpdateDesignProperty('positioning', 'top', 'auto');
-    } else {
-      const sanitized = removeSpaces(value);
-      debouncedUpdateDesignProperty('positioning', 'top', sanitized || null);
-    }
+    debouncedUpdateDesignProperty('positioning', 'top', value || null);
   };
 
-  // Handle right change (debounced for text input)
   const handleRightChange = (value: string) => {
-    setRightInput(value);
-    if (value === 'auto') {
-      debouncedUpdateDesignProperty('positioning', 'right', 'auto');
-    } else {
-      const sanitized = removeSpaces(value);
-      debouncedUpdateDesignProperty('positioning', 'right', sanitized || null);
-    }
+    debouncedUpdateDesignProperty('positioning', 'right', value || null);
   };
 
-  // Handle bottom change (debounced for text input)
   const handleBottomChange = (value: string) => {
-    setBottomInput(value);
-    if (value === 'auto') {
-      debouncedUpdateDesignProperty('positioning', 'bottom', 'auto');
-    } else {
-      const sanitized = removeSpaces(value);
-      debouncedUpdateDesignProperty('positioning', 'bottom', sanitized || null);
-    }
+    debouncedUpdateDesignProperty('positioning', 'bottom', value || null);
   };
 
-  // Handle left change (debounced for text input)
   const handleLeftChange = (value: string) => {
-    setLeftInput(value);
-    if (value === 'auto') {
-      debouncedUpdateDesignProperty('positioning', 'left', 'auto');
-    } else {
-      const sanitized = removeSpaces(value);
-      debouncedUpdateDesignProperty('positioning', 'left', sanitized || null);
-    }
+    debouncedUpdateDesignProperty('positioning', 'left', value || null);
   };
 
-  // Handle z-index change (debounced for text input)
   const handleZIndexChange = (value: string) => {
-    setZIndexInput(value);
-    if (value === 'auto') {
-      debouncedUpdateDesignProperty('positioning', 'zIndex', 'auto');
-    } else {
-      const sanitized = removeSpaces(value);
-      debouncedUpdateDesignProperty('positioning', 'zIndex', sanitized || null);
-    }
+    setZIndexLocal(value);
+    debouncedUpdateDesignProperty('positioning', 'zIndex', value || null);
   };
 
-  // Handle z-index slider change (immediate - slider interaction)
   const handleZIndexSliderChange = (values: number[]) => {
     const value = values[0].toString();
-    setZIndexInput(value);
+    setZIndexLocal(value);
     updateDesignProperty('positioning', 'zIndex', value);
   };
 
@@ -162,16 +115,13 @@ const PositionControls = memo(function PositionControls({ layer, onLayerUpdate }
                           <TooltipTrigger>
                             <Icon name="paddingSide" className="size-3" />
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Left</p>
-                          </TooltipContent>
+                          <TooltipContent><p>Left</p></TooltipContent>
                         </Tooltip>
                       </div>
                     </InputGroupAddon>
-                    <InputGroupInput
-                      className="!pr-0"
-                      value={leftInput}
-                      onChange={(e) => handleLeftChange(e.target.value)}
+                    <MeasurementInput
+                      value={left} onChange={handleLeftChange}
+                      className="flex-1"
                     />
                   </InputGroup>
                   <InputGroup>
@@ -181,16 +131,13 @@ const PositionControls = memo(function PositionControls({ layer, onLayerUpdate }
                           <TooltipTrigger>
                             <Icon name="paddingSide" className="size-3 rotate-90" />
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Top</p>
-                          </TooltipContent>
+                          <TooltipContent><p>Top</p></TooltipContent>
                         </Tooltip>
                       </div>
                     </InputGroupAddon>
-                    <InputGroupInput
-                      className="!pr-0"
-                      value={topInput}
-                      onChange={(e) => handleTopChange(e.target.value)}
+                    <MeasurementInput
+                      value={top} onChange={handleTopChange}
+                      className="flex-1"
                     />
                   </InputGroup>
                   <InputGroup>
@@ -200,16 +147,13 @@ const PositionControls = memo(function PositionControls({ layer, onLayerUpdate }
                           <TooltipTrigger>
                             <Icon name="paddingSide" className="size-3 rotate-180" />
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Right</p>
-                          </TooltipContent>
+                          <TooltipContent><p>Right</p></TooltipContent>
                         </Tooltip>
                       </div>
                     </InputGroupAddon>
-                    <InputGroupInput
-                      className="!pr-0"
-                      value={rightInput}
-                      onChange={(e) => handleRightChange(e.target.value)}
+                    <MeasurementInput
+                      value={right} onChange={handleRightChange}
+                      className="flex-1"
                     />
                   </InputGroup>
                   <InputGroup>
@@ -219,16 +163,13 @@ const PositionControls = memo(function PositionControls({ layer, onLayerUpdate }
                           <TooltipTrigger>
                             <Icon name="paddingSide" className="size-3 -rotate-90" />
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Bottom</p>
-                          </TooltipContent>
+                          <TooltipContent><p>Bottom</p></TooltipContent>
                         </Tooltip>
                       </div>
                     </InputGroupAddon>
-                    <InputGroupInput
-                      className="!pr-0"
-                      value={bottomInput}
-                      onChange={(e) => handleBottomChange(e.target.value)}
+                    <MeasurementInput
+                      value={bottom} onChange={handleBottomChange}
+                      className="flex-1"
                     />
                   </InputGroup>
                 </div>
@@ -243,11 +184,11 @@ const PositionControls = memo(function PositionControls({ layer, onLayerUpdate }
             <div className="col-span-2 grid grid-cols-2 items-center gap-2">
               <Input
                 type="text"
-                value={zIndexInput}
+                value={zIndexLocal}
                 onChange={(e) => handleZIndexChange(e.target.value)}
               />
               <Slider
-                value={[parseInt(zIndexInput) || 0]}
+                value={[parseInt(zIndexLocal) || 0]}
                 onValueChange={handleZIndexSliderChange}
                 min={0}
                 max={100}

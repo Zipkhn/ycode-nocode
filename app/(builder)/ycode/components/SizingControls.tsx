@@ -11,18 +11,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Icon from '@/components/ui/icon';
 import { Input } from '@/components/ui/input';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import SettingsPanel from './SettingsPanel';
 import { useDesignSync } from '@/hooks/use-design-sync';
-import { useControlledInputs } from '@/hooks/use-controlled-input';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { usePagesStore } from '@/stores/usePagesStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
-import { extractMeasurementValue, formatMeasurementValue } from '@/lib/measurement-utils';
 import type { Layer } from '@/types';
+import { MeasurementInput } from './MeasurementInput';
 
 interface SizingControlsProps {
   layer: Layer | null;
@@ -53,187 +52,112 @@ const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: Si
   const gridColumnSpan = getDesignProperty('sizing', 'gridColumnSpan') || '';
   const gridRowSpan = getDesignProperty('sizing', 'gridRowSpan') || '';
 
-  // Extract aspect ratio value for display (remove brackets)
   const extractAspectRatioValue = (value: string): string => {
     if (!value) return '';
-    // Remove brackets: [16/9] → 16/9
-    if (value.startsWith('[') && value.endsWith(']')) {
-      return value.slice(1, -1);
-    }
+    if (value.startsWith('[') && value.endsWith(']')) return value.slice(1, -1);
     return value;
   };
 
-  // Local controlled inputs (prevents repopulation bug)
-  const inputs = useControlledInputs({
-    width,
-    height,
-    minWidth,
-    minHeight,
-    maxWidth,
-    maxHeight,
-  }, extractMeasurementValue);
-
-  const [widthInput, setWidthInput] = inputs.width;
-  const [heightInput, setHeightInput] = inputs.height;
-  const [minWidthInput, setMinWidthInput] = inputs.minWidth;
-  const [minHeightInput, setMinHeightInput] = inputs.minHeight;
-  const [maxWidthInput, setMaxWidthInput] = inputs.maxWidth;
-  const [maxHeightInput, setMaxHeightInput] = inputs.maxHeight;
-
-  // Aspect ratio uses custom extraction to remove brackets
   const [aspectRatioInput, setAspectRatioInput] = useState(extractAspectRatioValue(aspectRatio));
 
-  // Sync aspect ratio input when prop changes
   useEffect(() => {
     setAspectRatioInput(extractAspectRatioValue(aspectRatio));
   }, [aspectRatio]);
 
-  // Handle width changes (debounced for text input)
   const handleWidthChange = (value: string) => {
-    setWidthInput(value);
-    debouncedUpdateDesignProperty('sizing', 'width', formatMeasurementValue(value));
+    debouncedUpdateDesignProperty('sizing', 'width', value || null);
   };
 
-  // Get current width preset value (for Select display)
   const getWidthPresetValue = () => {
-    if (widthInput === '100%') return 'w-[100%]';
-    if (widthInput === 'fit') return 'w-fit-content';
-    if (widthInput === '100vw') return 'w-[100vw]';
+    if (width === '100%') return 'w-[100%]';
+    if (width === 'fit') return 'w-fit-content';
+    if (width === '100vw') return 'w-[100vw]';
     return '';
   };
 
-  // Preset changes are immediate (button clicks)
   const handleWidthPresetChange = (value: string) => {
-    if (value === 'w-[100%]') {
-      setWidthInput('100%');
-      updateDesignProperty('sizing', 'width', '[100%]');
-    } else if (value === 'w-fit-content') {
-      setWidthInput('fit');
-      updateDesignProperty('sizing', 'width', 'fit');
-    } else if (value === 'w-[100vw]') {
-      setWidthInput('100vw');
-      updateDesignProperty('sizing', 'width', '[100vw]');
-    }
+    if (value === 'w-[100%]') updateDesignProperty('sizing', 'width', '100%');
+    else if (value === 'w-fit-content') updateDesignProperty('sizing', 'width', 'fit');
+    else if (value === 'w-[100vw]') updateDesignProperty('sizing', 'width', '100vw');
   };
 
-  // Handle height changes (debounced for text input)
   const handleHeightChange = (value: string) => {
-    setHeightInput(value);
-    debouncedUpdateDesignProperty('sizing', 'height', formatMeasurementValue(value));
+    debouncedUpdateDesignProperty('sizing', 'height', value || null);
   };
 
-  // Get current height preset value (for Select display)
   const getHeightPresetValue = () => {
-    if (heightInput === '100%') return 'h-[100%]';
-    if (heightInput === '100svh') return 'h-[100svh]';
+    if (height === '100%') return 'h-[100%]';
+    if (height === '100svh') return 'h-[100svh]';
     return '';
   };
 
-  // Preset changes are immediate (button clicks)
   const handleHeightPresetChange = (value: string) => {
-    if (value === 'h-[100%]') {
-      setHeightInput('100%');
-      updateDesignProperty('sizing', 'height', '[100%]');
-    } else if (value === 'h-[100svh]') {
-      setHeightInput('100svh');
-      updateDesignProperty('sizing', 'height', '[100svh]');
-    }
+    if (value === 'h-[100%]') updateDesignProperty('sizing', 'height', '100%');
+    else if (value === 'h-[100svh]') updateDesignProperty('sizing', 'height', '100svh');
   };
 
-  // Get current min/max width preset values
   const getMinWidthPresetValue = () => {
-    if (minWidthInput === '100%') return 'w-[100%]';
-    if (minWidthInput === 'fit') return 'w-fit-content';
-    if (minWidthInput === '100vw') return 'w-[100vw]';
+    if (minWidth === '100%') return 'w-[100%]';
+    if (minWidth === 'fit') return 'w-fit-content';
+    if (minWidth === '100vw') return 'w-[100vw]';
     return '';
   };
 
   const getMaxWidthPresetValue = () => {
-    if (maxWidthInput === '100%') return 'w-[100%]';
-    if (maxWidthInput === 'fit') return 'w-fit-content';
-    if (maxWidthInput === '100vw') return 'w-[100vw]';
+    if (maxWidth === '100%') return 'w-[100%]';
+    if (maxWidth === 'fit') return 'w-fit-content';
+    if (maxWidth === '100vw') return 'w-[100vw]';
     return '';
   };
 
-  // Handle min/max width changes (debounced for text input)
   const handleMinWidthChange = (value: string) => {
-    setMinWidthInput(value);
-    debouncedUpdateDesignProperty('sizing', 'minWidth', formatMeasurementValue(value));
+    debouncedUpdateDesignProperty('sizing', 'minWidth', value || null);
   };
 
   const handleMinWidthPresetChange = (value: string) => {
-    if (value === 'w-[100%]') {
-      setMinWidthInput('100%');
-      updateDesignProperty('sizing', 'minWidth', '[100%]');
-    } else if (value === 'w-fit-content') {
-      setMinWidthInput('fit');
-      updateDesignProperty('sizing', 'minWidth', 'fit');
-    } else if (value === 'w-[100vw]') {
-      setMinWidthInput('100vw');
-      updateDesignProperty('sizing', 'minWidth', '[100vw]');
-    }
+    if (value === 'w-[100%]') updateDesignProperty('sizing', 'minWidth', '100%');
+    else if (value === 'w-fit-content') updateDesignProperty('sizing', 'minWidth', 'fit');
+    else if (value === 'w-[100vw]') updateDesignProperty('sizing', 'minWidth', '100vw');
   };
 
   const handleMaxWidthChange = (value: string) => {
-    setMaxWidthInput(value);
-    debouncedUpdateDesignProperty('sizing', 'maxWidth', formatMeasurementValue(value));
+    debouncedUpdateDesignProperty('sizing', 'maxWidth', value || null);
   };
 
   const handleMaxWidthPresetChange = (value: string) => {
-    if (value === 'w-[100%]') {
-      setMaxWidthInput('100%');
-      updateDesignProperty('sizing', 'maxWidth', '[100%]');
-    } else if (value === 'w-fit-content') {
-      setMaxWidthInput('fit');
-      updateDesignProperty('sizing', 'maxWidth', 'fit');
-    } else if (value === 'w-[100vw]') {
-      setMaxWidthInput('100vw');
-      updateDesignProperty('sizing', 'maxWidth', '[100vw]');
-    }
+    if (value === 'w-[100%]') updateDesignProperty('sizing', 'maxWidth', '100%');
+    else if (value === 'w-fit-content') updateDesignProperty('sizing', 'maxWidth', 'fit');
+    else if (value === 'w-[100vw]') updateDesignProperty('sizing', 'maxWidth', '100vw');
   };
 
-  // Get current min/max height preset values
   const getMinHeightPresetValue = () => {
-    if (minHeightInput === '100%') return 'h-[100%]';
-    if (minHeightInput === '100svh') return 'h-[100svh]';
+    if (minHeight === '100%') return 'h-[100%]';
+    if (minHeight === '100svh') return 'h-[100svh]';
     return '';
   };
 
   const getMaxHeightPresetValue = () => {
-    if (maxHeightInput === '100%') return 'h-[100%]';
-    if (maxHeightInput === '100svh') return 'h-[100svh]';
+    if (maxHeight === '100%') return 'h-[100%]';
+    if (maxHeight === '100svh') return 'h-[100svh]';
     return '';
   };
 
-  // Handle min/max height changes (debounced for text input)
   const handleMinHeightChange = (value: string) => {
-    setMinHeightInput(value);
-    debouncedUpdateDesignProperty('sizing', 'minHeight', formatMeasurementValue(value));
+    debouncedUpdateDesignProperty('sizing', 'minHeight', value || null);
   };
 
   const handleMinHeightPresetChange = (value: string) => {
-    if (value === 'h-[100%]') {
-      setMinHeightInput('100%');
-      updateDesignProperty('sizing', 'minHeight', '[100%]');
-    } else if (value === 'h-[100svh]') {
-      setMinHeightInput('100svh');
-      updateDesignProperty('sizing', 'minHeight', '[100svh]');
-    }
+    if (value === 'h-[100%]') updateDesignProperty('sizing', 'minHeight', '100%');
+    else if (value === 'h-[100svh]') updateDesignProperty('sizing', 'minHeight', '100svh');
   };
 
   const handleMaxHeightChange = (value: string) => {
-    setMaxHeightInput(value);
-    debouncedUpdateDesignProperty('sizing', 'maxHeight', formatMeasurementValue(value));
+    debouncedUpdateDesignProperty('sizing', 'maxHeight', value || null);
   };
 
   const handleMaxHeightPresetChange = (value: string) => {
-    if (value === 'h-[100%]') {
-      setMaxHeightInput('100%');
-      updateDesignProperty('sizing', 'maxHeight', '[100%]');
-    } else if (value === 'h-[100svh]') {
-      setMaxHeightInput('100svh');
-      updateDesignProperty('sizing', 'maxHeight', '[100svh]');
-    }
+    if (value === 'h-[100%]') updateDesignProperty('sizing', 'maxHeight', '100%');
+    else if (value === 'h-[100svh]') updateDesignProperty('sizing', 'maxHeight', '100svh');
   };
 
   // Handle overflow change
@@ -420,9 +344,11 @@ const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: Si
       <div className="grid grid-cols-3 items-start">
         <Label variant="muted" className="h-8">Width</Label>
         <div className="col-span-2 flex flex-col gap-2">
-          <ButtonGroup>
-            <Input
-              value={widthInput} onChange={(e) => handleWidthChange(e.target.value)}
+          <ButtonGroup className="w-full">
+            <MeasurementInput
+              value={width}
+              onChange={handleWidthChange}
+              className="flex-1 min-w-0"
             />
             <ButtonGroupSeparator />
             <Select value={getWidthPresetValue()} onValueChange={handleWidthPresetChange}>
@@ -452,9 +378,11 @@ const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: Si
                       </Tooltip>
                     </div>
                   </InputGroupAddon>
-                  <InputGroupInput
-                    placeholder="Min" value={minWidthInput}
-                    onChange={(e) => handleMinWidthChange(e.target.value)}
+                  <MeasurementInput
+                    value={minWidth}
+                    onChange={handleMinWidthChange}
+                    placeholder="Min"
+                    className="flex-1"
                   />
                 </InputGroup>
               </ButtonGroup>
@@ -486,9 +414,11 @@ const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: Si
                       </Tooltip>
                     </div>
                   </InputGroupAddon>
-                  <InputGroupInput
-                    placeholder="Max" value={maxWidthInput}
-                    onChange={(e) => handleMaxWidthChange(e.target.value)}
+                  <MeasurementInput
+                    value={maxWidth}
+                    onChange={handleMaxWidthChange}
+                    placeholder="Max"
+                    className="flex-1"
                   />
                 </InputGroup>
               </ButtonGroup>
@@ -512,9 +442,11 @@ const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: Si
       <div className="grid grid-cols-3 items-start">
         <Label variant="muted" className="h-8">Height</Label>
         <div className="col-span-2 flex flex-col gap-2">
-          <ButtonGroup>
-            <Input
-              value={heightInput} onChange={(e) => handleHeightChange(e.target.value)}
+          <ButtonGroup className="w-full">
+            <MeasurementInput
+              value={height}
+              onChange={handleHeightChange}
+              className="flex-1 min-w-0"
             />
             <ButtonGroupSeparator />
             <Select value={getHeightPresetValue()} onValueChange={handleHeightPresetChange}>
@@ -543,9 +475,11 @@ const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: Si
                       </Tooltip>
                     </div>
                   </InputGroupAddon>
-                  <InputGroupInput
-                    placeholder="Min" value={minHeightInput}
-                    onChange={(e) => handleMinHeightChange(e.target.value)}
+                  <MeasurementInput
+                    value={minHeight}
+                    onChange={handleMinHeightChange}
+                    placeholder="Min"
+                    className="flex-1"
                   />
                 </InputGroup>
               </ButtonGroup>
@@ -576,9 +510,11 @@ const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: Si
                       </Tooltip>
                     </div>
                   </InputGroupAddon>
-                  <InputGroupInput
-                    placeholder="Max" value={maxHeightInput}
-                    onChange={(e) => handleMaxHeightChange(e.target.value)}
+                  <MeasurementInput
+                    value={maxHeight}
+                    onChange={handleMaxHeightChange}
+                    placeholder="Max"
+                    className="flex-1"
                   />
                 </InputGroup>
               </ButtonGroup>

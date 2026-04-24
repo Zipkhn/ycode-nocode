@@ -4,17 +4,14 @@ import { useState, useEffect, useCallback, memo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDesignSync } from '@/hooks/use-design-sync';
-import { useControlledInputs } from '@/hooks/use-controlled-input';
 import { useModeToggle } from '@/hooks/use-mode-toggle';
 import { useEditorStore } from '@/stores/useEditorStore';
-import { extractMeasurementValue } from '@/lib/measurement-utils';
-import { removeSpaces } from '@/lib/utils';
+import { MeasurementInput } from './MeasurementInput';
 import type { Layer } from '@/types';
 
 interface LayoutControlsProps {
@@ -72,17 +69,6 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
   useEffect(() => {
     setGridRowsInput(extractGridNumber(gridRows));
   }, [gridRows]);
-
-  // Local controlled inputs (prevents repopulation bug)
-  const inputs = useControlledInputs({
-    gap,
-    columnGap,
-    rowGap,
-  }, extractMeasurementValue);
-
-  const [gapInput, setGapInput] = inputs.gap;
-  const [columnGapInput, setColumnGapInput] = inputs.columnGap;
-  const [rowGapInput, setRowGapInput] = inputs.rowGap;
 
   // Use mode toggle hook for gap
   const gapModeToggle = useModeToggle({
@@ -149,25 +135,18 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
     updateDesignProperty('layout', 'flexWrap', value === 'yes' ? 'wrap' : 'nowrap');
   };
 
-  // Handle gap changes (debounced for text input)
   const handleGapChange = (value: string) => {
-    setGapInput(value);
     if (gapModeToggle.mode === 'all') {
-      const sanitized = removeSpaces(value);
-      debouncedUpdateDesignProperty('layout', 'gap', sanitized || null);
+      debouncedUpdateDesignProperty('layout', 'gap', value || null);
     }
   };
 
   const handleColumnGapChange = (value: string) => {
-    setColumnGapInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('layout', 'columnGap', sanitized || null);
+    debouncedUpdateDesignProperty('layout', 'columnGap', value || null);
   };
 
   const handleRowGapChange = (value: string) => {
-    setRowGapInput(value);
-    const sanitized = removeSpaces(value);
-    debouncedUpdateDesignProperty('layout', 'rowGap', sanitized || null);
+    debouncedUpdateDesignProperty('layout', 'rowGap', value || null);
   };
 
   // Handle grid columns change (number input only)
@@ -349,16 +328,12 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                   <Label variant="muted" className="h-8">Gap</Label>
                   <div className="col-span-2 flex flex-col gap-2">
                       <div className="flex items-center gap-2">
-                          <InputGroup className="flex-1">
-                              <InputGroupInput
-                                stepper
-                                min="0"
-                                step="1"
-                                disabled={gapModeToggle.mode === 'individual'}
-                                value={gapInput}
-                                onChange={(e) => handleGapChange(e.target.value)}
-                              />
-                          </InputGroup>
+                          <MeasurementInput
+                            className="flex-1"
+                            disabled={gapModeToggle.mode === 'individual'}
+                            value={gap}
+                            onChange={handleGapChange}
+                          />
                           <Button
                             variant={gapModeToggle.mode === 'individual' ? 'secondary' : 'ghost'}
                             size="sm"
@@ -382,12 +357,9 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                                        </Tooltip>
                                    </div>
                                </InputGroupAddon>
-                               <InputGroupInput
-                                 stepper
-                                 min="0"
-                                 step="1"
-                                 value={columnGapInput}
-                                 onChange={(e) => handleColumnGapChange(e.target.value)}
+                               <MeasurementInput
+                                 value={columnGap} onChange={handleColumnGapChange}
+                                 className="flex-1"
                                />
                            </InputGroup>
                            <InputGroup>
@@ -403,12 +375,9 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                                        </Tooltip>
                                    </div>
                                </InputGroupAddon>
-                               <InputGroupInput
-                                 stepper
-                                 min="0"
-                                 step="1"
-                                 value={rowGapInput}
-                                 onChange={(e) => handleRowGapChange(e.target.value)}
+                               <MeasurementInput
+                                 value={rowGap} onChange={handleRowGapChange}
+                                 className="flex-1"
                                />
                            </InputGroup>
                        </div>

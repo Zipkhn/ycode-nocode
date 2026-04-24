@@ -9,6 +9,17 @@ import type { Layer, UIState, Breakpoint } from '@/types';
 import { cn } from '@/lib/utils';
 import { getBreakpointPrefix } from './breakpoint-utils';
 
+// ─── Default measurement unit ─────────────────────────────────────────────────
+// Used when a plain number is typed (e.g. "7" → "7rem" if unit is rem).
+// Updated by setDefaultMeasurementUnit(), synced from useEditorStore.
+let _defaultMeasurementUnit: string = 'px';
+export function setDefaultMeasurementUnit(unit: string): void {
+  _defaultMeasurementUnit = unit;
+}
+export function getDefaultMeasurementUnit(): string {
+  return _defaultMeasurementUnit;
+}
+
 /**
  * Build a CSS custom property name for background image per breakpoint/state.
  * Omits suffixes for defaults: desktop→no bp suffix, neutral→no state suffix.
@@ -181,8 +192,7 @@ function formatMeasurementClass(
   // Check if value is just a number (e.g., "100" without any unit)
   const isPlainNumber = /^-?\d*\.?\d+$/.test(value);
   if (isPlainNumber) {
-    // Add px to plain numbers
-    return `${prefix}-[${value}px]`;
+    return `${prefix}-[${value}${_defaultMeasurementUnit}]`;
   }
 
   // For values with other units (rem, em, %, etc.) or negative prefix, wrap in arbitrary value
