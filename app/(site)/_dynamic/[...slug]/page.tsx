@@ -76,7 +76,7 @@ export default async function DynamicSlugPage({ params, searchParams }: DynamicS
     notFound();
   }
 
-  const { page, pageLayers, components, collectionItem, collectionFields, locale, availableLocales, translations } = data;
+  const { page, pageLayers, components, collectionItem, collectionFields, pageCollectionSortedItemIds, pageCollectionSortedItemSlugs, locale, availableLocales, translations } = data;
 
   const folders = await fetchFoldersForAuth(true);
   const protectionCheck = getPasswordProtection(page, folders, null);
@@ -137,6 +137,8 @@ export default async function DynamicSlugPage({ params, searchParams }: DynamicS
       colorVariablesCss={globalSettings.colorVariablesCss || undefined}
       collectionItem={collectionItem}
       collectionFields={collectionFields}
+      pageCollectionSortedItemIds={pageCollectionSortedItemIds}
+      pageCollectionSortedItemSlugs={pageCollectionSortedItemSlugs}
       locale={locale}
       availableLocales={availableLocales}
       translations={translations}

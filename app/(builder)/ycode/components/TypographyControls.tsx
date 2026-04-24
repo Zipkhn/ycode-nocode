@@ -7,10 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { InputGroup, InputGroupAddon } from '@/components/ui/input-group';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useControlledInput } from '@/hooks/use-controlled-input';
 import { useDesignSync } from '@/hooks/use-design-sync';
+import { extractMeasurementValue } from '@/lib/measurement-utils';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useFontsStore } from '@/stores/useFontsStore';
 import { removeSpaces } from '@/lib/utils';
@@ -61,6 +64,7 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
   const textDecorationThickness = getDesignProperty('typography', 'textDecorationThickness') || '';
   const underlineOffset = getDesignProperty('typography', 'underlineOffset') || '';
   const placeholderColor = getDesignProperty('typography', 'placeholderColor') || '';
+  const lineClamp = getDesignProperty('typography', 'lineClamp') || '';
 
   // Get available weights for the selected font
   const selectedFont = getFontByFamily(fontFamily);
@@ -71,6 +75,34 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
 
   // Detect if text transform is active
   const hasTransform = textTransform !== 'none' && textTransform !== '';
+
+  // Detect if line clamp is active
+  const hasLineClamp = lineClamp !== '' && lineClamp !== 'none';
+
+  // Custom extractor for letter spacing (strips 'em' as default unit, like fontSize strips 'px')
+  const extractLetterSpacingValue = (value: string): string => {
+    if (!value) return '';
+
+    // Special values that don't need processing
+    const specialValues = ['auto', 'normal'];
+    if (specialValues.includes(value)) return value;
+
+    // Strip 'em' unit (default for letter spacing)
+    // Keep all other units like px, rem, %, etc.
+    if (value.endsWith('em')) {
+      return value.slice(0, -2);
+    }
+
+    return value;
+  };
+
+  // Local controlled inputs (prevents repopulation bug)
+  const [fontSizeInput, setFontSizeInput] = useControlledInput(fontSize, extractMeasurementValue);
+  const [letterSpacingInput, setLetterSpacingInput] = useControlledInput(letterSpacing, extractLetterSpacingValue);
+  const [lineHeightInput, setLineHeightInput] = useControlledInput(lineHeight);
+  const [decorationThicknessInput, setDecorationThicknessInput] = useControlledInput(textDecorationThickness, extractMeasurementValue);
+  const [underlineOffsetInput, setUnderlineOffsetInput] = useControlledInput(underlineOffset, extractMeasurementValue);
+  const [lineClampInput, setLineClampInput] = useControlledInput(lineClamp);
 
   // Map numeric font weights to named values
   const fontWeightMap: Record<string, string> = {
@@ -173,6 +205,20 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
     updateDesignProperty('typography', 'textTransform', value);
   };
 
+  const handleAddLineClamp = () => {
+    updateDesignProperty('typography', 'lineClamp', '2');
+  };
+
+  const handleRemoveLineClamp = () => {
+    updateDesignProperty('typography', 'lineClamp', null);
+  };
+
+  const handleLineClampChange = (value: string) => {
+    setLineClampInput(value);
+    const sanitized = removeSpaces(value);
+    debouncedUpdateDesignProperty('typography', 'lineClamp', sanitized || null);
+  };
+
   // Debounced handler for keyboard-typed hex values
   const handleDecorationColorChange = (value: string) => {
     const sanitized = removeSpaces(value);
@@ -266,6 +312,12 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
                 disabled={hasTransform}
               >
                 Transform
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleAddLineClamp}
+                disabled={hasLineClamp}
+              >
+                Line clamp
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -556,6 +608,31 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
                 tabIndex={0}
                 className="p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
                 onClick={handleRemoveTransform}
+              >
+                <Icon name="x" className="size-2.5" />
+              </span>
+            </div>
+          </div>
+        )}
+
+        {!isIcon && hasLineClamp && (
+          <div className="grid grid-cols-3 items-start">
+            <Label variant="muted" className="h-8">Line clamp</Label>
+            <div className="col-span-2 flex items-center gap-2">
+              <Input
+                stepper
+                min="1"
+                step="1"
+                value={lineClampInput}
+                onChange={(e) => handleLineClampChange(e.target.value)}
+                placeholder="2"
+                className="flex-1"
+              />
+              <span
+                role="button"
+                tabIndex={0}
+                className="p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+                onClick={handleRemoveLineClamp}
               >
                 <Icon name="x" className="size-2.5" />
               </span>

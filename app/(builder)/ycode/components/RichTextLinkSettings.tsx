@@ -78,6 +78,7 @@ export default function RichTextLinkSettings({
 }: RichTextLinkSettingsProps) {
   const [collectionItems, setCollectionItems] = useState<CollectionItemWithValues[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
+  const [collectionItemSearch, setCollectionItemSearch] = useState('');
 
   // Stores
   const pages = usePagesStore((state) => state.pages);
@@ -185,6 +186,11 @@ export default function RichTextLinkSettings({
   const targetPageCollectionId = selectedPage?.settings?.cms?.collection_id || null;
   const canUseCurrentPageItem = !hidePageContextOptions && isDynamicPage && isCurrentPageDynamic
     && !!currentPageCollectionId && currentPageCollectionId === targetPageCollectionId;
+
+  // Next/previous navigation only makes sense when the link points back at the
+  // same dynamic page the user is editing.
+  const canUseNextPreviousItem = !hidePageContextOptions && isDynamicPage && isCurrentPageDynamic
+    && !!pageId && pageId === currentPageId;
 
   // Check if the layer itself is a collection layer
   const isCollectionLayer = !!(layer && getCollectionVariable(layer));
@@ -381,25 +387,18 @@ export default function RichTextLinkSettings({
     [linkSettings, onChange]
   );
 
-  // Handle collection item selection
+  // Handle collection item selection. The selection value (concrete id or
+  // dynamic-resolution keyword like `current-page` / `next-item`) is stored
+  // verbatim and resolved at render time by `generateLinkHref`.
   const handleCollectionItemChange = useCallback(
     (itemId: string) => {
       if (!linkSettings) return;
-
-      let storedValue: string;
-      if (itemId === 'current-page') {
-        storedValue = 'current-page';
-      } else if (itemId === 'current-collection') {
-        storedValue = 'current-collection';
-      } else {
-        storedValue = itemId;
-      }
 
       onChange({
         ...linkSettings,
         page: {
           ...linkSettings.page!,
-          collection_item_id: storedValue,
+          collection_item_id: itemId,
         },
       });
     },
@@ -650,19 +649,33 @@ export default function RichTextLinkSettings({
               <div className="col-span-2">
                 <Select
                   value={collectionItemId || ''}
-                  onValueChange={handleCollectionItemChange}
+                  onValueChange={(value) => {
+                    handleCollectionItemChange(value);
+                    setCollectionItemSearch('');
+                  }}
+                  onOpenChange={(open) => {
+                    if (!open) setCollectionItemSearch('');
+                  }}
                   disabled={loadingItems}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder={loadingItems ? 'Loading...' : 'Select...'} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent
+                    searchable
+                    searchValue={collectionItemSearch}
+                    onSearchChange={setCollectionItemSearch}
+                    searchPlaceholder="Search items..."
+                    className="w-72"
+                  >
                     <LinkItemOptions
                       canUseCurrentPageItem={canUseCurrentPageItem}
                       canUseCurrentCollectionItem={canUseCurrentCollectionItem}
+                      canUseNextPreviousItem={canUseNextPreviousItem}
                       referenceItemOptions={referenceItemOptions}
                       collectionItems={collectionItems}
                       collectionFields={linkedPageCollectionFields}
+                      searchValue={collectionItemSearch}
                     />
                   </SelectContent>
                 </Select>

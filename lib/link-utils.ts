@@ -198,6 +198,31 @@ export { REF_PAGE_PREFIX, REF_COLLECTION_PREFIX } from '@/lib/collection-field-u
 import { REF_PAGE_PREFIX, REF_COLLECTION_PREFIX } from '@/lib/collection-field-utils';
 
 /**
+ * Sentinel values stored in `linkSettings.page.collection_item_id` to indicate
+ * dynamic resolution at render time instead of a hard-coded item id.
+ */
+export const COLLECTION_ITEM_KEYWORDS = {
+  CURRENT_PAGE: 'current-page',
+  CURRENT_COLLECTION: 'current-collection',
+  NEXT_ITEM: 'next-item',
+  PREVIOUS_ITEM: 'previous-item',
+} as const;
+
+export type CollectionItemKeyword = typeof COLLECTION_ITEM_KEYWORDS[keyof typeof COLLECTION_ITEM_KEYWORDS];
+
+const KEYWORD_VALUES = new Set<string>(Object.values(COLLECTION_ITEM_KEYWORDS));
+
+/** Returns true when the value is one of the known dynamic-resolution keywords. */
+export function isCollectionItemKeyword(value: string | null | undefined): value is CollectionItemKeyword {
+  return !!value && KEYWORD_VALUES.has(value);
+}
+
+/** Returns true for next/previous page-navigation keywords. */
+export function isPageNavigationKeyword(value: string | null | undefined): boolean {
+  return value === COLLECTION_ITEM_KEYWORDS.NEXT_ITEM || value === COLLECTION_ITEM_KEYWORDS.PREVIOUS_ITEM;
+}
+
+/**
  * Resolve a ref-* collection_item_id to the actual referenced item ID
  * by looking up the reference field value in the current item data.
  */
@@ -237,6 +262,12 @@ export interface LinkResolutionContext {
   resolvedAssets?: Record<string, { url: string; width?: number | null; height?: number | null }>;
   /** Map of layer ID → item data for layer-specific field resolution */
   layerDataMap?: Record<string, Record<string, string>>;
+  /**
+   * Ordered list of collection item ids on the current dynamic page's collection.
+   * Used to resolve `next-item` / `previous-item` link keywords. Should be present
+   * for any render whose root is a dynamic collection page.
+   */
+  pageCollectionSortedItemIds?: string[];
 }
 
 /**
@@ -418,6 +449,7 @@ export function generateLinkHref(
     translations,
     getAsset,
     anchorMap,
+    pageCollectionSortedItemIds,
   } = context;
 
   let href = '';
@@ -459,24 +491,39 @@ export function generateLinkHref(
           if (page.is_dynamic && linkSettings.page.collection_item_id && collectionItemSlugs) {
             let itemSlug: string | undefined;
 
-            // Handle special "current" keywords and reference field resolution
-            if (linkSettings.page.collection_item_id === 'current-page') {
-              // Use the page's collection item (for dynamic pages)
-              itemSlug = pageCollectionItemId ? collectionItemSlugs[pageCollectionItemId] : undefined;
-            } else if (linkSettings.page.collection_item_id === 'current-collection') {
-              // Use the current collection layer's item
-              itemSlug = collectionItemId ? collectionItemSlugs[collectionItemId] : undefined;
-            } else if (linkSettings.page.collection_item_id.startsWith('ref-')) {
-              // Resolve via reference field value from current item data
-              const refItemId = resolveRefCollectionItemId(
-                linkSettings.page.collection_item_id,
-                pageCollectionItemData,
-                collectionItemData
-              );
-              itemSlug = refItemId ? collectionItemSlugs[refItemId] : undefined;
-            } else {
-              // Use the specific item slug
-              itemSlug = collectionItemSlugs[linkSettings.page.collection_item_id];
+            const itemKeyword = linkSettings.page.collection_item_id;
+            switch (itemKeyword) {
+              case COLLECTION_ITEM_KEYWORDS.CURRENT_PAGE:
+                itemSlug = pageCollectionItemId ? collectionItemSlugs[pageCollectionItemId] : undefined;
+                break;
+              case COLLECTION_ITEM_KEYWORDS.CURRENT_COLLECTION:
+                itemSlug = collectionItemId ? collectionItemSlugs[collectionItemId] : undefined;
+                break;
+              case COLLECTION_ITEM_KEYWORDS.NEXT_ITEM:
+              case COLLECTION_ITEM_KEYWORDS.PREVIOUS_ITEM: {
+                // Navigate to neighbouring item on the current dynamic page's collection.
+                // When out of bounds (first/last item), itemSlug stays undefined so we
+                // emit no href — callers can detect this and render a disabled state.
+                if (pageCollectionSortedItemIds && pageCollectionItemId) {
+                  const currentIndex = pageCollectionSortedItemIds.indexOf(pageCollectionItemId);
+                  if (currentIndex !== -1) {
+                    const offset = itemKeyword === COLLECTION_ITEM_KEYWORDS.NEXT_ITEM ? 1 : -1;
+                    const targetIndex = currentIndex + offset;
+                    if (targetIndex >= 0 && targetIndex < pageCollectionSortedItemIds.length) {
+                      itemSlug = collectionItemSlugs[pageCollectionSortedItemIds[targetIndex]];
+                    }
+                  }
+                }
+                break;
+              }
+              default:
+                if (itemKeyword.startsWith(REF_PAGE_PREFIX) || itemKeyword.startsWith(REF_COLLECTION_PREFIX)) {
+                  const refItemId = resolveRefCollectionItemId(itemKeyword, pageCollectionItemData, collectionItemData);
+                  itemSlug = refItemId ? collectionItemSlugs[refItemId] : undefined;
+                } else {
+                  itemSlug = collectionItemSlugs[itemKeyword];
+                }
+                break;
             }
 
             href = buildLocalizedDynamicPageUrl(page, folders, itemSlug || null, locale, translations || undefined);
@@ -589,4 +636,27 @@ export function resolveLinkAttrs(
     ...(rel && { rel }),
     ...(linkSettings.download && { download: linkSettings.download }),
   };
+}
+
+/**
+ * Detects whether a link is a next/previous navigation that has hit a
+ * collection boundary (first or last item). Useful for rendering a disabled
+ * affordance instead of an unclickable bare `<a>` tag.
+ */
+export function isLinkAtCollectionBoundary(
+  linkSettings: LinkSettings | undefined,
+  context: LinkResolutionContext
+): boolean {
+  if (!linkSettings || linkSettings.type !== 'page') return false;
+  const keyword = linkSettings.page?.collection_item_id;
+  if (!isPageNavigationKeyword(keyword)) return false;
+  // No bound item at all → not a boundary, just unconfigured.
+  const ids = context.pageCollectionSortedItemIds;
+  const currentId = context.pageCollectionItemId;
+  if (!ids || !currentId) return false;
+  const index = ids.indexOf(currentId);
+  if (index === -1) return false;
+  const offset = keyword === COLLECTION_ITEM_KEYWORDS.NEXT_ITEM ? 1 : -1;
+  const target = index + offset;
+  return target < 0 || target >= ids.length;
 }

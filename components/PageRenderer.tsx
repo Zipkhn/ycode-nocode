@@ -17,7 +17,7 @@ import { getMapboxAccessToken, getGoogleMapsEmbedApiKey } from '@/lib/map-server
 import { getAllColorVariables } from '@/lib/repositories/colorVariableRepository';
 import { getItemWithValues, getItemsWithValues } from '@/lib/repositories/collectionItemRepository';
 import { getFieldsByCollectionId } from '@/lib/repositories/collectionFieldRepository';
-import { REF_PAGE_PREFIX, REF_COLLECTION_PREFIX } from '@/lib/link-utils';
+import { REF_PAGE_PREFIX, REF_COLLECTION_PREFIX, isCollectionItemKeyword } from '@/lib/link-utils';
 import { getClassesString } from '@/lib/layer-utils';
 import type { Layer, Component, Page, CollectionItemWithValues, CollectionField, Locale, PageFolder } from '@/types';
 
@@ -112,6 +112,18 @@ interface PageRendererProps {
   colorVariablesCss?: string;
   collectionItem?: CollectionItemWithValues;
   collectionFields?: CollectionField[];
+  /**
+   * Ordered list of collection item ids on the dynamic page's collection.
+   * Used to resolve `next-item` / `previous-item` link keywords. Only relevant
+   * for dynamic pages.
+   */
+  pageCollectionSortedItemIds?: string[];
+  /**
+   * Map of `collection_item_id -> slug` for every item in
+   * `pageCollectionSortedItemIds`. Merged into the slug lookup so next/previous
+   * links resolve to a real URL.
+   */
+  pageCollectionSortedItemSlugs?: Record<string, string>;
   locale?: Locale | null;
   availableLocales?: Locale[];
   isPreview?: boolean;
@@ -152,6 +164,8 @@ export default async function PageRenderer({
   colorVariablesCss,
   collectionItem,
   collectionFields = [],
+  pageCollectionSortedItemIds,
+  pageCollectionSortedItemSlugs,
   locale,
   availableLocales = [],
   isPreview = false,
@@ -170,10 +184,9 @@ export default async function PageRenderer({
 
   // Single tree traversal — derive both sets from the flat list
   const allPageLinks = collectLayerPageLinks(resolvedLayers);
-  const DYNAMIC_KEYWORDS = new Set(['current-page', 'current-collection']);
   const referencedItemIds = new Set(
     allPageLinks
-      .filter(l => !DYNAMIC_KEYWORDS.has(l.collection_item_id) && !l.collection_item_id.startsWith('ref-'))
+      .filter(l => !isCollectionItemKeyword(l.collection_item_id) && !l.collection_item_id.startsWith('ref-'))
       .map(l => l.collection_item_id)
   );
 
@@ -190,6 +203,11 @@ export default async function PageRenderer({
     if (slugField && collectionItem.values[slugField.id]) {
       collectionItemSlugs[collectionItem.id] = collectionItem.values[slugField.id];
     }
+  }
+
+  // Merge slugs for the dynamic page's collection (next/previous navigation).
+  if (pageCollectionSortedItemSlugs) {
+    Object.assign(collectionItemSlugs, pageCollectionSortedItemSlugs);
   }
 
   // Fetch pages and folders for link resolution using repository functions
@@ -434,6 +452,7 @@ export default async function PageRenderer({
           isPublished={page.is_published}
           pageCollectionItemId={collectionItem?.id}
           pageCollectionItemData={collectionItem?.values || undefined}
+          pageCollectionSortedItemIds={pageCollectionSortedItemIds}
           hiddenLayerInfo={hiddenLayerInfo}
           currentLocale={locale}
           availableLocales={availableLocales}

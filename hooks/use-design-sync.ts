@@ -605,6 +605,7 @@ function mapClassToDesignValue(className: string, property: string): string | un
     minHeight: 'min-h-',
     gridColumnSpan: 'u-col-span-',
     gridRowSpan: 'u-row-span-',
+    lineClamp: 'line-clamp-',
   };
 
   const knownPrefix = multiSegmentPrefixes[property];
