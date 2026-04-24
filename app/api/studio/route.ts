@@ -46,7 +46,12 @@ export async function POST(request: Request) {
       } else if (new RegExp(`--${key}:`).test(css)) {
         css = css.replace(new RegExp(`(--${key}:\\s*)([^;]+)(;)`, 'g'), `$1${value}$3`);
       } else {
-        css = css.replace('/* STUDIO_CORE_END */', `:root {\n  --${key}: ${value};\n}\n/* STUDIO_CORE_END */`);
+        // Insert inside the existing theme block rather than creating a standalone :root {}
+        if (css.includes('/* STUDIO_THEME_END */')) {
+          css = css.replace('/* STUDIO_THEME_END */', `  --${key}: ${value};\n/* STUDIO_THEME_END */`);
+        } else {
+          css = css.replace('/* STUDIO_CORE_END */', `:root {\n  --${key}: ${value};\n}\n/* STUDIO_CORE_END */`);
+        }
       }
     }
 
@@ -70,14 +75,14 @@ export async function POST(request: Request) {
         }
       }
 
-      const bridgeBlock = `\n${bridgeStart}\n${finalBridges}\n${bridgeEnd}\n`;
+      const bridgeBlock = `${bridgeStart}\n${finalBridges}\n${bridgeEnd}`;
 
       if (css.includes(bridgeStart) && css.includes(bridgeEnd)) {
         const startIdx = css.indexOf(bridgeStart);
         const endIdx = css.indexOf(bridgeEnd) + bridgeEnd.length;
-        css = css.substring(0, startIdx) + bridgeBlock + css.substring(endIdx);
+        css = css.substring(0, startIdx).trimEnd() + '\n\n' + bridgeBlock + '\n';
       } else {
-        css = css.trimEnd() + '\n' + bridgeBlock;
+        css = css.trimEnd() + '\n\n' + bridgeBlock + '\n';
       }
     }
 

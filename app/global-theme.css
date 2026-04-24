@@ -150,6 +150,19 @@
   --theme-text-muted:   var(--theme-light--text-muted);
   --theme-accent:       var(--theme-light--accent);
   --theme-border:       var(--theme-light--border);
+  --space-0: 0px;
+  --__uuid--theme-bg: 42bd72cf-c7de-465c-9b31-4ef1e73a3c1c;
+  --__uuid--theme-text-main: a6001289-4d66-4729-844a-799a44e5c696;
+  --__uuid--theme-text-heading: 8b6a513e-934d-4ac9-ba7f-d464b9129d13;
+  --__uuid--theme-text-muted: 51534e8a-9368-464d-ae08-5a19f2678e94;
+  --__uuid--theme-accent: 3c4ecd93-04e9-4032-824c-afcc5bef487f;
+  --__uuid--theme-border: 84b41b3e-169f-48bb-b9cf-5c1629dd30b0;
+  --radius--small: 0.5rem;
+  --radius--main: 1rem;
+  --radius--round: 9999rem;
+  --border-width--main: 0.094rem;
+  --theme-light--background-2: #f5f5f5;
+  --theme-dark--background-2: #2a2a2a;
 /* STUDIO_THEME_END */
 }
 
@@ -746,136 +759,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   :is(#ybody, .y-canvas, [data-ycode-canvas]) .sm\:u-break-none  { margin-left: 0 !important; margin-right: 0 !important; width: 100% !important; }
 }
 
-:root {
-  --space-0: 0px;
-}
-:root {
-  --__uuid--theme-bg: 42bd72cf-c7de-465c-9b31-4ef1e73a3c1c;
-}
-:root {
-  --__uuid--theme-text-main: a6001289-4d66-4729-844a-799a44e5c696;
-}
-:root {
-  --__uuid--theme-text-heading: 8b6a513e-934d-4ac9-ba7f-d464b9129d13;
-}
-:root {
-  --__uuid--theme-text-muted: 51534e8a-9368-464d-ae08-5a19f2678e94;
-}
-:root {
-  --__uuid--theme-accent: 3c4ecd93-04e9-4032-824c-afcc5bef487f;
-}
-:root {
-  --__uuid--theme-border: 84b41b3e-169f-48bb-b9cf-5c1629dd30b0;
-}
-:root {
-  --radius--small: 8px;
-}
-:root {
-  --radius--main: 16px;
-}
-:root {
-  --radius--round: 9999px;
-}
-:root {
-  --border-width--main: 1.5px;
-}
-:root {
-  --theme-light--background-2: #f5f5f5;
-}
-:root {
-  --theme-dark--background-2: #2a2a2a;
-}
 /* STUDIO_CORE_END */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /* STUDIO_RUNTIME_BRIDGES_START */
 /* Studio Runtime Bridge v9.1 — breakpoint-aware, auto-generated */
@@ -1298,95 +1182,3 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   --84b41b3e-169f-48bb-b9cf-5c1629dd30b0: #e6b67e;
 }
 /* STUDIO_RUNTIME_BRIDGES_END */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

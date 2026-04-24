@@ -159,10 +159,10 @@ export default function StudioThemeEditor() {
           });
 
           // Radius & border-width defaults
-          if (!vars['radius--small'])      missingUpdates['radius--small']      = '8px';
-          if (!vars['radius--main'])       missingUpdates['radius--main']        = '16px';
+          if (!vars['radius--small'])      missingUpdates['radius--small']      = '0.5rem';
+          if (!vars['radius--main'])       missingUpdates['radius--main']        = '1rem';
           if (!vars['radius--round'])      missingUpdates['radius--round']       = '9999px';
-          if (!vars['border-width--main']) missingUpdates['border-width--main']  = '1.5px';
+          if (!vars['border-width--main']) missingUpdates['border-width--main']  = '0.094rem';
 
           // Theme background-2 defaults
           if (!vars['theme-light--background-2']) missingUpdates['theme-light--background-2'] = '#f5f5f5';
@@ -896,6 +896,11 @@ export default function StudioThemeEditor() {
 
   const remToPx   = (v: string) => String(Math.round(parseFloat(v) * 16));
   const pxToRem   = (v: string) => String(parseFloat(v) / 16);
+  // Convert a CSS length (rem or px) to raw pixels for Figma export (unitless number)
+  const cssValToPx = (v: string): number => {
+    const n = parseFloat(v);
+    return v.trim().endsWith('rem') ? Math.round(n * 16 * 1000) / 1000 : n;
+  };
   const stripEm   = (v: string) => v.replace(/em$/i, '');
   const addEm     = (v: string) => `${parseFloat(v)}em`;
   const firstFont = (v: string) => v.split(',')[0].trim().replace(/['"]/g, '');
@@ -967,8 +972,8 @@ export default function StudioThemeEditor() {
     const sizesDesktop: Record<string, unknown> = {
       'font-size':    buildFontSizes(sizeFnDesktop),
       'space':        buildSpacing(true),
-      'radius':       { small: tok('number', num(variables['radius--small'] ?? '8')), main: tok('number', num(variables['radius--main'] ?? '16')), round: tok('number', 9999) },
-      'border-width': { main: tok('number', num(variables['border-width--main'] ?? '1.5')) },
+      'radius':       { small: tok('number', cssValToPx(variables['radius--small'] ?? '0.5rem')), main: tok('number', cssValToPx(variables['radius--main'] ?? '1rem')), round: tok('number', 9999) },
+      'border-width': { main: tok('number', cssValToPx(variables['border-width--main'] ?? '0.094rem')) },
       '$extensions':  { 'com.figma.modeName': 'Desktop' },
     };
     const sizesMobile: Record<string, unknown> = {
@@ -1120,9 +1125,9 @@ export default function StudioThemeEditor() {
           if (parts[0] === 'font-size' && parts[1]) {
             cssUpdates[`_typography---font-size--${parts[1]}-max`] = String(value / 16);
           } else if (parts[0] === 'radius' && parts[1]) {
-            cssUpdates[`radius--${parts[1]}`] = parts[1] === 'round' ? '9999px' : `${value}px`;
+            cssUpdates[`radius--${parts[1]}`] = parts[1] === 'round' ? '9999px' : `${value / 16}rem`;
           } else if (parts[0] === 'border-width' && parts[1]) {
-            cssUpdates[`border-width--${parts[1]}`] = `${value}px`;
+            cssUpdates[`border-width--${parts[1]}`] = `${Math.round(value / 16 * 10000) / 10000}rem`;
           }
           // space.* intentionally skipped — Studio keeps ratio system
         }
