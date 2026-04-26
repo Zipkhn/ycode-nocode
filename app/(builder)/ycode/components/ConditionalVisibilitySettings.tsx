@@ -247,26 +247,34 @@ export default function ConditionalVisibilitySettings({
     return findAllCollectionLayers(layers);
   }, [currentPageId, editingComponentId, componentDrafts, draftsByPageId]);
 
-  // Initialize groups from layer data
+  // Initialize groups and default visibility from layer data
   const groups: VisibilityConditionGroup[] = useMemo(() => {
     return layer?.variables?.conditionalVisibility?.groups || [];
   }, [layer?.variables?.conditionalVisibility]);
 
-  // Helper to update layer with new groups
-  const updateGroups = useCallback((newGroups: VisibilityConditionGroup[]) => {
+  const defaultVisibility = layer?.variables?.conditionalVisibility?.defaultVisibility ?? 'visible';
+
+  // Helper to update the full conditionalVisibility object
+  const updateConditionalVisibility = useCallback((
+    newGroups: VisibilityConditionGroup[],
+    newDefault?: 'visible' | 'hidden'
+  ) => {
     if (!layer) return;
-
-    const conditionalVisibility: ConditionalVisibility = {
-      groups: newGroups,
-    };
-
+    const base = newDefault ?? defaultVisibility;
+    const hasContent = newGroups.length > 0 || base === 'hidden';
     onLayerUpdate(layer.id, {
       variables: {
         ...layer.variables,
-        conditionalVisibility: newGroups.length > 0 ? conditionalVisibility : undefined,
+        conditionalVisibility: hasContent
+          ? { defaultVisibility: base, groups: newGroups }
+          : undefined,
       },
     });
-  }, [layer, onLayerUpdate]);
+  }, [layer, onLayerUpdate, defaultVisibility]);
+
+  const updateGroups = useCallback((newGroups: VisibilityConditionGroup[]) => {
+    updateConditionalVisibility(newGroups);
+  }, [updateConditionalVisibility]);
 
   const hasConditions = groups.length > 0;
 
@@ -779,6 +787,10 @@ export default function ConditionalVisibilitySettings({
     );
   };
 
+  const handleGroupActionChange = (groupId: string, action: 'show' | 'hide') => {
+    updateGroups(groups.map(g => g.id === groupId ? { ...g, action } : g));
+  };
+
   return (
     <SettingsPanel
       title="Conditional visibility"
@@ -800,6 +812,30 @@ export default function ConditionalVisibilitySettings({
       }
     >
       <div className="flex flex-col gap-3">
+
+        {/* Default state toggle */}
+        <div className="flex items-center justify-between gap-2">
+          <Label variant="muted" className="text-[11px] shrink-0">Default state</Label>
+          <div className="flex gap-1">
+            <Button
+              size="xs"
+              variant={defaultVisibility === 'visible' ? 'secondary' : 'ghost'}
+              onClick={() => updateConditionalVisibility(groups, 'visible')}
+              className="gap-1"
+            >
+              <Icon name="eye" className="size-3" /> Visible
+            </Button>
+            <Button
+              size="xs"
+              variant={defaultVisibility === 'hidden' ? 'secondary' : 'ghost'}
+              onClick={() => updateConditionalVisibility(groups, 'hidden')}
+              className="gap-1"
+            >
+              <Icon name="eye-off" className="size-3" /> Hidden
+            </Button>
+          </div>
+        </div>
+
         {groups.map((group, groupIndex) => (
             <React.Fragment key={group.id}>
               {groupIndex > 0 && (
@@ -824,9 +860,7 @@ export default function ConditionalVisibilitySettings({
                           variant="ghost" size="xs"
                           className="size-5"
                         >
-                          <div>
-                            <Icon name="plus" className="size-2.5!" />
-                          </div>
+                          <div><Icon name="plus" className="size-2.5!" /></div>
                         </Button>
                       </DropdownMenuTrigger>
                       {renderAddConditionDropdown(
@@ -837,10 +871,32 @@ export default function ConditionalVisibilitySettings({
                     </DropdownMenu>
                   </li>
                 </ul>
+
+                {/* Then set to */}
+                <div className="flex items-center justify-between gap-2 px-2 pb-2">
+                  <Label variant="muted" className="text-[10px] shrink-0">Then set to</Label>
+                  <div className="flex gap-1">
+                    <Button
+                      size="xs"
+                      variant={(group.action ?? 'show') === 'show' ? 'secondary' : 'ghost'}
+                      onClick={() => handleGroupActionChange(group.id, 'show')}
+                      className="gap-1"
+                    >
+                      <Icon name="eye" className="size-3" /> Visible
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant={(group.action ?? 'show') === 'hide' ? 'secondary' : 'ghost'}
+                      onClick={() => handleGroupActionChange(group.id, 'hide')}
+                      className="gap-1"
+                    >
+                      <Icon name="eye-off" className="size-3" /> Hidden
+                    </Button>
+                  </div>
+                </div>
               </div>
             </React.Fragment>
-        ))
-        }
+        ))}
       </div>
     </SettingsPanel>
   );

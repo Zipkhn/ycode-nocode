@@ -2198,45 +2198,42 @@ function evaluateCondition(
 }
 
 /**
- * Evaluate conditional visibility for a layer
- * Groups are AND'd together; conditions within a group are OR'd
+ * Evaluate conditional visibility for a layer.
  *
- * @param conditionalVisibility - The visibility rules from layer.variables
- * @param context - The context containing field values and collection counts
- * @returns True if layer should be visible, false if it should be hidden
+ * Logic:
+ *  - No groups → return base state (defaultVisibility, default 'visible')
+ *  - Each group is evaluated independently; OR logic within each group
+ *  - If group conditions are TRUE → apply group.action ('show'|'hide')
+ *  - HIDE wins when multiple groups match with conflicting actions
+ *  - No group matched → return base state
  */
 export function evaluateVisibility(
   conditionalVisibility: import('@/types').ConditionalVisibility | undefined,
   context: VisibilityContext
 ): boolean {
-  // No conditional visibility set - layer is visible
-  if (!conditionalVisibility || !conditionalVisibility.groups || conditionalVisibility.groups.length === 0) {
-    return true;
-  }
+  const defaultVisible = (conditionalVisibility?.defaultVisibility ?? 'visible') === 'visible';
 
-  // Evaluate each group (AND logic between groups)
+  if (!conditionalVisibility?.groups?.length) return defaultVisible;
+
+  let anyMatched = false;
+  let result = defaultVisible;
+
   for (const group of conditionalVisibility.groups) {
-    if (!group.conditions || group.conditions.length === 0) {
-      continue; // Empty group is truthy (skipped)
-    }
+    if (!group.conditions?.length) continue;
 
-    // Evaluate conditions within group (OR logic)
-    let groupResult = false;
-    for (const condition of group.conditions) {
-      if (evaluateCondition(condition, context)) {
-        groupResult = true;
-        break; // Short-circuit: one true condition makes the group true
+    const groupTrue = group.conditions.some(c => evaluateCondition(c, context));
+
+    if (groupTrue) {
+      anyMatched = true;
+      if ((group.action ?? 'show') === 'hide') {
+        result = false; // HIDE overrides SHOW
+      } else if (result !== false) {
+        result = true;
       }
     }
-
-    // If any group is false, the whole visibility is false (AND logic)
-    if (!groupResult) {
-      return false;
-    }
   }
 
-  // All groups passed
-  return true;
+  return anyMatched ? result : defaultVisible;
 }
 
 /**

@@ -1293,9 +1293,11 @@ export interface VisibilityCondition {
 export interface VisibilityConditionGroup {
   id: string;
   conditions: VisibilityCondition[];
+  action?: 'show' | 'hide'; // what to apply when conditions are TRUE
 }
 
 export interface ConditionalVisibility {
+  defaultVisibility?: 'visible' | 'hidden'; // base state when no condition matches
   groups: VisibilityConditionGroup[];
 }
 
