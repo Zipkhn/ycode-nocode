@@ -269,11 +269,8 @@ export default function ConditionalVisibilitySettings({
   }, [layer, onLayerUpdate]);
 
   const hasConditions = groups.length > 0;
-  const hasAvailableSources = allFieldsFromGroups.length > 0 || pageCollectionLayers.length > 0;
 
-  if (!layer || (!hasConditions && !hasAvailableSources)) {
-    return null;
-  }
+  if (!layer) return null;
 
   // Handle adding a new condition group for a collection field
   const handleAddFieldConditionGroup = (field: CollectionField) => {
