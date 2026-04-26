@@ -820,7 +820,7 @@ export default function ConditionalVisibilitySettings({
   return (
     <SettingsPanel
       title="Conditional visibility"
-      isOpen={hasConditions}
+      isOpen={true}
       onToggle={() => {}}
       action={
         <DropdownMenu>
