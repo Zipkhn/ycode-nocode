@@ -57,6 +57,23 @@ import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { collectionsApi } from '@/lib/api';
 import type { CollectionItemWithValues } from '@/types';
 
+const RUNTIME_VAR_OPERATORS: { value: VisibilityOperator; label: string }[] = [
+  { value: 'is_present', label: 'Is set' },
+  { value: 'is_empty', label: 'Is not set' },
+  { value: 'is', label: 'Equals' },
+  { value: 'is_not', label: 'Does not equal' },
+  { value: 'contains', label: 'Contains' },
+  { value: 'does_not_contain', label: 'Does not contain' },
+  { value: 'lt', label: 'Less than' },
+  { value: 'lte', label: 'Less than or equal' },
+  { value: 'gt', label: 'Greater than' },
+  { value: 'gte', label: 'Greater than or equal' },
+  { value: 'is_before', label: 'Is before (date)' },
+  { value: 'is_after', label: 'Is after (date)' },
+];
+
+const RUNTIME_VAR_OPERATORS_NO_VALUE: VisibilityOperator[] = ['is_present', 'is_empty'];
+
 interface ConditionalVisibilitySettingsProps {
   layer: Layer | null;
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
@@ -278,6 +295,54 @@ export default function ConditionalVisibilitySettings({
     updateGroups([...groups, newGroup]);
   };
 
+  // Handle adding a new condition group for a runtime variable
+  const handleAddRuntimeVarConditionGroup = () => {
+    const newCondition: VisibilityCondition = {
+      id: `${Date.now()}-1`,
+      source: 'runtime_var',
+      runtimeVarPath: '',
+      operator: 'is_present',
+    };
+    const newGroup: VisibilityConditionGroup = {
+      id: Date.now().toString(),
+      conditions: [newCondition],
+    };
+    updateGroups([...groups, newGroup]);
+  };
+
+  // Handle adding a runtime var condition to an existing group (OR logic)
+  const handleAddRuntimeVarConditionFromOr = (groupId: string) => {
+    const newGroups = groups.map(group => {
+      if (group.id === groupId) {
+        const newCondition: VisibilityCondition = {
+          id: `${groupId}-${Date.now()}`,
+          source: 'runtime_var',
+          runtimeVarPath: '',
+          operator: 'is_present',
+        };
+        return { ...group, conditions: [...group.conditions, newCondition] };
+      }
+      return group;
+    });
+    updateGroups(newGroups);
+  };
+
+  // Handle runtime var path change
+  const handleRuntimeVarPathChange = (groupId: string, conditionId: string, path: string) => {
+    const newGroups = groups.map(group => {
+      if (group.id === groupId) {
+        return {
+          ...group,
+          conditions: group.conditions.map(c =>
+            c.id === conditionId ? { ...c, runtimeVarPath: path } : c
+          ),
+        };
+      }
+      return group;
+    });
+    updateGroups(newGroups);
+  };
+
   // Handle adding a new condition group for a page collection
   const handleAddPageCollectionConditionGroup = (collectionLayer: CollectionLayerInfo) => {
     const newCondition: VisibilityCondition = {
@@ -478,7 +543,8 @@ export default function ConditionalVisibilitySettings({
   // Render the dropdown content for adding conditions
   const renderAddConditionDropdown = (
     onFieldSelect: (field: CollectionField) => void,
-    onPageCollectionSelect: (layer: CollectionLayerInfo) => void
+    onPageCollectionSelect: (layer: CollectionLayerInfo) => void,
+    onRuntimeVarSelect: () => void
   ) => (
     <DropdownMenuContent align="end" className="max-h-75! overflow-y-auto">
       {/* Collection Fields Section - render each group */}
@@ -521,12 +587,13 @@ export default function ConditionalVisibilitySettings({
         </>
       )}
 
-      {/* Empty State */}
-      {allFieldsFromGroups.length === 0 && pageCollectionLayers.length === 0 && (
-        <div className="px-2 py-4 text-xs text-muted-foreground text-center">
-          No fields or collections available
-        </div>
-      )}
+      {/* Runtime Variable Section */}
+      {(allFieldsFromGroups.length > 0 || pageCollectionLayers.length > 0) && <DropdownMenuSeparator />}
+      <DropdownMenuLabel className="text-xs text-muted-foreground">App State</DropdownMenuLabel>
+      <DropdownMenuItem onClick={onRuntimeVarSelect} className="flex items-center gap-2">
+        <Icon name="zap" className="size-3 opacity-60" />
+        Runtime variable
+      </DropdownMenuItem>
     </DropdownMenuContent>
   );
 
@@ -545,13 +612,16 @@ export default function ConditionalVisibilitySettings({
 
   // Render a single condition
   const renderCondition = (condition: VisibilityCondition, group: VisibilityConditionGroup, index: number) => {
+    const isRuntimeVar = condition.source === 'runtime_var';
     const isPageCollection = condition.source === 'page_collection';
-    const fieldType = isPageCollection ? undefined : condition.fieldType || getFieldType(condition.fieldId || '');
-    const operators = isPageCollection ? PAGE_COLLECTION_OPERATORS : getOperatorsForFieldType(fieldType);
-    const icon = isPageCollection ? 'database' : getFieldIcon(fieldType);
-    const displayName = isPageCollection
-      ? condition.collectionLayerName || 'Collection'
-      : getFieldName(condition.fieldId || '');
+    const fieldType = (isPageCollection || isRuntimeVar) ? undefined : condition.fieldType || getFieldType(condition.fieldId || '');
+    const operators = isRuntimeVar ? RUNTIME_VAR_OPERATORS : isPageCollection ? PAGE_COLLECTION_OPERATORS : getOperatorsForFieldType(fieldType);
+    const icon = isRuntimeVar ? 'zap' : isPageCollection ? 'database' : getFieldIcon(fieldType);
+    const displayName = isRuntimeVar
+      ? (condition.runtimeVarPath || 'Runtime variable')
+      : isPageCollection
+        ? condition.collectionLayerName || 'Collection'
+        : getFieldName(condition.fieldId || '');
     const referenceCollectionId = getReferenceCollectionId(condition);
 
     return (
@@ -598,6 +668,24 @@ export default function ConditionalVisibilitySettings({
               </SelectGroup>
             </SelectContent>
           </Select>
+
+          {/* Runtime var: path input */}
+          {isRuntimeVar && (
+            <Input
+              placeholder="forms.contact.email"
+              value={condition.runtimeVarPath || ''}
+              onChange={(e) => handleRuntimeVarPathChange(group.id, condition.id, e.target.value)}
+            />
+          )}
+
+          {/* Runtime var: value input (hidden for set/not_set operators) */}
+          {isRuntimeVar && !RUNTIME_VAR_OPERATORS_NO_VALUE.includes(condition.operator) && (
+            <Input
+              placeholder={condition.operator === 'is_before' || condition.operator === 'is_after' ? 'YYYY-MM-DD or "today"' : 'Value...'}
+              value={condition.value || ''}
+              onChange={(e) => handleValueChange(group.id, condition.id, e.target.value)}
+            />
+          )}
 
           {/* Value Input(s) based on operator */}
           {condition.operator === 'item_count' && (
@@ -708,7 +796,8 @@ export default function ConditionalVisibilitySettings({
           </DropdownMenuTrigger>
           {renderAddConditionDropdown(
             handleAddFieldConditionGroup,
-            handleAddPageCollectionConditionGroup
+            handleAddPageCollectionConditionGroup,
+            handleAddRuntimeVarConditionGroup
           )}
         </DropdownMenu>
       }
@@ -745,7 +834,8 @@ export default function ConditionalVisibilitySettings({
                       </DropdownMenuTrigger>
                       {renderAddConditionDropdown(
                         (field) => handleAddConditionFromOr(group.id, field),
-                        (layer) => handleAddPageCollectionConditionFromOr(group.id, layer)
+                        (layer) => handleAddPageCollectionConditionFromOr(group.id, layer),
+                        () => handleAddRuntimeVarConditionFromOr(group.id)
                       )}
                     </DropdownMenu>
                   </li>

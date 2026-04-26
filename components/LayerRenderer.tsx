@@ -37,6 +37,7 @@ import { useFilterStore } from '@/stores/useFilterStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
+import { useRuntimeVarStore } from '@/stores/useRuntimeVarStore';
 import { ShimmerSkeleton } from '@/components/ui/shimmer-skeleton';
 import { combineBgValues, mergeStaticBgVars } from '@/lib/tailwind-class-mapper';
 import { clsx } from 'clsx';
@@ -473,6 +474,7 @@ const LayerItem: React.FC<{
   const assetsById = useAssetsStore((state) => state.assetsById);
   const settingsByKey = useSettingsStore((state) => state.settingsByKey);
   const colorVariables = useColorVariablesStore((state) => state.colorVariables);
+  const runtimeVars = useRuntimeVarStore((state) => state.vars);
   const timezone = (settingsByKey.timezone as string | null) ?? 'UTC';
 
   // Create asset resolver that checks pre-resolved assets first (SSR), then falls back to store
@@ -1523,6 +1525,7 @@ const LayerItem: React.FC<{
   }
 
   // Evaluate conditional visibility (only in edit mode - SSR handles published pages)
+  let isConditionallyHidden = false;
   const conditionalVisibility = layer.variables?.conditionalVisibility;
   if (isEditMode && conditionalVisibility && conditionalVisibility.groups?.length > 0) {
     // Build page collection counts from the store
@@ -1541,9 +1544,10 @@ const LayerItem: React.FC<{
       collectionLayerData,
       pageCollectionData: pageCollectionItemData,
       pageCollectionCounts,
+      runtimeVars,
     });
     if (!isVisible) {
-      return null;
+      isConditionallyHidden = true;
     }
   }
 
@@ -1871,6 +1875,11 @@ const LayerItem: React.FC<{
       if (hasPlaceholder) {
         elementProps.defaultValue = '';
       }
+    }
+
+    // Ghost state for conditionally hidden layers (edit mode only)
+    if (isConditionallyHidden) {
+      elementProps['data-conditional-hidden'] = 'true';
     }
 
     // Add editor event handlers if in edit mode (but not for context menu trigger)

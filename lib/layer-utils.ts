@@ -1900,6 +1900,8 @@ export interface VisibilityContext {
   pageCollectionCounts?: Record<string, number>;
   /** Field definitions for type-aware comparison */
   collectionFields?: CollectionField[];
+  /** Runtime variable state (forms, auth, n8n payloads) */
+  runtimeVars?: Record<string, unknown>;
 }
 
 /**
@@ -1937,6 +1939,50 @@ function evaluateCondition(
       }
       default:
         return true;
+    }
+  }
+
+  // Runtime variable conditions - resolve via dot-notation path against runtime state
+  if (condition.source === 'runtime_var') {
+    const path = condition.runtimeVarPath;
+    if (!path) return false;
+
+    const rawValue = context.runtimeVars
+      ? (path.split('.').reduce((acc: unknown, key) => {
+        if (acc !== null && acc !== undefined && typeof acc === 'object') {
+          return (acc as Record<string, unknown>)[key];
+        }
+        return undefined;
+      }, context.runtimeVars as unknown))
+      : undefined;
+
+    const isPresent = rawValue !== undefined && rawValue !== null && rawValue !== '';
+    const strValue = rawValue === undefined || rawValue === null ? '' : String(rawValue);
+    const compareValue = String(condition.value ?? '');
+
+    switch (condition.operator) {
+      case 'is':
+        return typeof rawValue === 'boolean'
+          ? rawValue === (compareValue === 'true')
+          : strValue === compareValue;
+      case 'is_not': return strValue !== compareValue;
+      case 'is_present': return isPresent;
+      case 'is_empty': return !isPresent;
+      case 'contains': return strValue.toLowerCase().includes(compareValue.toLowerCase());
+      case 'does_not_contain': return !strValue.toLowerCase().includes(compareValue.toLowerCase());
+      case 'lt': return parseFloat(strValue) < parseFloat(compareValue);
+      case 'lte': return parseFloat(strValue) <= parseFloat(compareValue);
+      case 'gt': return parseFloat(strValue) > parseFloat(compareValue);
+      case 'gte': return parseFloat(strValue) >= parseFloat(compareValue);
+      case 'is_before': {
+        const target = compareValue === 'today' ? new Date() : new Date(compareValue);
+        return new Date(strValue) < target;
+      }
+      case 'is_after': {
+        const target = compareValue === 'today' ? new Date() : new Date(compareValue);
+        return new Date(strValue) > target;
+      }
+      default: return false;
     }
   }
 

@@ -254,3 +254,11 @@
 
 /* Override Sonner toast content gap */
 [data-sonner-toast][data-styled='true'] [data-content] { gap: 0; }
+
+/* Conditional visibility ghost state (editor only) */
+[data-conditional-hidden="true"] {
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+  outline: 1px dashed hsl(var(--muted-foreground) / 0.4);
+  outline-offset: -1px;
+}
