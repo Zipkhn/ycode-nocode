@@ -791,6 +791,32 @@ export default function ConditionalVisibilitySettings({
     updateGroups(groups.map(g => g.id === groupId ? { ...g, action } : g));
   };
 
+  const VisibilityToggle = ({
+    value,
+    onChange,
+  }: {
+    value: 'visible' | 'hidden' | 'show' | 'hide';
+    onChange: (v: 'visible' | 'hidden' | 'show' | 'hide') => void;
+  }) => {
+    const isVisible = value === 'visible' || value === 'show';
+    return (
+      <div className="flex gap-1">
+        <Button
+          size="xs" variant={isVisible ? 'secondary' : 'ghost'}
+          onClick={() => onChange(value === 'show' || value === 'hide' ? 'show' : 'visible')} className="gap-1"
+        >
+          <Icon name="eye" className="size-3" /> Visible
+        </Button>
+        <Button
+          size="xs" variant={!isVisible ? 'secondary' : 'ghost'}
+          onClick={() => onChange(value === 'show' || value === 'hide' ? 'hide' : 'hidden')} className="gap-1"
+        >
+          <Icon name="eye-off" className="size-3" /> Hidden
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <SettingsPanel
       title="Conditional visibility"
@@ -799,9 +825,7 @@ export default function ConditionalVisibilitySettings({
       action={
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="xs">
-              <Icon name="plus" />
-            </Button>
+            <Button variant="ghost" size="xs"><Icon name="plus" /></Button>
           </DropdownMenuTrigger>
           {renderAddConditionDropdown(
             handleAddFieldConditionGroup,
@@ -813,44 +837,39 @@ export default function ConditionalVisibilitySettings({
     >
       <div className="flex flex-col gap-3">
 
-        {/* Default state toggle */}
-        <div className="flex items-center justify-between gap-2">
-          <Label variant="muted" className="text-[11px] shrink-0">Default state</Label>
-          <div className="flex gap-1">
-            <Button
-              size="xs"
-              variant={defaultVisibility === 'visible' ? 'secondary' : 'ghost'}
-              onClick={() => updateConditionalVisibility(groups, 'visible')}
-              className="gap-1"
-            >
-              <Icon name="eye" className="size-3" /> Visible
-            </Button>
-            <Button
-              size="xs"
-              variant={defaultVisibility === 'hidden' ? 'secondary' : 'ghost'}
-              onClick={() => updateConditionalVisibility(groups, 'hidden')}
-              className="gap-1"
-            >
-              <Icon name="eye-off" className="size-3" /> Hidden
-            </Button>
+        {/* No conditions: simple visible/hidden toggle */}
+        {!hasConditions && (
+          <div className="flex items-center justify-between gap-2">
+            <Label variant="muted" className="text-[11px] shrink-0">Element is</Label>
+            <VisibilityToggle
+              value={defaultVisibility}
+              onChange={(v) => updateConditionalVisibility([], v as 'visible' | 'hidden')}
+            />
           </div>
-        </div>
+        )}
 
+        {/* Conditions: IF / THEN / ELSE layout */}
         {groups.map((group, groupIndex) => (
-            <React.Fragment key={group.id}>
-              {groupIndex > 0 && (
-                <div className="flex items-center gap-2 py-1">
-                  <hr className="flex-1" />
-                  <Label variant="muted" className="text-[10px]">And</Label>
-                  <hr className="flex-1" />
-                </div>
-              )}
+          <React.Fragment key={group.id}>
+            {groupIndex > 0 && (
+              <div className="flex items-center gap-2 py-1">
+                <hr className="flex-1" />
+                <Label variant="muted" className="text-[10px]">And</Label>
+                <hr className="flex-1" />
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              {/* IF label */}
+              <Label variant="muted" className="text-[10px] uppercase tracking-wide px-0.5">If</Label>
+
               <div className="flex flex-col bg-muted rounded-lg">
                 <ul className="p-2 flex flex-col gap-2">
                   {group.conditions.map((condition, index) =>
                     renderCondition(condition, group, index)
                   )}
 
+                  {/* OR row */}
                   <li className="flex items-center gap-2 h-6">
                     <Label variant="muted" className="text-[10px]">Or</Label>
                     <hr className="flex-1" />
@@ -871,31 +890,29 @@ export default function ConditionalVisibilitySettings({
                     </DropdownMenu>
                   </li>
                 </ul>
-
-                {/* Then set to */}
-                <div className="flex items-center justify-between gap-2 px-2 pb-2">
-                  <Label variant="muted" className="text-[10px] shrink-0">Then set to</Label>
-                  <div className="flex gap-1">
-                    <Button
-                      size="xs"
-                      variant={(group.action ?? 'show') === 'show' ? 'secondary' : 'ghost'}
-                      onClick={() => handleGroupActionChange(group.id, 'show')}
-                      className="gap-1"
-                    >
-                      <Icon name="eye" className="size-3" /> Visible
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant={(group.action ?? 'show') === 'hide' ? 'secondary' : 'ghost'}
-                      onClick={() => handleGroupActionChange(group.id, 'hide')}
-                      className="gap-1"
-                    >
-                      <Icon name="eye-off" className="size-3" /> Hidden
-                    </Button>
-                  </div>
-                </div>
               </div>
-            </React.Fragment>
+
+              {/* THEN */}
+              <div className="flex items-center justify-between gap-2 pl-0.5">
+                <Label variant="muted" className="text-[10px] uppercase tracking-wide shrink-0">Then</Label>
+                <VisibilityToggle
+                  value={group.action ?? 'show'}
+                  onChange={(v) => handleGroupActionChange(group.id, v as 'show' | 'hide')}
+                />
+              </div>
+
+              {/* ELSE (shown only on the last group) */}
+              {groupIndex === groups.length - 1 && (
+                <div className="flex items-center justify-between gap-2 pl-0.5">
+                  <Label variant="muted" className="text-[10px] uppercase tracking-wide shrink-0">Else</Label>
+                  <VisibilityToggle
+                    value={defaultVisibility}
+                    onChange={(v) => updateConditionalVisibility(groups, v as 'visible' | 'hidden')}
+                  />
+                </div>
+              )}
+            </div>
+          </React.Fragment>
         ))}
       </div>
     </SettingsPanel>
