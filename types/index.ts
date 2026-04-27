@@ -1270,7 +1270,7 @@ export type VisibilityOperator =
 
 export interface VisibilityCondition {
   id: string;
-  source: 'collection_field' | 'page_collection' | 'runtime_var';
+  source: 'collection_field' | 'page_collection' | 'runtime_var' | 'current_page';
   // For collection_field source
   fieldId?: string;
   fieldType?: CollectionFieldType;
@@ -1288,6 +1288,8 @@ export interface VisibilityCondition {
   inputLayerId2?: string; // For second bound (e.g. 'is_between')
   // For runtime_var source
   runtimeVarPath?: string; // dot-notation path e.g. "forms.contact.email"
+  // For current_page source
+  pageField?: 'locale' | 'name' | 'folder_name' | 'title_tag' | 'meta_description';
 }
 
 export interface VisibilityConditionGroup {

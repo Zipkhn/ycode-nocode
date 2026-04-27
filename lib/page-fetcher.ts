@@ -522,8 +522,15 @@ export const fetchPageByPath = cache(async function fetchPageByPath(
             // The isPublished parameter controls which collection items to fetch
             // Pass enhanced values so nested collections can filter based on dynamic page data
             // Pass collectionItem.id so inverse reference layers can query by parent item
+            const pageDataForVisibility = {
+              locale: detectedLocale?.code,
+              name: matchingPage.name,
+              folder_name: matchingPage.page_folder_id ? (folders as import('@/types').PageFolder[]).find(f => f.id === matchingPage.page_folder_id)?.name : undefined,
+              title_tag: matchingPage.settings?.seo?.title,
+              meta_description: matchingPage.settings?.seo?.description,
+            };
             let resolvedLayers = layersWithInjectedData.length > 0
-              ? await resolveCollectionLayers(layersWithInjectedData, isPublished, enhancedItemValues, paginationContext, translations, collectionItem.id)
+              ? await resolveCollectionLayers(layersWithInjectedData, isPublished, enhancedItemValues, paginationContext, translations, collectionItem.id, pageDataForVisibility)
               : [];
 
             // Resolve collections inside rich text embedded components
@@ -617,8 +624,15 @@ export const fetchPageByPath = cache(async function fetchPageByPath(
 
     // Resolve collection layers server-side (for both draft and published)
     // The isPublished parameter controls which collection items to fetch
+    const pageDataForVisibility = {
+      locale: detectedLocale?.code,
+      name: matchingPage.name,
+      folder_name: matchingPage.page_folder_id ? (folders as import('@/types').PageFolder[]).find(f => f.id === matchingPage.page_folder_id)?.name : undefined,
+      title_tag: matchingPage.settings?.seo?.title,
+      meta_description: matchingPage.settings?.seo?.description,
+    };
     let resolvedLayers = layersWithComponents.length > 0
-      ? await resolveCollectionLayers(layersWithComponents, isPublished, undefined, paginationContext, translations)
+      ? await resolveCollectionLayers(layersWithComponents, isPublished, undefined, paginationContext, translations, undefined, pageDataForVisibility)
       : [];
 
     // Resolve collections inside rich text embedded components
@@ -1687,7 +1701,8 @@ export async function resolveCollectionLayers(
   parentItemValues?: Record<string, string>,
   paginationContext?: PaginationContext,
   translations?: Record<string, Translation>,
-  parentCollectionItemId?: string
+  parentCollectionItemId?: string,
+  currentPageData?: { locale?: string; name?: string; folder_name?: string; title_tag?: string; meta_description?: string }
 ): Promise<Layer[]> {
   // Fetch timezone setting for date formatting
   const timezone = (await getSettingByKey('timezone') as string | null) || 'UTC';
@@ -2316,7 +2331,7 @@ export async function resolveCollectionLayers(
   // Third pass: Filter layers by conditional visibility
   // We need to compute collection counts first, then filter
   // parentItemValues is the page collection data for dynamic pages
-  const filteredResult = filterByVisibility(resultWithPagination, undefined, parentItemValues);
+  const filteredResult = filterByVisibility(resultWithPagination, undefined, parentItemValues, currentPageData);
 
   return filteredResult;
 }
@@ -2410,7 +2425,8 @@ function getFilterableCollectionTarget(
 function filterByVisibility(
   layers: Layer[],
   collectionLayerData?: Record<string, string>,
-  pageCollectionData?: Record<string, string> | null
+  pageCollectionData?: Record<string, string> | null,
+  currentPageData?: { locale?: string; name?: string; folder_name?: string; title_tag?: string; meta_description?: string }
 ): Layer[] {
   const pageCollectionCounts = computeCollectionCounts(layers);
   const filterableCollectionIds = findFilterableCollectionIds(layers);
@@ -2427,6 +2443,7 @@ function filterByVisibility(
         collectionLayerData: effectiveCollectionLayerData,
         pageCollectionData,
         pageCollectionCounts,
+        currentPageData,
       });
       const filterTarget = getFilterableCollectionTarget(conditionalVisibility, filterableCollectionIds);
       if (filterTarget) {

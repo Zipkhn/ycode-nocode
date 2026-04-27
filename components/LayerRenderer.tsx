@@ -452,7 +452,7 @@ const LayerItem: React.FC<{
   const lock = useCollaborationPresenceStore((state) => state.resourceLocks[lockKey]);
   // Check if locked by another user (only compute when lock exists)
   const isLockedByOther = !!(lock && lock.user_id !== currentUserId && Date.now() <= lock.expires_at);
-  const classesString = getClassesString(layer);
+  let classesString = getClassesString(layer);
   // Collection layer data (from repeaters/loops) - separate from page collection data
   // Use layer's pre-resolved values if present (from SSR), otherwise use prop from parent
   const collectionLayerItemId = layer._collectionItemId || collectionItemId;
@@ -1506,6 +1506,22 @@ const LayerItem: React.FC<{
     return !cls.some((c: string) => /^w-/.test(c.split(':').pop() || ''));
   })();
 
+  // Strip hidden classes in edit mode so the element renders as ghost instead of disappearing.
+  // Must happen before fullClassName is built.
+  let isLayoutHiddenAtBp = false;
+  if (isEditMode && editorBreakpoint) {
+    const layerClasses = classesString.split(' ').filter(Boolean);
+    const toStrip: string[] = [];
+    if (editorBreakpoint === 'desktop' && layerClasses.includes('lg:hidden')) toStrip.push('lg:hidden');
+    if (editorBreakpoint === 'desktop' && layerClasses.includes('hidden')) toStrip.push('hidden'); // legacy
+    if ((editorBreakpoint === 'mobile' || editorBreakpoint === 'tablet') && layerClasses.includes('max-lg:hidden')) toStrip.push('max-lg:hidden');
+    if (editorBreakpoint === 'mobile' && layerClasses.includes('max-md:hidden')) toStrip.push('max-md:hidden');
+    if (toStrip.length > 0) {
+      classesString = layerClasses.filter(c => !toStrip.includes(c)).join(' ');
+      isLayoutHiddenAtBp = true;
+    }
+  }
+
   const fullClassName = isEditMode ? clsx(
     classesString,
     paragraphClasses,
@@ -1540,15 +1556,30 @@ const LayerItem: React.FC<{
       });
     });
 
+    const currentPageObj = pages?.find(p => p.id === pageId);
+    const currentFolderObj = currentPageObj?.page_folder_id
+      ? folders?.find(f => f.id === currentPageObj.page_folder_id)
+      : undefined;
     const isVisible = evaluateVisibility(conditionalVisibility, {
       collectionLayerData,
       pageCollectionData: pageCollectionItemData,
       pageCollectionCounts,
       runtimeVars,
+      currentPageData: {
+        locale: currentLocale?.code,
+        name: currentPageObj?.name,
+        folder_name: currentFolderObj?.name,
+        title_tag: currentPageObj?.settings?.seo?.title,
+        meta_description: currentPageObj?.settings?.seo?.description,
+      },
     });
     if (!isVisible) {
       isConditionallyHidden = true;
     }
+  }
+
+  if (isLayoutHiddenAtBp && !isConditionallyHidden) {
+    isConditionallyHidden = true;
   }
 
   // Prevent circular component rendering (A → B → A)
@@ -1880,6 +1911,8 @@ const LayerItem: React.FC<{
     // Ghost state for conditionally hidden layers (edit mode only)
     if (isConditionallyHidden) {
       elementProps['data-conditional-hidden'] = 'true';
+      const existingStyle = typeof elementProps.style === 'object' ? elementProps.style as Record<string, unknown> : {};
+      elementProps.style = { ...existingStyle, opacity: 0.3, pointerEvents: 'none' };
     }
 
     // Add editor event handlers if in edit mode (but not for context menu trigger)

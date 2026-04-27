@@ -1187,3 +1187,8 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   --84b41b3e-169f-48bb-b9cf-5c1629dd30b0: #e6b67e;
 }
 /* STUDIO_RUNTIME_BRIDGES_END */
+/* Visibility: hidden classes must override all !important display rules above */
+#ybody .hidden { display: none !important; }
+@media (min-width: 1024px) { #ybody .lg\:hidden { display: none !important; } }
+@media (max-width: 1023px) { #ybody .max-lg\:hidden { display: none !important; } }
+@media (max-width: 767px) { #ybody .max-md\:hidden { display: none !important; } }

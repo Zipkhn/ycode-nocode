@@ -54,8 +54,30 @@ import { usePagesStore } from '@/stores/usePagesStore';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
+import { useLocalisationStore } from '@/stores/useLocalisationStore';
 import { collectionsApi } from '@/lib/api';
 import type { CollectionItemWithValues } from '@/types';
+
+type PageFieldKey = 'locale' | 'name' | 'folder_name' | 'title_tag' | 'meta_description';
+
+const PAGE_FIELDS: { key: PageFieldKey; label: string; icon: string }[] = [
+  { key: 'locale', label: 'Locale', icon: 'globe' },
+  { key: 'name', label: 'Page name', icon: 'file' },
+  { key: 'folder_name', label: 'Folder name', icon: 'folder' },
+  { key: 'title_tag', label: 'Title tag', icon: 'type' },
+  { key: 'meta_description', label: 'Meta description', icon: 'align-left' },
+];
+
+const CURRENT_PAGE_OPERATORS: { value: import('@/types').VisibilityOperator; label: string }[] = [
+  { value: 'is', label: 'Is' },
+  { value: 'is_not', label: 'Is not' },
+  { value: 'is_present', label: 'Is set' },
+  { value: 'is_empty', label: 'Is not set' },
+  { value: 'contains', label: 'Contains' },
+  { value: 'does_not_contain', label: 'Does not contain' },
+];
+
+const CURRENT_PAGE_OPERATORS_NO_VALUE: import('@/types').VisibilityOperator[] = ['is_present', 'is_empty'];
 
 const RUNTIME_VAR_OPERATORS: { value: VisibilityOperator; label: string }[] = [
   { value: 'is_present', label: 'Is set' },
@@ -230,7 +252,10 @@ export default function ConditionalVisibilitySettings({
   const draftsByPageId = usePagesStore((state) => state.draftsByPageId);
   const currentPageId = useEditorStore((state) => state.currentPageId);
   const editingComponentId = useEditorStore((state) => state.editingComponentId);
+  const activeBreakpoint = useEditorStore((state) => state.activeBreakpoint);
+
   const componentDrafts = useComponentsStore((state) => state.componentDrafts);
+  const availableLocales = useLocalisationStore((state) => state.locales);
 
   // Get all collection layers on the page
   const pageCollectionLayers = useMemo((): CollectionLayerInfo[] => {
@@ -415,6 +440,40 @@ export default function ConditionalVisibilitySettings({
     updateGroups(newGroups);
   };
 
+  // Handle adding a current_page field condition group
+  const handleAddCurrentPageFieldConditionGroup = (pageField: PageFieldKey) => {
+    const newCondition: VisibilityCondition = {
+      id: `${Date.now()}-1`,
+      source: 'current_page',
+      pageField,
+      operator: 'is',
+      value: '',
+    };
+    const newGroup: VisibilityConditionGroup = {
+      id: Date.now().toString(),
+      conditions: [newCondition],
+    };
+    updateGroups([...groups, newGroup]);
+  };
+
+  // Handle adding a current_page field condition to an existing group (OR logic)
+  const handleAddCurrentPageFieldConditionFromOr = (groupId: string, pageField: PageFieldKey) => {
+    const newGroups = groups.map(group => {
+      if (group.id === groupId) {
+        const newCondition: VisibilityCondition = {
+          id: `${groupId}-${Date.now()}`,
+          source: 'current_page',
+          pageField,
+          operator: 'is',
+          value: '',
+        };
+        return { ...group, conditions: [...group.conditions, newCondition] };
+      }
+      return group;
+    });
+    updateGroups(newGroups);
+  };
+
   // Handle removing a condition
   const handleRemoveCondition = (groupId: string, conditionId: string) => {
     const newGroups = groups.map(group => {
@@ -549,7 +608,8 @@ export default function ConditionalVisibilitySettings({
   const renderAddConditionDropdown = (
     onFieldSelect: (field: CollectionField) => void,
     onPageCollectionSelect: (layer: CollectionLayerInfo) => void,
-    onRuntimeVarSelect: () => void
+    onRuntimeVarSelect: () => void,
+    onCurrentPageFieldSelect: (pageField: PageFieldKey) => void = handleAddCurrentPageFieldConditionGroup
   ) => (
     <DropdownMenuContent align="end" className="max-h-75! overflow-y-auto">
       {/* Collection Fields Section - render each group */}
@@ -592,8 +652,21 @@ export default function ConditionalVisibilitySettings({
         </>
       )}
 
+      {/* Current Page Section */}
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel className="text-xs text-muted-foreground">Current Page</DropdownMenuLabel>
+      {PAGE_FIELDS.map((pf) => (
+        <DropdownMenuItem
+          key={pf.key} onClick={() => onCurrentPageFieldSelect(pf.key)}
+          className="flex items-center gap-2"
+        >
+          <Icon name={pf.icon as any} className="size-3 opacity-60" />
+          {pf.label}
+        </DropdownMenuItem>
+      ))}
+
       {/* Runtime Variable Section */}
-      {(allFieldsFromGroups.length > 0 || pageCollectionLayers.length > 0) && <DropdownMenuSeparator />}
+      <DropdownMenuSeparator />
       <DropdownMenuLabel className="text-xs text-muted-foreground">App State</DropdownMenuLabel>
       <DropdownMenuItem onClick={onRuntimeVarSelect} className="flex items-center gap-2">
         <Icon name="zap" className="size-3 opacity-60" />
@@ -619,14 +692,18 @@ export default function ConditionalVisibilitySettings({
   const renderCondition = (condition: VisibilityCondition, group: VisibilityConditionGroup, index: number) => {
     const isRuntimeVar = condition.source === 'runtime_var';
     const isPageCollection = condition.source === 'page_collection';
-    const fieldType = (isPageCollection || isRuntimeVar) ? undefined : condition.fieldType || getFieldType(condition.fieldId || '');
-    const operators = isRuntimeVar ? RUNTIME_VAR_OPERATORS : isPageCollection ? PAGE_COLLECTION_OPERATORS : getOperatorsForFieldType(fieldType);
-    const icon = isRuntimeVar ? 'zap' : isPageCollection ? 'database' : getFieldIcon(fieldType);
+    const isCurrentPage = condition.source === 'current_page';
+    const fieldType = (isPageCollection || isRuntimeVar || isCurrentPage) ? undefined : condition.fieldType || getFieldType(condition.fieldId || '');
+    const operators = isRuntimeVar ? RUNTIME_VAR_OPERATORS : isPageCollection ? PAGE_COLLECTION_OPERATORS : isCurrentPage ? CURRENT_PAGE_OPERATORS : getOperatorsForFieldType(fieldType);
+    const pageFieldDef = isCurrentPage ? PAGE_FIELDS.find(pf => pf.key === condition.pageField) : undefined;
+    const icon = isRuntimeVar ? 'zap' : isPageCollection ? 'database' : isCurrentPage ? (pageFieldDef?.icon || 'file') : getFieldIcon(fieldType);
     const displayName = isRuntimeVar
       ? (condition.runtimeVarPath || 'Runtime variable')
       : isPageCollection
         ? condition.collectionLayerName || 'Collection'
-        : getFieldName(condition.fieldId || '');
+        : isCurrentPage
+          ? (pageFieldDef?.label || 'Page field')
+          : getFieldName(condition.fieldId || '');
     const referenceCollectionId = getReferenceCollectionId(condition);
 
     return (
@@ -641,7 +718,7 @@ export default function ConditionalVisibilitySettings({
         <li className="*:w-full flex flex-col gap-2">
           <header className="flex items-center gap-1.5">
             <div className="size-5 flex items-center justify-center rounded-[6px] bg-secondary/50 hover:bg-secondary">
-              <Icon name={icon} className="size-2.5 opacity-60" />
+              <Icon name={icon as any} className="size-2.5 opacity-60" />
             </div>
             <Label variant="muted" className="truncate">{displayName}</Label>
 
@@ -692,6 +769,29 @@ export default function ConditionalVisibilitySettings({
             />
           )}
 
+          {/* Current page: value input */}
+          {isCurrentPage && !CURRENT_PAGE_OPERATORS_NO_VALUE.includes(condition.operator) && (
+            condition.pageField === 'locale' ? (
+              <Select
+                value={condition.value || ''}
+                onValueChange={(v) => handleValueChange(group.id, condition.id, v)}
+              >
+                <SelectTrigger><SelectValue placeholder="Select locale..." /></SelectTrigger>
+                <SelectContent>
+                  {availableLocales.map(locale => (
+                    <SelectItem key={locale.id} value={locale.code}>{locale.label} ({locale.code})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                placeholder="Value..."
+                value={condition.value || ''}
+                onChange={(e) => handleValueChange(group.id, condition.id, e.target.value)}
+              />
+            )
+          )}
+
           {/* Value Input(s) based on operator */}
           {condition.operator === 'item_count' && (
             <div className="flex gap-2">
@@ -731,7 +831,7 @@ export default function ConditionalVisibilitySettings({
             />
           )}
 
-          {operatorRequiresValue(condition.operator) && condition.operator !== 'item_count' && !operatorRequiresItemSelection(condition.operator) && (
+          {!isCurrentPage && !isRuntimeVar && operatorRequiresValue(condition.operator) && condition.operator !== 'item_count' && !operatorRequiresItemSelection(condition.operator) && (
             <>
               {fieldType === 'boolean' ? (
                 <Select
@@ -837,16 +937,38 @@ export default function ConditionalVisibilitySettings({
     >
       <div className="flex flex-col gap-3">
 
-        {/* No conditions: simple visible/hidden toggle */}
-        {!hasConditions && (
-          <div className="flex items-center justify-between gap-2">
-            <Label variant="muted" className="text-[11px] shrink-0">Element is</Label>
-            <VisibilityToggle
-              value={defaultVisibility}
-              onChange={(v) => updateConditionalVisibility([], v as 'visible' | 'hidden')}
-            />
-          </div>
-        )}
+        {/* No conditions: simple visible/hidden toggle (breakpoint-aware) */}
+        {!hasConditions && (() => {
+          // Per-breakpoint hidden class: desktop uses lg:hidden (min-width 1024px only)
+          const hiddenClass = activeBreakpoint === 'desktop' ? 'lg:hidden'
+            : activeBreakpoint === 'tablet' ? 'max-lg:hidden'
+              : 'max-md:hidden';
+          const layerClasses = Array.isArray(layer.classes)
+            ? layer.classes
+            : (layer.classes || '').split(' ').filter(Boolean);
+          // Also detect legacy 'hidden' class as hidden at desktop
+          const isHidden = layerClasses.includes(hiddenClass)
+            || (activeBreakpoint === 'desktop' && layerClasses.includes('hidden'));
+
+          const handleChange = (v: string) => {
+            const toRemove = activeBreakpoint === 'desktop'
+              ? ['hidden', 'lg:hidden']
+              : [hiddenClass];
+            const filtered = layerClasses.filter(c => !toRemove.includes(c));
+            if (v === 'hidden') filtered.push(hiddenClass);
+            onLayerUpdate(layer.id, { classes: filtered.join(' ') });
+          };
+
+          return (
+            <div className="flex items-center justify-between gap-2">
+              <Label variant="muted" className="text-[11px] shrink-0">Element is</Label>
+              <VisibilityToggle
+                value={isHidden ? 'hidden' : 'visible'}
+                onChange={handleChange}
+              />
+            </div>
+          );
+        })()}
 
         {/* Conditions: IF / THEN / ELSE layout */}
         {groups.map((group, groupIndex) => (
@@ -860,8 +982,14 @@ export default function ConditionalVisibilitySettings({
             )}
 
             <div className="flex flex-col gap-1.5">
-              {/* IF label */}
-              <Label variant="muted" className="text-[10px] uppercase tracking-wide px-0.5">If</Label>
+              {/* IF header: label + action toggle on same row */}
+              <div className="flex items-center justify-between px-0.5">
+                <Label variant="muted" className="text-[10px] uppercase tracking-wide shrink-0">If</Label>
+                <VisibilityToggle
+                  value={group.action ?? 'show'}
+                  onChange={(v) => handleGroupActionChange(group.id, v as 'show' | 'hide')}
+                />
+              </div>
 
               <div className="flex flex-col bg-muted rounded-lg">
                 <ul className="p-2 flex flex-col gap-2">
@@ -885,20 +1013,12 @@ export default function ConditionalVisibilitySettings({
                       {renderAddConditionDropdown(
                         (field) => handleAddConditionFromOr(group.id, field),
                         (layer) => handleAddPageCollectionConditionFromOr(group.id, layer),
-                        () => handleAddRuntimeVarConditionFromOr(group.id)
+                        () => handleAddRuntimeVarConditionFromOr(group.id),
+                        (pageField) => handleAddCurrentPageFieldConditionFromOr(group.id, pageField)
                       )}
                     </DropdownMenu>
                   </li>
                 </ul>
-              </div>
-
-              {/* THEN */}
-              <div className="flex items-center justify-between gap-2 pl-0.5">
-                <Label variant="muted" className="text-[10px] uppercase tracking-wide shrink-0">Then</Label>
-                <VisibilityToggle
-                  value={group.action ?? 'show'}
-                  onChange={(v) => handleGroupActionChange(group.id, v as 'show' | 'hide')}
-                />
               </div>
 
               {/* ELSE (shown only on the last group) */}

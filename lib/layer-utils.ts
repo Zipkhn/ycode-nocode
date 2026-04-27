@@ -1902,6 +1902,14 @@ export interface VisibilityContext {
   collectionFields?: CollectionField[];
   /** Runtime variable state (forms, auth, n8n payloads) */
   runtimeVars?: Record<string, unknown>;
+  /** Current page metadata (for current_page conditions) */
+  currentPageData?: {
+    locale?: string;
+    name?: string;
+    folder_name?: string;
+    title_tag?: string;
+    meta_description?: string;
+  };
 }
 
 /**
@@ -1982,6 +1990,25 @@ function evaluateCondition(
         const target = compareValue === 'today' ? new Date() : new Date(compareValue);
         return new Date(strValue) > target;
       }
+      default: return false;
+    }
+  }
+
+  // Current page conditions
+  if (condition.source === 'current_page') {
+    const pageField = condition.pageField;
+    if (!pageField) return false;
+    const rawValue = context.currentPageData?.[pageField] ?? '';
+    const strValue = String(rawValue);
+    const compareValue = String(condition.value ?? '');
+    const isPresent = rawValue !== '' && rawValue !== null && rawValue !== undefined;
+    switch (condition.operator) {
+      case 'is': return strValue === compareValue;
+      case 'is_not': return strValue !== compareValue;
+      case 'is_present': return isPresent;
+      case 'is_empty': return !isPresent;
+      case 'contains': return strValue.toLowerCase().includes(compareValue.toLowerCase());
+      case 'does_not_contain': return !strValue.toLowerCase().includes(compareValue.toLowerCase());
       default: return false;
     }
   }

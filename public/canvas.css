@@ -77,6 +77,14 @@
   display: none !important;
 }
 
+/* Conditional visibility & layout-hidden ghost state (editor only) */
+[data-conditional-hidden="true"] {
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+  outline: 1px dashed rgba(107, 114, 128, 0.4);
+  outline-offset: -1px;
+}
+
 /* Body layer fills canvas height */
 #canvas-body {
   height: 100%;

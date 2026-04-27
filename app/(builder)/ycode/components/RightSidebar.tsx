@@ -1820,7 +1820,7 @@ const RightSidebar = React.memo(function RightSidebar({
         {/* Design tab */}
         <TabsContent value="design" className="flex-1 flex flex-col divide-y data-[state=inactive]:hidden mt-0 overflow-hidden">
 
-          <div className="flex flex-col divide-y">
+          <div className="flex flex-col divide-y shrink-0">
 
             {/* Layer Styles Panel - hide in text style mode except for richText sublayers */}
             {(!showTextStyleControls || (selectedLayer && isRichTextLayer(selectedLayer))) && (
@@ -1838,7 +1838,7 @@ const RightSidebar = React.memo(function RightSidebar({
 
           </div>
 
-          <div className="overflow-y-auto no-scrollbar overflow-x-hidden divide-y ">
+          <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar overflow-x-hidden divide-y">
 
           {shouldShowControl('layout', selectedLayer) && !showTextStyleControls && (
             <LayoutControls layer={selectedLayer} onLayerUpdate={handleLayerUpdate} />
