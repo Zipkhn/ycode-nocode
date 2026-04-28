@@ -36,6 +36,7 @@ export interface TypographyDesign {
   textAlign?: string;
   textTransform?: string;
   textDecoration?: string;
+  lineClamp?: string;
   textDecorationColor?: string;
   textDecorationThickness?: string;
   underlineOffset?: string;
@@ -306,9 +307,9 @@ export interface InteractionTween {
 
 export type ApplyStyles = 'on-load' | 'on-trigger';
 
-export type TweenPropertyKey = 'x' | 'y' | 'rotation' | 'scale' | 'skewX' | 'skewY' | 'autoAlpha' | 'display';
+export type TweenPropertyKey = 'x' | 'y' | 'rotation' | 'scale' | 'skewX' | 'skewY' | 'autoAlpha' | 'display' | 'height';
 
-export type InteractionApplyStyles = Record<TweenPropertyKey, ApplyStyles>;
+export type InteractionApplyStyles = Partial<Record<TweenPropertyKey, ApplyStyles>>;
 
 export type TweenProperties = {
   [K in TweenPropertyKey]?: string | null;
@@ -628,6 +629,16 @@ export interface PageSettings {
   cms?: {
     collection_id: string;
     slug_field_id: string;
+    /**
+     * Controls the order in which `next-item` / `previous-item` link keywords
+     * traverse this dynamic page's collection. When omitted, items are sorted
+     * by their `manual_order` ascending — the same default used elsewhere in
+     * the system.
+     */
+    next_previous?: {
+      sort_by?: 'manual' | string; // 'manual' or a collection field id
+      sort_order?: 'asc' | 'desc';
+    };
   };
   auth?: {
     enabled: boolean;

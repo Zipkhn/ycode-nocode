@@ -79,6 +79,7 @@ interface EditorActions {
   setPreviewMode: (enabled: boolean) => void;
   setActiveSidebarTab: (tab: EditorSidebarTab) => void;
   setLastDesignUrl: (url: string | null) => void;
+  setPreviewReturn: (url: string | null, tab?: EditorSidebarTab | null) => void;
   openFileManager: (onSelect?: ((asset: Asset) => void | false) | null, assetId?: string | null, category?: AssetCategoryFilter) => void;
   closeFileManager: () => void;
   setKeyboardShortcutsOpen: (open: boolean) => void;
@@ -129,6 +130,9 @@ interface EditorStoreWithHistory extends EditorState {
   activeSidebarTab: EditorSidebarTab;
   /** Last visited design route URL for restoring navigation */
   lastDesignUrl: string | null;
+  /** URL and sidebar tab to return to when exiting preview from a non-design route */
+  previewReturnUrl: string | null;
+  previewReturnTab: EditorSidebarTab | null;
   fileManager: {
     open: boolean;
     onSelect: ((asset: Asset) => void | false) | null;
@@ -215,6 +219,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   isPreviewMode: false,
   activeSidebarTab: 'layers' as EditorSidebarTab,
   lastDesignUrl: null,
+  previewReturnUrl: null,
+  previewReturnTab: null,
   fileManager: {
     open: false,
     onSelect: null,
@@ -514,6 +520,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   setActiveSidebarTab: (tab) => set({ activeSidebarTab: tab }),
   setLastDesignUrl: (url) => set({ lastDesignUrl: url }),
+  setPreviewReturn: (url, tab) => set({ previewReturnUrl: url, previewReturnTab: tab ?? null }),
 
   openFileManager: (onSelect, assetId, category) => set({
     fileManager: {

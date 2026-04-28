@@ -92,6 +92,9 @@ export default function HeaderBar({
   const setActiveSidebarTab = useEditorStore((s) => s.setActiveSidebarTab);
   const lastDesignUrl = useEditorStore((s) => s.lastDesignUrl);
   const setLastDesignUrl = useEditorStore((s) => s.setLastDesignUrl);
+  const previewReturnUrl = useEditorStore((s) => s.previewReturnUrl);
+  const previewReturnTab = useEditorStore((s) => s.previewReturnTab);
+  const setPreviewReturn = useEditorStore((s) => s.setPreviewReturn);
 
   const folders = usePagesStore((s) => s.folders);
   const storePages = usePagesStore((s) => s.pages);
@@ -127,6 +130,16 @@ export default function HeaderBar({
       setOptimisticNav(null);
     }
   }, [routeType, optimisticNav]);
+
+  // Turn off preview mode only after navigation to the return route completes,
+  // keeping the preview overlay visible during the transition to avoid flashing
+  useEffect(() => {
+    if (!isPreviewMode || previewReturnUrl) return;
+    const isDesignRoute = routeType === 'layers' || routeType === 'page' || routeType === 'component' || routeType === null;
+    if (!isDesignRoute) {
+      setPreviewMode(false);
+    }
+  }, [routeType, isPreviewMode, previewReturnUrl, setPreviewMode]);
 
   // Derive active button: optimistic state takes priority, then URL
   const activeNavButton = useMemo((): NavButton | null => {
@@ -610,14 +623,37 @@ export default function HeaderBar({
           variant="secondary"
           onClick={() => {
             if (isPreviewMode) {
-              // Exit preview mode
+              if (previewReturnUrl) {
+                // Navigate back while keeping preview visible — the useEffect
+                // above will turn off preview once the route change completes
+                if (previewReturnTab) {
+                  setActiveSidebarTab(previewReturnTab);
+                }
+                router.push(previewReturnUrl);
+                setPreviewReturn(null);
+                return;
+              }
+
               setPreviewMode(false);
               updateQueryParams({ preview: undefined });
-            } else {
-              // Enter preview mode
-              setPreviewMode(true);
-              updateQueryParams({ preview: 'true' });
+              return;
             }
+
+            setPreviewMode(true);
+
+            // Preview renders the current page, so when invoked from a non-design
+            // route (CMS, forms, etc.) we need to jump to the layers view first
+            const isDesignRoute = routeType === 'layers' || routeType === 'page' || routeType === 'component' || routeType === null;
+            if (!isDesignRoute && currentPageId) {
+              setPreviewReturn(window.location.pathname + window.location.search, activeTab);
+              setActiveSidebarTab('layers');
+              const params = new URLSearchParams(window.location.search);
+              params.set('preview', 'true');
+              router.push(`/ycode/layers/${currentPageId}?${params.toString()}`);
+              return;
+            }
+
+            updateQueryParams({ preview: 'true' });
           }}
           disabled={!currentPage || isSaving}
           className={isPreviewMode ? 'bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90' : ''}

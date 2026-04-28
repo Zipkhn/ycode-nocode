@@ -118,6 +118,7 @@ export default function LinkSettings(props: LinkSettingsProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [collectionItems, setCollectionItems] = useState<CollectionItemWithValues[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
+  const [collectionItemSearch, setCollectionItemSearch] = useState('');
 
   // Stores
   const pages = usePagesStore((state) => state.pages);
@@ -246,6 +247,11 @@ export default function LinkSettings(props: LinkSettingsProps) {
   const targetPageCollectionId = selectedPage?.settings?.cms?.collection_id || null;
   const canUseCurrentPageItem = isDynamicPage && isCurrentPageDynamic
     && !!currentPageCollectionId && currentPageCollectionId === targetPageCollectionId;
+
+  // Next/previous navigation only makes sense when the link points back at the
+  // same dynamic page the user is editing — that's the only context where
+  // "previous" / "next" relative to the current item is well-defined.
+  const canUseNextPreviousItem = isDynamicPage && isCurrentPageDynamic && !!pageId && pageId === currentPageId;
 
   // Check if the layer itself is a collection layer
   const isCollectionLayer = !!(layer && getCollectionVariable(layer));
@@ -532,26 +538,20 @@ export default function LinkSettings(props: LinkSettingsProps) {
     [isStandaloneMode, layer, linkSettings, updateLinkSettings]
   );
 
-  // Handle collection item selection
+  // Handle collection item selection.
+  // The selection value is stored verbatim; it's either a concrete item id or
+  // one of the dynamic-resolution keywords (current-page / current-collection /
+  // next-item / previous-item / ref-*). Resolution happens at render time in
+  // `generateLinkHref`.
   const handleCollectionItemChange = useCallback(
     (itemId: string) => {
       if ((!isStandaloneMode && !layer) || !linkSettings) return;
-
-      // Map the selection values to the stored values
-      let storedValue: string;
-      if (itemId === 'current-page') {
-        storedValue = 'current-page';
-      } else if (itemId === 'current-collection') {
-        storedValue = 'current-collection';
-      } else {
-        storedValue = itemId; // Specific item ID
-      }
 
       updateLinkSettings({
         ...linkSettings,
         page: {
           ...linkSettings.page!,
-          collection_item_id: storedValue,
+          collection_item_id: itemId,
         },
       });
     },
@@ -893,19 +893,33 @@ export default function LinkSettings(props: LinkSettingsProps) {
               <div className={useStackedLayout ? '' : 'col-span-2'}>
                 <Select
                   value={collectionItemId || ''}
-                  onValueChange={handleCollectionItemChange}
+                  onValueChange={(value) => {
+                    handleCollectionItemChange(value);
+                    setCollectionItemSearch('');
+                  }}
+                  onOpenChange={(open) => {
+                    if (!open) setCollectionItemSearch('');
+                  }}
                   disabled={isLockedByOther || loadingItems}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder={loadingItems ? 'Loading...' : 'Select...'} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent
+                    searchable
+                    searchValue={collectionItemSearch}
+                    onSearchChange={setCollectionItemSearch}
+                    searchPlaceholder="Search items..."
+                    className="w-72"
+                  >
                     <LinkItemOptions
                       canUseCurrentPageItem={canUseCurrentPageItem}
                       canUseCurrentCollectionItem={canUseCurrentCollectionItem}
+                      canUseNextPreviousItem={canUseNextPreviousItem}
                       referenceItemOptions={referenceItemOptions}
                       collectionItems={collectionItems}
                       collectionFields={linkedPageCollectionFields}
+                      searchValue={collectionItemSearch}
                     />
                   </SelectContent>
                 </Select>

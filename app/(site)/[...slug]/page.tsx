@@ -283,7 +283,7 @@ export default async function Page({ params }: PageProps) {
     notFound();
   }
 
-  const { page, pageLayers, components, collectionItem, collectionFields, locale, availableLocales, translations } = data;
+  const { page, pageLayers, components, collectionItem, collectionFields, pageCollectionSortedItemIds, pageCollectionSortedItemSlugs, locale, availableLocales, translations } = data;
 
   // Check password protection for this page.
   // First evaluate without cookies() so non-protected pages stay cacheable.
@@ -348,6 +348,8 @@ export default async function Page({ params }: PageProps) {
       colorVariablesCss={globalSettings.colorVariablesCss || undefined}
       collectionItem={collectionItem}
       collectionFields={collectionFields}
+      pageCollectionSortedItemIds={pageCollectionSortedItemIds}
+      pageCollectionSortedItemSlugs={pageCollectionSortedItemSlugs}
       locale={locale}
       availableLocales={availableLocales}
       translations={translations}
