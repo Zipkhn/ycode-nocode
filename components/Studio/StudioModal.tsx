@@ -11,7 +11,8 @@ import { TextStyleSection }  from './sections/TextStyleSection';
 import { ColorsSection }     from './sections/ColorsSection';
 import { ThemeSection }      from './sections/ThemeSection';
 import { SpacingSection }    from './sections/SpacingSection';
-import { LayoutSection }     from './sections/LayoutSection';
+import { LayoutSection }              from './sections/LayoutSection';
+import { CustomVariablesSection }     from './sections/CustomVariablesSection';
 import { THEME_TOKENS_MAP, labelToUuidKey, generateSpacingBridgeCSS, generateTypographyBridgeCSS } from './utils/bridge-generators';
 import { resolveVarToHex }   from './utils/color-utils';
 
@@ -113,7 +114,8 @@ export function StudioModal() {
       case 'colors':     return <ColorsSection     hook={hook} />;
       case 'theme':      return <ThemeSection      hook={hook} />;
       case 'spacing':    return <SpacingSection    hook={hook} />;
-      case 'layout':     return <LayoutSection     hook={hook} />;
+      case 'layout':     return <LayoutSection          hook={hook} />;
+      case 'variables':  return <CustomVariablesSection hook={hook} />;
     }
   };
 

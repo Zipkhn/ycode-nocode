@@ -9,7 +9,8 @@ export type StudioSection =
   | 'colors'
   | 'theme'
   | 'spacing'
-  | 'layout';
+  | 'layout'
+  | 'variables';
 
 const NAV_ITEMS: { id: StudioSection; label: string; icon: string }[] = [
   { id: 'general',    label: 'General',     icon: '⚙' },
@@ -19,6 +20,7 @@ const NAV_ITEMS: { id: StudioSection; label: string; icon: string }[] = [
   { id: 'theme',      label: 'Theme',       icon: '◑' },
   { id: 'spacing',    label: 'Spacing',     icon: '↕' },
   { id: 'layout',     label: 'Layout',      icon: '⊟' },
+  { id: 'variables',  label: 'Variables',   icon: '{}' },
 ];
 
 interface Props {

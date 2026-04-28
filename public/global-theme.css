@@ -774,6 +774,10 @@ body.is-dev-mode .dev-grid_wrapper:not(#ycode-dev-grid) { display: none !importa
 
 /* STUDIO_CORE_END */
 
+/* STUDIO_CUSTOM_VARS_START */
+/* CONFIG: {"modes":[{"id":"default","name":"Default","selector":":root"}],"variables":[]} */
+/* STUDIO_CUSTOM_VARS_END */
+
 /* STUDIO_RUNTIME_BRIDGES_START */
 /* Studio Runtime Bridge v9.1 — breakpoint-aware, auto-generated */
 :root{--space-0:0px}

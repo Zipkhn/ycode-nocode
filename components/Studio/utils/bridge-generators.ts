@@ -161,6 +161,25 @@ export function generateThemeDarkBridgeCSS(variables: Record<string, string>): s
   return `/* Studio Theme Dark Bridge */\n.u-theme-dark {\n${overrides.join('\n')}\n}`;
 }
 
+// ── Custom Variables Bridge ───────────────────────────────────────────────────
+
+export interface CustomMode     { id: string; name: string; selector: string; }
+export interface CustomVariable { id: string; name: string; type: 'color' | 'size' | 'text'; values: Record<string, string>; }
+export interface CustomVarsConfig { modes: CustomMode[]; variables: CustomVariable[]; }
+
+export function generateCustomVarsBridgeCSS(config: CustomVarsConfig): string {
+  if (!config.variables.length) return '';
+  const lines: string[] = [];
+  for (const mode of config.modes) {
+    const vars = config.variables
+      .map(v => { const val = v.values[mode.id] ?? ''; return val ? `  --custom--${v.name}: ${val};` : null; })
+      .filter(Boolean) as string[];
+    if (!vars.length) continue;
+    lines.push(`${mode.selector} {`, ...vars, '}');
+  }
+  return lines.length ? `/* Studio Custom Variables Bridge */\n${lines.join('\n')}` : '';
+}
+
 // ── Complete Bridge ───────────────────────────────────────────────────────────
 
 export function getCompleteBridgeCSS(

@@ -8,7 +8,9 @@ import {
   generateTypographyBridgeCSS,
   generateThemeDarkBridgeCSS,
   generateRadiusBridgeCSS,
+  generateCustomVarsBridgeCSS,
   TYPOGRAPHY_LEVELS,
+  type CustomVarsConfig,
 } from '../utils/bridge-generators';
 
 export type StudioStatus = 'idle' | 'saving' | 'done' | 'error';
@@ -19,6 +21,8 @@ export interface SpacingParams {
   spaceVpMin: number;
   spaceVpMax: number;
 }
+
+export type { CustomVarsConfig };
 
 export interface StudioVariablesHook {
   variables: Record<string, string>;
@@ -31,6 +35,8 @@ export interface StudioVariablesHook {
   removeVar: (key: string) => void;
   saveUpdates: (updates: Record<string, string>) => Promise<void>;
   triggerIframeCSSReload: () => Promise<void>;
+  customVarsConfig: CustomVarsConfig;
+  saveCustomVars: (config: CustomVarsConfig) => Promise<void>;
 }
 
 function useDebounce<T extends (...args: any[]) => void>(callback: T, delay: number) {
@@ -41,6 +47,11 @@ function useDebounce<T extends (...args: any[]) => void>(callback: T, delay: num
   }, [callback, delay]);
 }
 
+const DEFAULT_CUSTOM_VARS_CONFIG: CustomVarsConfig = {
+  modes: [{ id: 'default', name: 'Default', selector: ':root' }],
+  variables: [],
+};
+
 export function useStudioVariables(): StudioVariablesHook {
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [loading, setLoading]     = useState(true);
@@ -48,6 +59,8 @@ export function useStudioVariables(): StudioVariablesHook {
   const [spacingParams, _setSpacingParams] = useState<SpacingParams>({
     spaceBase: 16, spaceRatio: 1.25, spaceVpMin: 375, spaceVpMax: 1366,
   });
+  const [customVarsConfig, setCustomVarsConfig] = useState<CustomVarsConfig>(DEFAULT_CUSTOM_VARS_CONFIG);
+  const customVarsConfigRef = useRef<CustomVarsConfig>(DEFAULT_CUSTOM_VARS_CONFIG);
 
   const loadColorVariables = useColorVariablesStore((s) => s.loadColorVariables);
   const mountBridgeSyncDone = useRef(false);
@@ -95,6 +108,11 @@ export function useStudioVariables(): StudioVariablesHook {
           }).catch(console.error);
         }
 
+        if (data.customVarsConfig) {
+          setCustomVarsConfig(data.customVarsConfig);
+          customVarsConfigRef.current = data.customVarsConfig;
+        }
+
         setVariables(vars);
         _setSpacingParams(prev => ({
           spaceBase:   vars['space-base']   ? Number(vars['space-base'])   : prev.spaceBase,
@@ -115,6 +133,9 @@ export function useStudioVariables(): StudioVariablesHook {
     const TAG_SPACING = 'studio-runtime-bridge';
     const TAG_TYPO    = 'studio-runtime-typography';
 
+    const customVarsCSS = generateCustomVarsBridgeCSS(customVarsConfig);
+    const TAG_CUSTOM = 'studio-runtime-custom-vars';
+
     const inject = (doc: Document | null | undefined) => {
       if (!doc?.head) return;
       let el = doc.getElementById(TAG_SPACING) as HTMLStyleElement | null;
@@ -123,6 +144,9 @@ export function useStudioVariables(): StudioVariablesHook {
       let typoEl = doc.getElementById(TAG_TYPO) as HTMLStyleElement | null;
       if (!typoEl) { typoEl = doc.createElement('style') as HTMLStyleElement; typoEl.id = TAG_TYPO; doc.head.appendChild(typoEl); }
       typoEl.textContent = typoCSS;
+      let customEl = doc.getElementById(TAG_CUSTOM) as HTMLStyleElement | null;
+      if (!customEl) { customEl = doc.createElement('style') as HTMLStyleElement; customEl.id = TAG_CUSTOM; doc.head.appendChild(customEl); }
+      customEl.textContent = customVarsCSS;
     };
 
     inject(document);
@@ -154,7 +178,7 @@ export function useStudioVariables(): StudioVariablesHook {
         const h = loadHandlers.get(f); if (h) f.removeEventListener('load', h);
       });
     };
-  }, [spacingParams, variables]);
+  }, [spacingParams, variables, customVarsConfig]);
 
   // ── triggerIframeCSSReload ────────────────────────────────────────────────
 
@@ -298,6 +322,25 @@ export function useStudioVariables(): StudioVariablesHook {
     });
   }, []);
 
+  const saveCustomVars = useCallback(async (config: CustomVarsConfig) => {
+    setCustomVarsConfig(config);
+    customVarsConfigRef.current = config;
+    setStatus('saving');
+    try {
+      await fetch('/api/studio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customVarsConfig: config }),
+      });
+      setStatus('done');
+      setTimeout(() => setStatus('idle'), 2000);
+      triggerIframeCSSReload();
+    } catch {
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
+  }, [triggerIframeCSSReload]);
+
   return {
     variables,
     loading,
@@ -309,5 +352,7 @@ export function useStudioVariables(): StudioVariablesHook {
     removeVar,
     saveUpdates,
     triggerIframeCSSReload,
+    customVarsConfig,
+    saveCustomVars,
   };
 }
