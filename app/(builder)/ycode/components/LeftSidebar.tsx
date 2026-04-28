@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 // 4. Internal components
 import LayersTree from './LayersTree';
 import LeftSidebarPages from './LeftSidebarPages';
-import StudioThemeEditor from '@/components/StudioThemeEditor';
+import { useStudioStore } from '@/components/Studio/StudioModal';
 
 // Lazy-loaded components (heavy, not needed immediately)
 const ElementLibrary = lazy(() => import('./ElementLibrary'));
@@ -283,9 +283,11 @@ const LeftSidebar = React.memo(function LeftSidebar({
     setTimeout(() => setAssetMessage(null), 3000);
   };
 
+  const openStudio = useStudioStore(s => s.open);
+
   return (
     <>
-      <div className="w-64 shrink-0 bg-background border-r flex overflow-hidden p-4 pb-0">
+      <div className="w-64 shrink-0 bg-background border-r flex flex-col overflow-hidden p-4 pb-0">
         {/* Tabs */}
         <div className="w-full">
           <Tabs
@@ -309,7 +311,6 @@ const LeftSidebar = React.memo(function LeftSidebar({
             <TabsList className="w-full shrink-0">
               <TabsTrigger value="layers">Layers</TabsTrigger>
               <TabsTrigger value="pages">Pages</TabsTrigger>
-              <TabsTrigger value="theme">Studio</TabsTrigger>
             </TabsList>
 
             <hr className="mt-4" />
@@ -371,16 +372,20 @@ const LeftSidebar = React.memo(function LeftSidebar({
               />
             </TabsContent>
 
-            <TabsContent
-              value="theme"
-              className="flex flex-col min-h-0 overflow-y-auto no-scrollbar pt-4"
-              forceMount
-            >
-              <StudioThemeEditor />
-            </TabsContent>
-
           </Tabs>
         </div>
+      </div>
+
+      {/* Studio trigger button */}
+      <div className="shrink-0 px-4 pb-3 border-t border-border/50 pt-3">
+        <Button
+          variant="ghost" size="sm"
+          className="w-full justify-start gap-2 text-muted-foreground" onClick={openStudio}
+          title="Open Studio (Shift+Option+S)"
+        >
+          <Icon name="slider" className="size-3.5" />
+          Studio
+        </Button>
       </div>
 
       {/* Element Library Slide-Out (lazy loaded, always mounted to preserve state) */}
