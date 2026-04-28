@@ -286,7 +286,7 @@ const LeftSidebar = React.memo(function LeftSidebar({
     <>
       <div className="w-64 shrink-0 bg-background border-r flex flex-col overflow-hidden p-4 pb-0">
         {/* Tabs */}
-        <div className="w-full">
+        <div className="w-full flex flex-col flex-1 min-h-0">
           <Tabs
             value={activeTab}
             onValueChange={(value) => {

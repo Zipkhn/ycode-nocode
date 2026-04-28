@@ -201,6 +201,7 @@ function SpacingInput({
     <MeasurementInput
       value={value}
       onChange={onChange}
+      onFocus={onFocus}
       inputClassName="text-center text-xs border border-border rounded px-1 py-0.5 focus:border-ring"
       className="bg-background rounded border-0 w-full"
       placeholder="0"

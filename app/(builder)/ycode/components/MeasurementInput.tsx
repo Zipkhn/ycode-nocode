@@ -18,6 +18,7 @@ function parseRaw(raw: string): { num: string; unit: CSSUnit } {
 interface Props {
   value: string;
   onChange: (val: string) => void;
+  onFocus?: () => void;
   placeholder?: string;
   disabled?: boolean;
   /** Extra classes on the wrapper div */
@@ -29,6 +30,7 @@ interface Props {
 export function MeasurementInput({
   value,
   onChange,
+  onFocus,
   placeholder = '0',
   disabled,
   className = '',
@@ -59,7 +61,7 @@ export function MeasurementInput({
         value={localNum}
         placeholder={placeholder}
         disabled={disabled}
-        onFocus={() => { editing.current = true; }}
+        onFocus={() => { editing.current = true; onFocus?.(); }}
         onBlur={() => { editing.current = false; }}
         onChange={e => {
           const v = e.target.value.replace(/\s/g, '');
