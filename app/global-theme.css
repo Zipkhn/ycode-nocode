@@ -10,7 +10,7 @@
   /* --- 1. CONFIGURATION --- */
   --site--viewport-max: 90; /* 1440px */
   --site--viewport-min: 20; /* 320px */
-  --site--column-count: 12;
+  --site--column-count:12;
   --site--gutter: 1rem;
 
   /* --- 2. SITE MARGIN (Fluid Variable) --- */
@@ -523,7 +523,8 @@ html:has(#ybody), body:has(#ybody) { height: 100% !important; margin: 0 !importa
 .dev-grid_wrapper { position: fixed !important; inset: 0 !important; z-index: 999999 !important; pointer-events: none !important; }
 .dev-grid_wrapper .u-container, .dev-grid_wrapper .u-grid { height: 100% !important; }
 body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; background-color: rgba(255, 0, 0, 0.05) !important; border-inline: 1px solid rgba(255, 0, 0, 0.1) !important; }
-/* Supprime ou commente ces blocs qui forcent 12 colonnes sur petit écran */
+/* Hide any manually-built dev-grid_wrapper when the injected one is active */
+body.is-dev-mode .dev-grid_wrapper:not(#ycode-dev-grid) { display: none !important; }
 
 /* Hauteur Canva Fix */
 #ybody {
@@ -631,7 +632,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 
 /* Tablette + Mobile (≤ 1024px) : 8 colonnes + variantes responsives — cascade vers mobile */
 @media screen and (max-width: 1024px) {
-  :is(#ybody, .y-canvas, [data-ycode-canvas]) { --site--column-count: 8 !important; }
+  :is(#ybody, .y-canvas, [data-ycode-canvas]) { --site--column-count:12; }
 
   :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-grid {
     grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
@@ -695,7 +696,7 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
 
 /* Mobile (< 768px) : 4 colonnes + variantes responsives */
 @media screen and (max-width: 767px) {
-  :is(#ybody, .y-canvas, [data-ycode-canvas]) { --site--column-count: 4 !important; }
+  :is(#ybody, .y-canvas, [data-ycode-canvas]) { --site--column-count:12; }
 
   :is(#ybody, .y-canvas, [data-ycode-canvas]) .u-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
@@ -1187,8 +1188,3 @@ body.is-dev-mode .dev-grid_wrapper .u-grid > div { height: 100% !important; back
   --84b41b3e-169f-48bb-b9cf-5c1629dd30b0: #e6b67e;
 }
 /* STUDIO_RUNTIME_BRIDGES_END */
-/* Visibility: hidden classes must override all !important display rules above */
-#ybody .hidden { display: none !important; }
-@media (min-width: 1024px) { #ybody .lg\:hidden { display: none !important; } }
-@media (max-width: 1023px) { #ybody .max-lg\:hidden { display: none !important; } }
-@media (max-width: 767px) { #ybody .max-md\:hidden { display: none !important; } }

@@ -212,6 +212,8 @@ const RightSidebar = React.memo(function RightSidebar({
   const startElementPicker = useEditorStore((state) => state.startElementPicker);
   const stopElementPicker = useEditorStore((state) => state.stopElementPicker);
   const isElementPickerActive = useEditorStore((state) => !!state.elementPicker?.active);
+  const isDevMode = useEditorStore((state) => state.isDevMode);
+  const toggleDevMode = useEditorStore((state) => state.toggleDevMode);
 
   // Check if text is being edited on canvas
   const isTextEditingOnCanvas = useCanvasTextEditorStore((state) => state.isEditing);
@@ -1807,12 +1809,23 @@ const RightSidebar = React.memo(function RightSidebar({
         onValueChange={handleTabChange}
         className="flex flex-col flex-1 min-h-0 gap-0"
       >
-        <div className="">
-          <TabsList className="w-full">
-            <TabsTrigger value="design">Design</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-            <TabsTrigger value="interactions">Interactions</TabsTrigger>
-          </TabsList>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <TabsList className="flex-1">
+              <TabsTrigger value="design">Design</TabsTrigger>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
+              <TabsTrigger value="interactions">Interactions</TabsTrigger>
+            </TabsList>
+            <Button
+              variant={isDevMode ? 'secondary' : 'ghost'}
+              size="xs"
+              className="ml-1 shrink-0"
+              onClick={toggleDevMode}
+              title="Dev mode"
+            >
+              <Icon name="grid" className="size-3.5" />
+            </Button>
+          </div>
         </div>
 
         <hr className="mt-2" />

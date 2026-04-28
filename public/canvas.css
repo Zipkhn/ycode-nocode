@@ -91,6 +91,9 @@
   min-height: 100%;
 }
 
+/* Hide any manually-built dev-grid_wrapper from page content (injected grid lives on body, not here) */
+#canvas-body .dev-grid_wrapper { display: none !important; }
+
 /* Gap indicator styles */
 .gap-indicator-overlay {
   position: fixed;

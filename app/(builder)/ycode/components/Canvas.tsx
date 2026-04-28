@@ -196,6 +196,38 @@ function CanvasContent({
     ? [...(bodyLayer.children || []), ...layers.filter(l => l.id !== 'body')]
     : layers;
 
+  // Sync dev mode class on iframe body + inject/remove grid overlay
+  const isDevMode = useEditorStore((state) => state.isDevMode);
+  useEffect(() => {
+    if (!bodyRef.current) return;
+    const iframeDoc = bodyRef.current.ownerDocument;
+    const iframeBody = iframeDoc.body;
+    if (isDevMode) {
+      iframeBody.classList.add('is-dev-mode');
+      if (!iframeDoc.getElementById('ycode-dev-grid')) {
+        const columnCount = parseInt(
+          getComputedStyle(iframeBody).getPropertyValue('--site--column-count').trim()
+        ) || 12;
+        const wrapper = iframeDoc.createElement('div');
+        wrapper.id = 'ycode-dev-grid';
+        wrapper.className = 'dev-grid_wrapper';
+        const container = iframeDoc.createElement('div');
+        container.className = 'u-container';
+        const grid = iframeDoc.createElement('div');
+        grid.className = 'u-grid';
+        for (let i = 0; i < columnCount; i++) {
+          grid.appendChild(iframeDoc.createElement('div'));
+        }
+        container.appendChild(grid);
+        wrapper.appendChild(container);
+        iframeBody.appendChild(wrapper);
+      }
+    } else {
+      iframeBody.classList.remove('is-dev-mode');
+      iframeDoc.getElementById('ycode-dev-grid')?.remove();
+    }
+  }, [isDevMode]);
+
   // Move body layer classes from #canvas-body to the iframe's <body> element
   useEffect(() => {
     if (!bodyRef.current) return;
