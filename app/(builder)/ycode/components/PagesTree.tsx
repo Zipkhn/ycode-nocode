@@ -24,6 +24,7 @@ interface PagesTreeProps {
   onDelete?: (id: string, type: 'folder' | 'page') => void;
   onDuplicate?: (id: string, type: 'folder' | 'page') => void;
   onRename?: (id: string, type: 'folder' | 'page') => void;
+  onToggleDraftOnly?: (id: string) => void;
 }
 
 interface PageRowProps {
@@ -42,6 +43,7 @@ interface PageRowProps {
   onDelete?: (id: string, type: 'folder' | 'page') => void;
   onDuplicate?: (id: string, type: 'folder' | 'page') => void;
   onRename?: (id: string, type: 'folder' | 'page') => void;
+  onToggleDraftOnly?: () => void;
 }
 
 // Helper function to get display name
@@ -86,6 +88,7 @@ function PageRow({
   onDelete,
   onDuplicate,
   onRename,
+  onToggleDraftOnly,
 }: PageRowProps) {
   // Check if this is an error page or the virtual error pages folder
   const isErrorPage = node.type === 'page' && (node.data as Page).error_page !== null;
@@ -122,6 +125,8 @@ function PageRow({
       onDelete={onDelete ? () => onDelete(node.id, node.type) : undefined}
       onDuplicate={onDuplicate ? () => onDuplicate(node.id, node.type) : undefined}
       onRename={onRename ? () => onRename(node.id, node.type) : undefined}
+      onToggleDraftOnly={node.type === 'page' && onToggleDraftOnly ? onToggleDraftOnly : undefined}
+      isDraftOnly={node.type === 'page' && !!(node.data as Page).settings?.draft_only}
     >
       <div className="relative">
       {/* Vertical connector lines - one for each depth level */}
@@ -342,6 +347,7 @@ export default function PagesTree({
   onDelete,
   onDuplicate,
   onRename,
+  onToggleDraftOnly,
 }: PagesTreeProps) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
@@ -718,6 +724,7 @@ export default function PagesTree({
             onDelete={onDelete}
             onDuplicate={onDuplicate}
             onRename={onRename}
+            onToggleDraftOnly={onToggleDraftOnly && node.type === 'page' ? () => onToggleDraftOnly(node.id) : undefined}
           />
         ))}
 

@@ -162,7 +162,9 @@ export async function POST(request: NextRequest) {
       } else if (isPublishingAll) {
         const unpublishedPages = await getAllDraftPages();
         if (unpublishedPages.length > 0) {
-          const allPageIds = unpublishedPages.map(p => p.id);
+          const allPageIds = unpublishedPages
+            .filter(p => !p.settings?.draft_only)
+            .map(p => p.id);
           const pagesResult = await publishPages(allPageIds);
           result.changes.pages = pagesResult.count;
           stats.tables.pages.added = pagesResult.count;

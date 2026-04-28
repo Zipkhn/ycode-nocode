@@ -678,6 +678,7 @@ export interface PageSettings {
     head: string;
     body: string;
   };
+  draft_only?: boolean; // Exclude from "Publish All" — page stays draft even when publishing
 }
 
 export interface PageLayers {

@@ -631,6 +631,13 @@ export default function LeftSidebarPages({
     }
   };
 
+  const handleToggleDraftOnly = async (pageId: string) => {
+    const page = pages.find(p => p.id === pageId);
+    if (!page) return;
+    const current = !!page.settings?.draft_only;
+    await updatePage(pageId, { settings: { ...page.settings, draft_only: !current } });
+  };
+
   // Prompt confirmation before deleting a page or folder
   const deletePageOrFolderItem = (id: string, type: 'folder' | 'page') => {
     setPendingDelete({ id, type });
@@ -810,6 +817,7 @@ export default function LeftSidebarPages({
           onFolderSettings={handleEditFolder}
           onDuplicate={handleDuplicate}
           onDelete={deletePageOrFolderItem}
+          onToggleDraftOnly={handleToggleDraftOnly}
         />
 
         <div className="flex items-center gap-2 mt-2">

@@ -14,6 +14,8 @@ interface PageContextMenuProps {
   onDuplicate?: () => void;
   onDelete?: () => void;
   onSettings?: () => void;
+  onToggleDraftOnly?: () => void; // For pages — keep draft even on publish all
+  isDraftOnly?: boolean;
   onAddPage?: () => void; // For folders
   onAddFolder?: () => void; // For folders
 }
@@ -27,6 +29,8 @@ export default function PageContextMenu({
   onDuplicate,
   onDelete,
   onSettings,
+  onToggleDraftOnly,
+  isDraftOnly,
   onAddPage,
   onAddFolder,
 }: PageContextMenuProps) {
@@ -81,6 +85,15 @@ export default function PageContextMenu({
           <ContextMenuItem onClick={onRename}>
             <span>Rename</span>
           </ContextMenuItem>
+        )}
+
+        {nodeType === 'page' && onToggleDraftOnly && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={onToggleDraftOnly}>
+              <span>{isDraftOnly ? '✓ Draft only (click to publish)' : 'Keep as draft only'}</span>
+            </ContextMenuItem>
+          </>
         )}
 
         {(onDuplicate || onDelete) && <ContextMenuSeparator />}
