@@ -1716,6 +1716,9 @@ const LAYER_NAME_TO_HTML_TAG: Record<string, string> = {
   td: 'td',
   th: 'th',
 
+  // Link block — container rendered as <a>
+  'link-block': 'a',
+
   // Embedded / special
   htmlEmbed: 'div',
   map: 'div',

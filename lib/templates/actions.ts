@@ -7,6 +7,17 @@ import { BlockTemplate } from '@/types';
 import { getTiptapTextContent } from '@/lib/text-format-utils';
 
 export const actionTemplates: Record<string, BlockTemplate> = {
+  'link-block': {
+    icon: 'link',
+    name: 'Link Block',
+    template: {
+      name: 'link-block',
+      classes: ['flex', 'flex-col', 'w-full'],
+      children: [],
+      attributes: {},
+      design: {},
+    }
+  },
   button: {
     icon: 'cursor-default',
     name: 'Button',
