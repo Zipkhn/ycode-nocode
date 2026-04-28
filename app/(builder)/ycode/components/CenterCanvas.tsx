@@ -59,7 +59,7 @@ import RichTextEditorSheet from './RichTextEditorSheet';
 import { buildLocalizedSlugPath, buildLocalizedDynamicPageUrl } from '@/lib/page-utils';
 import { getTranslationValue } from '@/lib/localisation-utils';
 import { cn } from '@/lib/utils';
-import { getCollectionVariable, canDeleteLayer, findLayerById, findParentCollectionLayer, canLayerHaveLink, updateLayerProps, removeRichTextSublayer } from '@/lib/layer-utils';
+import { getCollectionVariable, canDeleteLayer, findLayerById, findParentCollectionLayer, canLayerHaveLink, updateLayerProps, removeRichTextSublayer, isRichTextLayer, getLayerCmsFieldBinding } from '@/lib/layer-utils';
 import { CANVAS_BORDER, CANVAS_PADDING, updateViewportOverrides } from '@/lib/canvas-utils';
 import { BREAKPOINTS } from '@/lib/breakpoint-utils';
 import { buildFieldGroupsForLayer, flattenFieldGroups, filterFieldGroupsByType, SIMPLE_TEXT_FIELD_TYPES } from '@/lib/collection-field-utils';
@@ -601,9 +601,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const [containerHeight, setContainerHeight] = useState(0);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  // Store initial canvas height on load - used as baseline for iframe height
-  const initialCanvasHeightRef = useRef<number | null>(null);
-
   // Track whether zoom calculation is ready (prevents flash of wrong zoom on initial load)
   const [isCanvasReady, setIsCanvasReady] = useState(false);
 
@@ -747,18 +744,12 @@ const CenterCanvas = React.memo(function CenterCanvas({
     return parseInt(viewportSizes[viewportMode].width);
   }, [viewportMode]);
 
-  // Calculate default iframe height to fill canvas (set once on load)
+  // Calculate default iframe height to fill canvas — track current container height
+  // so the white canvas always fills all the available vertical space, even when the
+  // surrounding panels (sidebar, inspector, etc.) resize the canvas container.
   const defaultCanvasHeight = useMemo(() => {
     if (!containerHeight) return 600;
-    const calculatedHeight = containerHeight - CANVAS_PADDING;
-
-    // Store the initial height when first calculated
-    if (initialCanvasHeightRef.current === null) {
-      initialCanvasHeightRef.current = calculatedHeight;
-    }
-
-    // Always use the initial height - don't change with zoom or container changes
-    return initialCanvasHeightRef.current;
+    return Math.max(0, containerHeight - CANVAS_PADDING);
   }, [containerHeight]);
 
   // Effective iframe height: max of reported content and canvas height
@@ -782,12 +773,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
     }
     return viewportWidth;
   }, [editingComponentId, reportedContentWidth, viewportWidth]);
-
-  // Calculate "zoom to fit" level - where scaled height equals container height
-  const zoomToFitLevel = useMemo(() => {
-    if (!containerHeight || !iframeContentHeight) return 100;
-    return ((containerHeight - CANVAS_PADDING) / iframeContentHeight) * 100;
-  }, [containerHeight, iframeContentHeight]);
 
   // Calculate content height for zoom calculations
   // Use actual iframe content height for both modes
@@ -836,20 +821,16 @@ const CenterCanvas = React.memo(function CenterCanvas({
     iframeRef,
   });
 
-  // Determine if we should center (zoomed out beyond "zoom to fit" level)
-  const shouldCenter = zoom < zoomToFitLevel;
-
-  // Calculate final iframe height - ensure it fills the visible canvas at any zoom level
-  // When zoomed in or at fit level, stretch the iframe so the scaled result fills the canvas.
-  // When zoomed out beyond fit, use content height directly — centering handles the gap.
+  // Calculate final iframe height — always stretch so the scaled canvas fills the
+  // visible viewport at any zoom level. When the actual content is taller than the
+  // viewport, use the content height instead so scrolling works naturally.
   const finalIframeHeight = useMemo(() => {
     if (editingComponentId) return iframeContentHeight;
     if (!containerHeight || zoom <= 0) return iframeContentHeight;
-    if (shouldCenter) return iframeContentHeight;
 
     const minHeightForZoom = (containerHeight - CANVAS_PADDING) / (zoom / 100);
     return Math.max(iframeContentHeight, minHeightForZoom);
-  }, [iframeContentHeight, containerHeight, zoom, editingComponentId, shouldCenter]);
+  }, [iframeContentHeight, containerHeight, zoom, editingComponentId]);
 
   const previewObserverRef = useRef<ResizeObserver | null>(null);
 
@@ -1340,12 +1321,15 @@ const CenterCanvas = React.memo(function CenterCanvas({
 
       if (event) {
         let target = event.target as HTMLElement;
+        let blockLevelStyleKey: string | null = null;
 
-        // Walk up the DOM tree to find data-style, data-block-index, data-list-item-index
+        // Walk up the DOM tree to find data-style, data-block-index, data-list-item-index.
+        // The textStyleKey from the element with data-block-index is the actual content
+        // block type (e.g. blockquote), not an inner element's style (e.g. paragraph).
         while (target && target !== event.currentTarget) {
-          if (!textStyleKey) {
-            const styleAttr = target.getAttribute?.('data-style');
-            if (styleAttr) textStyleKey = styleAttr;
+          const styleAttr = target.getAttribute?.('data-style');
+          if (styleAttr && !textStyleKey) {
+            textStyleKey = styleAttr;
           }
           if (listItemIndex === null) {
             const listItemAttr = target.getAttribute?.('data-list-item-index');
@@ -1353,20 +1337,45 @@ const CenterCanvas = React.memo(function CenterCanvas({
           }
           if (blockIndex === null) {
             const blockAttr = target.getAttribute?.('data-block-index');
-            if (blockAttr !== null) blockIndex = parseInt(blockAttr, 10);
+            if (blockAttr !== null) {
+              blockIndex = parseInt(blockAttr, 10);
+              if (styleAttr) blockLevelStyleKey = styleAttr;
+            }
           }
           target = target.parentElement as HTMLElement;
         }
+
+        // Prefer the block-level style over structural inner elements (e.g.
+        // paragraph inside blockquote), but keep inline marks and sub-block
+        // styles like listItem that shouldn't be overridden by their container
+        const INNER_STYLE_KEYS = new Set(['bold', 'italic', 'underline', 'strike', 'link', 'subscript', 'superscript']);
+        if (blockLevelStyleKey && (!textStyleKey || !INNER_STYLE_KEYS.has(textStyleKey))) {
+          textStyleKey = blockLevelStyleKey;
+        }
       }
 
-      // Use atomic state update to prevent transient null activeTextStyleKey
+      // For non-CMS-bound rich text, sublayers are style-based (unique types),
+      // so skip block-level sublayerIndex/listItemIndex — only set textStyleKey
+      let resolvedSublayerIndex = Number.isFinite(blockIndex) ? blockIndex : null;
+      let resolvedListItemIndex = Number.isFinite(listItemIndex) ? listItemIndex : null;
+      if (resolvedSublayerIndex !== null && textStyleKey) {
+        const layers = editingComponentId
+          ? (componentDrafts[editingComponentId] || [])
+          : (currentDraft?.layers || []);
+        const layer = findLayerById(layers, layerId);
+        if (layer && isRichTextLayer(layer) && !getLayerCmsFieldBinding(layer)) {
+          resolvedSublayerIndex = null;
+          resolvedListItemIndex = null;
+        }
+      }
+
       selectLayerWithSublayer(layerId, {
         textStyleKey,
-        sublayerIndex: Number.isFinite(blockIndex) ? blockIndex : null,
-        listItemIndex: Number.isFinite(listItemIndex) ? listItemIndex : null,
+        sublayerIndex: resolvedSublayerIndex,
+        listItemIndex: resolvedListItemIndex,
       });
     }
-  }, [isPreviewMode, setActiveSidebarTab, selectLayerWithSublayer]);
+  }, [isPreviewMode, setActiveSidebarTab, selectLayerWithSublayer, editingComponentId, componentDrafts, currentDraft]);
 
   const handleCanvasLayerUpdate = useCallback((layerId: string, updates: Partial<Layer>) => {
     if (editingComponentId) {
@@ -2360,18 +2369,14 @@ const CenterCanvas = React.memo(function CenterCanvas({
                   // Width: exact scaled size, min 100% to fill viewport horizontally
                   width: `${effectiveCanvasWidth * (zoom / 100) + CANVAS_PADDING}px`,
                   minWidth: '100%',
-                  // Height: exact viewport height when centered, scaled size when top-aligned
-                  height: shouldCenter
-                    ? `${containerHeight}px`  // Use actual viewport height
-                    : `${finalIframeHeight * (zoom / 100) + CANVAS_PADDING}px`,
+                  // Height: scaled iframe size + canvas padding. finalIframeHeight is
+                  // already stretched to fill the viewport at any zoom level, so the
+                  // white canvas always fills the available height.
+                  height: `${finalIframeHeight * (zoom / 100) + CANVAS_PADDING}px`,
                   display: 'flex',
-                  // Always use flex-start - we'll handle centering via padding
                   alignItems: 'flex-start',
-                  justifyContent: 'center', // Center horizontally
-                  // Calculate padding: center based on VISUAL (scaled) height, or fixed border when top-aligned
-                  paddingTop: shouldCenter
-                    ? `${Math.max(0, (containerHeight - finalIframeHeight * (zoom / 100)) / 2)}px`
-                    : `${CANVAS_BORDER}px`,
+                  justifyContent: 'center',
+                  paddingTop: `${CANVAS_BORDER}px`,
                   position: 'relative',
                 }}
               >

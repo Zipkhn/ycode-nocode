@@ -601,12 +601,14 @@ export function generateLinkHref(
 }
 
 /** Heuristic: value looks like email when field type unknown (e.g. collection layer fields not in fieldsByFieldId) */
-export function looksLikeEmail(value: string): boolean {
+export function looksLikeEmail(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
 /** Heuristic: value looks like phone (digits, spaces, dashes, parens) when field type unknown */
-export function looksLikePhone(value: string): boolean {
+export function looksLikePhone(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
   const trimmed = value.trim();
   const digitCount = (trimmed.match(/\d/g) || []).length;
   return /^[\d\s\-()+.]*$/.test(trimmed) && digitCount >= 7;

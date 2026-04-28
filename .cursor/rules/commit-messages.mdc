@@ -28,6 +28,7 @@ alwaysApply: true
 
 ## Rules
 
+- **Branch detection**: use `git branch --show-current` to determine the current branch unless the user explicitly specifies it
 - **Imperative mood**: "add user auth" not "added user auth" or "adding user auth"
 - **Lowercase** after the type prefix: `feat: add domain management`
 - **No period** at the end of the subject line

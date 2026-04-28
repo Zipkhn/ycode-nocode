@@ -631,6 +631,7 @@ export function getFieldTypeLabel(type: CollectionFieldType): string {
     link: 'Link',
     email: 'Email',
     phone: 'Phone',
+    option: 'Option',
     status: 'Status',
   };
   return labels[type] || type;

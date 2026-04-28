@@ -36,6 +36,7 @@ import { useSettingsStore } from '@/stores/useSettingsStore';
 import { slugify, isTruthyBooleanValue, parseMultiReferenceValue, getSortParams } from '@/lib/collection-utils';
 import { getSampleCollectionOptions } from '@/lib/sample-collections';
 import { ASSET_CATEGORIES, getOptimizedImageUrl, isAssetOfType } from '@/lib/asset-utils';
+import { parseMultiAssetFieldValue } from '@/lib/multi-asset-utils';
 import { type FieldType, findDisplayField, getItemDisplayName, getFieldIcon, isMultipleAssetField, findStatusFieldId, isDateFieldType } from '@/lib/collection-field-utils';
 import { CollectionStatusPill, parseStatusValue } from './CollectionStatusPill';
 import { extractPlainTextFromTiptap } from '@/lib/tiptap-utils';
@@ -362,6 +363,7 @@ const CMS = React.memo(function CMS() {
     reorderCollections,
     setItemPublishable,
     setItemStatus,
+    reloadCurrentItems,
   } = useCollectionsStore();
 
   // Collection collaboration sync
@@ -1225,12 +1227,36 @@ const CMS = React.memo(function CMS() {
           ? { ...editingField.data, ...data.data }
           : editingField.data;
 
+        // Detect option renames or removals so we refresh the item list
+        // after the server propagates renames / clears removed values.
+        const previousOptions = Array.isArray(editingField.data?.options)
+          ? editingField.data.options
+          : [];
+        const nextOptions = Array.isArray(data.data?.options)
+          ? data.data.options
+          : [];
+        const previousById = new Map(previousOptions.map(o => [o.id, o.name]));
+        const nextIds = new Set(nextOptions.map(o => o.id));
+        const isOptionField = editingField.type === 'option';
+        const hasOptionRename =
+          isOptionField &&
+          nextOptions.some((next) => {
+            const previousName = previousById.get(next.id);
+            return typeof previousName === 'string' && previousName.trim() !== next.name.trim();
+          });
+        const hasOptionRemoval =
+          isOptionField && previousOptions.some(prev => !nextIds.has(prev.id));
+
         await updateField(selectedCollectionId, editingField.id, {
           name: data.name,
           default: data.default || null,
           reference_collection_id: data.reference_collection_id,
           data: mergedData,
         });
+
+        if (hasOptionRename || hasOptionRemoval) {
+          await reloadCurrentItems();
+        }
       } else {
         // Create new field
         await createField(selectedCollectionId, {
@@ -1627,9 +1653,8 @@ const CMS = React.memo(function CMS() {
 
                       // Image fields - show thumbnail (match file manager: SVG inline, raster via img + checkerboard)
                       if (field.type === 'image' && value) {
-                        // Handle multi-asset fields (value is an array)
                         const assetIds: string[] = isMultipleAssetField(field)
-                          ? (Array.isArray(value) ? value : [])
+                          ? parseMultiAssetFieldValue(value)
                           : [value as string];
 
                         if (assetIds.length === 0) {
@@ -1706,9 +1731,8 @@ const CMS = React.memo(function CMS() {
 
                       // Audio/Video/Document fields - show icon with filename in tooltip
                       if ((field.type === 'audio' || field.type === 'video' || field.type === 'document') && value) {
-                        // Handle multi-asset fields (value is an array)
                         const assetIds: string[] = isMultipleAssetField(field)
-                          ? (Array.isArray(value) ? value : [])
+                          ? parseMultiAssetFieldValue(value)
                           : [value as string];
 
                         if (assetIds.length === 0) {
@@ -1872,6 +1896,25 @@ const CMS = React.memo(function CMS() {
                                 aria-hidden="true"
                               />
                             </div>
+                          </td>
+                        );
+                      }
+
+                      // Option fields - display as Badge with the option name
+                      if (field.type === 'option') {
+                        return (
+                          <td
+                            key={field.id}
+                            className="px-4 py-5"
+                            onClick={() => handleEditItem(item)}
+                          >
+                            {value ? (
+                              <Badge variant="secondary" className="font-normal">
+                                <span className="line-clamp-1 truncate max-w-[200px]">{value}</span>
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </td>
                         );
                       }

@@ -501,6 +501,76 @@ export async function deleteValue(
 }
 
 /**
+ * Soft-delete every stored value for a field whose value exactly matches
+ * `value`. Used when an option is removed from an option-type field so item
+ * values storing that option name are cleared from both draft and published
+ * rows.
+ * @returns Number of rows soft-deleted
+ */
+export async function clearValuesForField(
+  field_id: string,
+  value: string
+): Promise<number> {
+  const client = await getSupabaseAdmin();
+
+  if (!client) {
+    throw new Error('Supabase client not configured');
+  }
+
+  const now = new Date().toISOString();
+  const { data, error } = await client
+    .from('collection_item_values')
+    .update({ deleted_at: now, updated_at: now })
+    .eq('field_id', field_id)
+    .eq('value', value)
+    .is('deleted_at', null)
+    .select('id');
+
+  if (error) {
+    throw new Error(`Failed to clear values: ${error.message}`);
+  }
+
+  return data?.length || 0;
+}
+
+/**
+ * Replace stored values for a field where the value exactly matches `old_value`.
+ * Used to propagate option renames in option-type fields to all draft and
+ * published item values storing the previous option name.
+ * @returns Number of rows updated
+ */
+export async function renameValuesForField(
+  field_id: string,
+  old_value: string,
+  new_value: string
+): Promise<number> {
+  if (old_value === new_value) return 0;
+
+  const client = await getSupabaseAdmin();
+
+  if (!client) {
+    throw new Error('Supabase client not configured');
+  }
+
+  const { data, error } = await client
+    .from('collection_item_values')
+    .update({
+      value: new_value,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('field_id', field_id)
+    .eq('value', old_value)
+    .is('deleted_at', null)
+    .select('id');
+
+  if (error) {
+    throw new Error(`Failed to rename values: ${error.message}`);
+  }
+
+  return data?.length || 0;
+}
+
+/**
  * Publish values for an item
  * Copies all draft values to published values for the same item
  * Uses batch upsert for efficiency

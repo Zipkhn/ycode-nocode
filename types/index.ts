@@ -135,6 +135,25 @@ export interface PositioningDesign {
   zIndex?: string;
 }
 
+export interface TransformsDesign {
+  isActive?: boolean;
+  scale?: string;
+  rotate?: string;
+  translateX?: string;
+  translateY?: string;
+  skewX?: string;
+  skewY?: string;
+  transformOrigin?: string;
+}
+
+export interface TransitionsDesign {
+  isActive?: boolean;
+  transitionProperty?: string;
+  duration?: string;
+  easing?: string;
+  delay?: string;
+}
+
 export interface DesignProperties {
   layout?: LayoutDesign;
   typography?: TypographyDesign;
@@ -144,6 +163,8 @@ export interface DesignProperties {
   backgrounds?: BackgroundsDesign;
   effects?: EffectsDesign;
   positioning?: PositioningDesign;
+  transforms?: TransformsDesign;
+  transitions?: TransitionsDesign;
 }
 
 export interface FormSettings {
@@ -307,7 +328,7 @@ export interface InteractionTween {
 
 export type ApplyStyles = 'on-load' | 'on-trigger';
 
-export type TweenPropertyKey = 'x' | 'y' | 'rotation' | 'scale' | 'skewX' | 'skewY' | 'autoAlpha' | 'display' | 'height';
+export type TweenPropertyKey = 'x' | 'y' | 'rotation' | 'scale' | 'skewX' | 'skewY' | 'autoAlpha' | 'display' | 'width' | 'height';
 
 export type InteractionApplyStyles = Partial<Record<TweenPropertyKey, ApplyStyles>>;
 
@@ -947,7 +968,7 @@ export interface ActivityNotification {
 }
 
 // Collection Types (EAV Architecture)
-export type CollectionFieldType = 'text' | 'number' | 'boolean' | 'date' | 'date_only' | 'color' | 'reference' | 'multi_reference' | 'rich_text' | 'image' | 'audio' | 'video' | 'document' | 'link' | 'email' | 'phone' | 'status';
+export type CollectionFieldType = 'text' | 'number' | 'boolean' | 'date' | 'date_only' | 'color' | 'reference' | 'multi_reference' | 'rich_text' | 'image' | 'audio' | 'video' | 'document' | 'link' | 'email' | 'phone' | 'option' | 'status';
 export type CollectionSortDirection = 'asc' | 'desc' | 'manual';
 
 export interface CollectionSorting {
@@ -985,6 +1006,7 @@ export interface UpdateCollectionData {
 /** Field-specific settings stored in the data column */
 export interface CollectionFieldData {
   multiple?: boolean; // For asset fields - allow multiple files
+  options?: { id: string; name: string }[]; // For option fields - selectable values
 }
 
 export interface CreateCollectionFieldData {
