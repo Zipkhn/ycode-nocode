@@ -264,23 +264,42 @@ async function ensureScaffolds(
   // Pass 2 — ensure each Webflow field has a matching YCode field, and that
   // a hidden tracking field exists. Missing-by-slug matching lets us recover
   // the mapping if a Webflow field was renamed or the mapping was lost.
+  //
+  // Imported fields are created with `key: null` (just like user-created
+  // fields) so they remain editable / deletable in the CMS UI — the YCode
+  // builder gates field editing behind `field.key`, treating any keyed field
+  // as a built-in / system field.
   for (const scaffold of scaffolds) {
     const wf = scaffold.webflowCollection;
     const ycodeFields = await getFieldsByCollectionId(scaffold.ycodeCollectionId);
     const ycodeFieldBySlug = new Map<string, CollectionField>();
     for (const f of ycodeFields) {
+      // Index by both `key` (legacy imports + system fields) and slugified
+      // `name` so we can recover mappings for newly-imported user-style fields.
       if (f.key) ycodeFieldBySlug.set(f.key, f);
+      const nameSlug = slugify(f.name);
+      if (nameSlug && !ycodeFieldBySlug.has(nameSlug)) {
+        ycodeFieldBySlug.set(nameSlug, f);
+      }
     }
     let order = ycodeFields.reduce((max, f) => Math.max(max, (f.order ?? 0) + 1), 0);
 
     for (const wfField of wf.fields ?? []) {
       const existingFieldId = scaffold.fieldIdMap[wfField.id];
       if (existingFieldId) {
-        // Re-sync: keep YCode's option list in step with Webflow when Webflow
-        // adds new choices to an Option field after the initial migration.
-        if (wfField.type === 'Option') {
-          const existingField = ycodeFields.find((f) => f.id === existingFieldId);
-          if (existingField) {
+        const existingField = ycodeFields.find((f) => f.id === existingFieldId);
+        if (existingField) {
+          // Backfill: earlier versions of this migration set `key: slug` on
+          // every imported field, which made the YCode CMS treat them as
+          // built-in fields and block editing. Clear the key so users can
+          // edit / duplicate / delete them like any user-created field.
+          if (existingField.key && existingField.id !== scaffold.recordIdFieldId) {
+            await updateField(existingField.id, { key: null });
+            existingField.key = null;
+          }
+          // Re-sync: keep YCode's option list in step with Webflow when
+          // Webflow adds new choices to an Option field after migration.
+          if (wfField.type === 'Option') {
             await syncOptionFieldChoices(existingField, wfField);
           }
         }
@@ -293,6 +312,10 @@ async function ensureScaffolds(
       if (matched) {
         scaffold.fieldIdMap[wfField.id] = matched.id;
         scaffold.fieldSlugMap[wfField.slug] = matched.id;
+        if (matched.key && matched.id !== scaffold.recordIdFieldId) {
+          await updateField(matched.id, { key: null });
+          matched.key = null;
+        }
         if (wfField.type === 'Option') {
           await syncOptionFieldChoices(matched, wfField);
         }
@@ -306,7 +329,6 @@ async function ensureScaffolds(
 
       const field = await createField({
         name: wfField.displayName,
-        key: slug,
         type: cmsType,
         collection_id: scaffold.ycodeCollectionId,
         order: order++,
