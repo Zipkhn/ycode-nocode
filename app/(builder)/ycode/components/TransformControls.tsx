@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -57,11 +57,28 @@ const TransformControls = memo(function TransformControls({ layer, onLayerUpdate
   const skewY = getDesignProperty('transforms', 'skewY') || '';
   const transformOrigin = getDesignProperty('transforms', 'transformOrigin') || '';
 
+  // Track which transform sections are explicitly active so a row stays
+  // visible when the user temporarily clears its inputs. The set is reseeded
+  // from existing stored values whenever the layer/breakpoint/state changes.
+  const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const next = new Set<string>();
+    if (scale) next.add('scale');
+    if (rotate) next.add('rotate');
+    if (translateX !== '' || translateY !== '') next.add('move');
+    if (skewX || skewY) next.add('skew');
+    setActiveKeys(next);
+    // Only reseed when the layer or active breakpoint/state changes — not on
+    // every value edit, otherwise clearing an input would reactivate the row.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layer?.id, activeBreakpoint, activeUIState]);
+
   const visibility: Record<string, boolean> = {
-    scale: !!scale,
-    rotate: !!rotate,
-    move: translateX !== '' || translateY !== '',
-    skew: !!skewX || !!skewY,
+    scale: activeKeys.has('scale') || !!scale,
+    rotate: activeKeys.has('rotate') || !!rotate,
+    move: activeKeys.has('move') || translateX !== '' || translateY !== '',
+    skew: activeKeys.has('skew') || !!skewX || !!skewY,
   };
 
   const inputs = useControlledInputs({
@@ -96,20 +113,70 @@ const TransformControls = memo(function TransformControls({ layer, onLayerUpdate
     updateDesignProperty('transforms', 'transformOrigin', value === 'center' ? null : value);
   }, [updateDesignProperty]);
 
+  const activate = useCallback((id: string) => {
+    setActiveKeys(prev => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  const deactivate = useCallback((id: string) => {
+    setActiveKeys(prev => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
   const addHandlers: Record<string, () => void> = {
-    scale: () => { inputs.scale[1]('1'); updateDesignProperty('transforms', 'scale', '1'); },
-    rotate: () => { inputs.rotate[1]('0'); updateDesignProperty('transforms', 'rotate', '0'); },
+    scale: () => { activate('scale'); inputs.scale[1]('1'); updateDesignProperty('transforms', 'scale', '1'); },
+    rotate: () => { activate('rotate'); inputs.rotate[1]('0'); updateDesignProperty('transforms', 'rotate', '0'); },
     move: () => {
+      activate('move');
       inputs.translateX[1]('0'); inputs.translateY[1]('0');
       updateDesignProperty('transforms', 'translateX', '0');
       updateDesignProperty('transforms', 'translateY', '0');
     },
     skew: () => {
+      activate('skew');
       inputs.skewX[1]('0'); inputs.skewY[1]('0');
       updateDesignProperty('transforms', 'skewX', '0');
       updateDesignProperty('transforms', 'skewY', '0');
     },
   };
+
+  const removeHandlers: Record<string, () => void> = {
+    scale: () => { deactivate('scale'); inputs.scale[1](''); updateDesignProperty('transforms', 'scale', null); },
+    rotate: () => { deactivate('rotate'); inputs.rotate[1](''); updateDesignProperty('transforms', 'rotate', null); },
+    move: () => {
+      deactivate('move');
+      inputs.translateX[1](''); inputs.translateY[1]('');
+      updateDesignProperty('transforms', 'translateX', null);
+      updateDesignProperty('transforms', 'translateY', null);
+    },
+    skew: () => {
+      deactivate('skew');
+      inputs.skewX[1](''); inputs.skewY[1]('');
+      updateDesignProperty('transforms', 'skewX', null);
+      updateDesignProperty('transforms', 'skewY', null);
+    },
+  };
+
+  const renderRemoveButton = (id: string) => (
+    <span
+      role="button"
+      tabIndex={0}
+      aria-label={`Remove ${id}`}
+      className="p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer shrink-0"
+      onClick={removeHandlers[id]}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); removeHandlers[id](); } }}
+    >
+      <Icon name="x" className="size-2.5" />
+    </span>
+  );
 
   const scaleSliderValue = parseFloat(inputs.scale[0]) || 1;
 
@@ -162,21 +229,24 @@ const TransformControls = memo(function TransformControls({ layer, onLayerUpdate
       {visibility.scale && (
         <div className="grid grid-cols-3">
           <Label variant="muted">Scale</Label>
-          <div className="col-span-2 grid grid-cols-2 items-center gap-2">
-            <Input
-              type="text"
-              value={inputs.scale[0]}
-              onChange={(e) => handlers.scale(e.target.value)}
-              placeholder="1"
-            />
-            <Slider
-              value={[Math.round(scaleSliderValue * 100)]}
-              onValueChange={handleScaleSliderChange}
-              min={0}
-              max={200}
-              step={5}
-              className="flex-1"
-            />
+          <div className="col-span-2 flex items-center gap-2">
+            <div className="grid grid-cols-2 items-center gap-2 flex-1 min-w-0">
+              <Input
+                type="text"
+                value={inputs.scale[0]}
+                onChange={(e) => handlers.scale(e.target.value)}
+                placeholder="1"
+              />
+              <Slider
+                value={[Math.round(scaleSliderValue * 100)]}
+                onValueChange={handleScaleSliderChange}
+                min={0}
+                max={200}
+                step={5}
+                className="flex-1"
+              />
+            </div>
+            {renderRemoveButton('scale')}
           </div>
         </div>
       )}
@@ -185,15 +255,16 @@ const TransformControls = memo(function TransformControls({ layer, onLayerUpdate
       {visibility.rotate && (
         <div className="grid grid-cols-3">
           <Label variant="muted">Rotate</Label>
-          <div className="col-span-2">
-            <InputGroup>
+          <div className="col-span-2 flex items-center gap-2">
+            <InputGroup className="flex-1 min-w-0">
               <InputGroupInput
                 value={inputs.rotate[0]}
                 onChange={(e) => handlers.rotate(e.target.value)}
                 placeholder="0"
               />
-              <InputGroupAddon align="inline-end">deg</InputGroupAddon>
+              <InputGroupAddon align="inline-end" className="text-xs opacity-50">deg</InputGroupAddon>
             </InputGroup>
+            {renderRemoveButton('rotate')}
           </div>
         </div>
       )}
@@ -204,15 +275,20 @@ const TransformControls = memo(function TransformControls({ layer, onLayerUpdate
         return (
           <div key={field.id} className="grid grid-cols-3 items-start">
             <Label variant="muted" className="h-8">{field.label} X/Y</Label>
-            <div className="col-span-2 grid grid-cols-2 gap-2">
-              {field.keys.map((key) => (
-                <Input
-                  key={key}
-                  value={inputs[key as keyof typeof inputs][0]}
-                  onChange={(e) => handlers[key](e.target.value)}
-                  placeholder="0"
-                />
-              ))}
+            <div className="col-span-2 flex items-start gap-2">
+              <div className="grid grid-cols-2 gap-2 flex-1 min-w-0">
+                {field.keys.map((key) => (
+                  <Input
+                    key={key}
+                    value={inputs[key as keyof typeof inputs][0]}
+                    onChange={(e) => handlers[key](e.target.value)}
+                    placeholder="0"
+                  />
+                ))}
+              </div>
+              <div className="h-8 flex items-center">
+                {renderRemoveButton(field.id)}
+              </div>
             </div>
           </div>
         );
