@@ -1507,9 +1507,9 @@ const LayerItem: React.FC<{
   // because it treats font-size as overriding line-height. Our own
   // setBreakpointClass already handles property-aware conflict resolution.
 
-  // <a> with display:flex is block-level (full width) unlike <button> which
-  // shrink-wraps. Add w-fit to match button sizing unless width is explicit.
-  const buttonNeedsFit = isButtonWithLink && (() => {
+  // Buttons inside grid cells stretch by default. Add w-fit unless an explicit
+  // w-* class is already set (covers both <button> and <a> rendered buttons).
+  const buttonNeedsFit = layer.name === 'button' && (() => {
     const cls = Array.isArray(layer.classes) ? layer.classes : (layer.classes || '').split(' ');
     return !cls.some((c: string) => /^w-/.test(c.split(':').pop() || ''));
   })();
