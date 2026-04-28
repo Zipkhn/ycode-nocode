@@ -12,11 +12,12 @@ const LEVEL_LABELS: Record<string, string> = {
 };
 
 const PROPS = [
-  { key: 'font-family',     label: 'Family',          cssKey: (l: string) => l === 'body' ? '_typography---font-family-body' : '_typography---font-family-headings' },
-  { key: 'font-weight',     label: 'Weight',          cssKey: (l: string) => `${l}-font-weight`    },
-  { key: 'line-height',     label: 'Line Height',     cssKey: (l: string) => `${l}-line-height`    },
-  { key: 'letter-spacing',  label: 'Letter Spacing',  cssKey: (l: string) => `${l}-letter-spacing` },
-  { key: 'margin-bottom',   label: 'Margin Bottom',   cssKey: (l: string) => `${l}-margin-bottom`  },
+  { key: 'font-family',     label: 'Family',          cssKey: (l: string) => l === 'body' ? '_typography---font-family-body' : '_typography---font-family-headings', type: 'text' },
+  { key: 'font-weight',     label: 'Weight',          cssKey: (l: string) => `${l}-font-weight`,    type: 'text' },
+  { key: 'line-height',     label: 'Line Height',     cssKey: (l: string) => `${l}-line-height`,    type: 'text' },
+  { key: 'letter-spacing',  label: 'Letter Spacing',  cssKey: (l: string) => `${l}-letter-spacing`, type: 'text' },
+  { key: 'margin-bottom',   label: 'Margin Bottom',   cssKey: (l: string) => `${l}-margin-bottom`,  type: 'text' },
+  { key: 'text-wrap',       label: 'Text Wrap',       cssKey: (l: string) => `${l}-text-wrap`,      type: 'textwrap' },
 ] as const;
 
 function isShared(propKey: string) {
@@ -24,7 +25,7 @@ function isShared(propKey: string) {
 }
 
 export function TextStyleSection({ hook }: Props) {
-  const { variables, setVar } = hook;
+  const { variables, setVar, removeVar } = hook;
 
   return (
     <div className="flex flex-col h-full">
@@ -55,6 +56,22 @@ export function TextStyleSection({ hook }: Props) {
                   const displayVal = prop.key === 'font-family'
                     ? val.split(',')[0].trim().replace(/['"]/g, '') || 'inherit'
                     : val;
+                  if (prop.type === 'textwrap') {
+                    const options = ['', 'pretty', 'balance'] as const;
+                    const idx = options.indexOf(val as typeof options[number]);
+                    const next = options[(idx + 1) % options.length];
+                    return (
+                      <td key={lvl} className="border-l border-white/5 px-2 py-0.5 text-center">
+                        <button
+                          onClick={() => next ? setVar(cssKey, next) : removeVar(cssKey)}
+                          className={`text-[10px] font-mono px-1.5 py-0.5 rounded transition-colors ${val ? 'bg-white/15 text-white' : 'text-white/25 hover:text-white/50'}`}
+                          title={`text-wrap: ${val || 'unset'}`}
+                        >
+                          {val || '—'}
+                        </button>
+                      </td>
+                    );
+                  }
                   return (
                     <td key={lvl} className="border-l border-white/5 px-2 py-0.5">
                       <input

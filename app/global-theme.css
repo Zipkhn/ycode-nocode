@@ -169,6 +169,16 @@
   --_text-style---trim-bottom-body: 0.34em;
   --_text-style---optical-offset-headings: 0;
   --_text-style---optical-offset-body: 0;
+  --display-text-wrap: pretty;
+  --h1-text-wrap: pretty;
+  --h2-text-wrap: pretty;
+  --h3-text-wrap: pretty;
+  --h4-text-wrap: pretty;
+  --h5-text-wrap: pretty;
+  --h6-text-wrap: balance;
+  --large-text-wrap: balance;
+  --body-text-wrap: balance;
+  --small-text-wrap: balance;
 /* STUDIO_THEME_END */
 }
 
@@ -1178,16 +1188,16 @@ body.is-dev-mode .dev-grid_wrapper:not(#ycode-dev-grid) { display: none !importa
 
 /* Studio Runtime Typography Bridge v9.0 */
 :where(body) { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-:where(body) .u-text-display{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
-:where(body) h1{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
-:where(body) h2{font-weight:700!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important}
-:where(body) h3{font-weight:600!important;line-height:1.3!important;letter-spacing:0em!important;margin-bottom:0rem!important}
-:where(body) h4{font-weight:600!important;line-height:1.4!important;letter-spacing:0em!important;margin-bottom:0rem!important}
-:where(body) h5{font-weight:500!important;line-height:1.4!important;letter-spacing:0em!important;margin-bottom:0rem!important}
-:where(body) h6{font-weight:500!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
-:where(body) .u-text-large{font-weight:500!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
-:where(body) p{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
-:where(body) .u-text-small{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important}
+:where(body) .u-text-display{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
+:where(body) h1{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
+:where(body) h2{font-weight:700!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
+:where(body) h3{font-weight:600!important;line-height:1.3!important;letter-spacing:0em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
+:where(body) h4{font-weight:600!important;line-height:1.4!important;letter-spacing:0em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
+:where(body) h5{font-weight:500!important;line-height:1.4!important;letter-spacing:0em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
+:where(body) h6{font-weight:500!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important;text-wrap:balance!important}
+:where(body) .u-text-large{font-weight:500!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important;text-wrap:balance!important}
+:where(body) p{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important;text-wrap:balance!important}
+:where(body) .u-text-small{font-weight:400!important;line-height:1.5!important;letter-spacing:0em!important;margin-bottom:0rem!important;text-wrap:balance!important}
 
 /* Studio Radius Bridge */
 :where(body) [class*="rounded-radius-small"]{border-radius:var(--radius--small)!important}

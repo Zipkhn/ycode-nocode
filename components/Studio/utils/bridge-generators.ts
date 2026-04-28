@@ -126,7 +126,9 @@ export function generateTypographyBridgeCSS(variables: Record<string, string>): 
     const lh = variables[`${lvl.key}-line-height`]    || '1.4';
     const ls = variables[`${lvl.key}-letter-spacing`] || '0em';
     const mb = variables[`${lvl.key}-margin-bottom`]  || '0rem';
-    lines.push(`${selector}{font-weight:${fw}!important;line-height:${lh}!important;letter-spacing:${ls}!important;margin-bottom:${mb}!important}`);
+    const tw = variables[`${lvl.key}-text-wrap`];
+    const twPart = tw ? `;text-wrap:${tw}!important` : '';
+    lines.push(`${selector}{font-weight:${fw}!important;line-height:${lh}!important;letter-spacing:${ls}!important;margin-bottom:${mb}!important${twPart}}`);
   }
   return lines.join('\n');
 }

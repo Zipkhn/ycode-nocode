@@ -136,6 +136,7 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
   const [authEnabled, setAuthEnabled] = useState(false);
   const [authPassword, setAuthPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [draftOnly, setDraftOnly] = useState(false);
 
   const [collectionId, setCollectionId] = useState<string | null>(null);
   const [slugFieldId, setSlugFieldId] = useState<string | null>(null);
@@ -463,6 +464,7 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
           initialValuesRef.current.customCodeBody = settings?.custom_code?.body || '';
           initialValuesRef.current.authEnabled = settings?.auth?.enabled || false;
           initialValuesRef.current.authPassword = settings?.auth?.password || '';
+          setDraftOnly(settings?.draft_only || false);
           initialValuesRef.current.collectionId = settings?.cms?.collection_id || null;
           initialValuesRef.current.slugFieldId = settings?.cms?.slug_field_id || null;
           {
@@ -1057,6 +1059,7 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
           head: customCodeHead.trim(),
           body: customCodeBody.trim(),
         },
+        draft_only: draftOnly || undefined,
         // Explicitly set or clear cms property
         cms: collectionId && slugFieldId ? {
           collection_id: collectionId,
@@ -1569,6 +1572,22 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
                         checked={isIndex}
                         disabled={isLastRootIndexPage || isErrorPage || isDynamicPage}
                         onCheckedChange={(checked) => setIsIndex(checked === true)}
+                      />
+                    </Field>
+
+                    <Field orientation="horizontal" className="flex flex-row-reverse!">
+                      <FieldContent>
+                        <FieldLabel htmlFor="draftOnly">
+                          Draft only
+                        </FieldLabel>
+                        <FieldDescription>
+                          Exclude this page from &ldquo;Publish All&rdquo;. It will stay in draft even when publishing the whole site.
+                        </FieldDescription>
+                      </FieldContent>
+                      <Checkbox
+                        id="draftOnly"
+                        checked={draftOnly}
+                        onCheckedChange={(checked) => setDraftOnly(checked === true)}
                       />
                     </Field>
                   </FieldGroup>
