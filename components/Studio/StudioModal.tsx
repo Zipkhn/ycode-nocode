@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
 import { StudioNav, type StudioSection } from './StudioNav';
@@ -12,8 +12,6 @@ import { ColorsSection }     from './sections/ColorsSection';
 import { ThemeSection }      from './sections/ThemeSection';
 import { SpacingSection }    from './sections/SpacingSection';
 import { LayoutSection }     from './sections/LayoutSection';
-import { exportCollections } from './utils/figma-io';
-import { parseImportFile }   from './utils/figma-io';
 import { THEME_TOKENS_MAP, labelToUuidKey, generateSpacingBridgeCSS, generateTypographyBridgeCSS } from './utils/bridge-generators';
 import { resolveVarToHex }   from './utils/color-utils';
 
@@ -80,8 +78,6 @@ export function StudioModal() {
   const { isOpen, close } = useStudioStore();
   const [section, setSection] = useState<StudioSection>('general');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'done' | 'error'>('idle');
-  const [importStatus, setImportStatus] = useState<'idle' | 'importing' | 'done' | 'error'>('idle');
-  const importFileRef = useRef<HTMLInputElement>(null);
   const hook = useStudioVariables();
   const loadColorVariables = useColorVariablesStore(s => s.loadColorVariables);
 
@@ -106,24 +102,6 @@ export function StudioModal() {
     } catch {
       setSyncStatus('error');
       setTimeout(() => setSyncStatus('idle'), 3000);
-    }
-  };
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-    setImportStatus('importing');
-    try {
-      const text = await file.text();
-      const updates = parseImportFile(text);
-      hook.setVars(updates);
-      await hook.saveUpdates(updates);
-      setImportStatus('done');
-      setTimeout(() => setImportStatus('idle'), 3000);
-    } catch {
-      setImportStatus('error');
-      setTimeout(() => setImportStatus('idle'), 3000);
     }
   };
 
@@ -158,26 +136,6 @@ export function StudioModal() {
             {hook.status === 'done'   && <span className="text-[10px] text-green-400">✓ Saved</span>}
           </div>
           <div className="flex items-center gap-2">
-            <input
-              ref={importFileRef} type="file"
-              accept=".json" className="hidden"
-              onChange={handleImport}
-            />
-            <button
-              onClick={() => exportCollections(hook.variables, hook.spacingParams)}
-              className="px-2.5 py-1 rounded border border-white/10 text-[11px] text-white/50 hover:text-white hover:bg-white/5 transition-colors"
-            >
-              ↓ Export ZIP
-            </button>
-            <button
-              onClick={() => importFileRef.current?.click()} disabled={importStatus === 'importing'}
-              className="px-2.5 py-1 rounded border border-white/10 text-[11px] text-white/50 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40"
-            >
-              {importStatus === 'idle'      && '↑ Import'}
-              {importStatus === 'importing' && '…'}
-              {importStatus === 'done'      && '✓ Importé'}
-              {importStatus === 'error'     && '✗ Erreur'}
-            </button>
             <button
               onClick={handleSync} disabled={syncStatus === 'syncing'}
               className="px-2.5 py-1 rounded bg-primary text-primary-foreground text-[11px] font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"

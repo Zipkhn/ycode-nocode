@@ -32,6 +32,7 @@ import type { User } from '@supabase/supabase-js';
 import ActiveUsersInHeader from './ActiveUsersInHeader';
 import InviteUserButton from './InviteUserButton';
 import PublishPopover from './PublishPopover';
+import { useStudioStore } from '@/components/Studio/StudioModal';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { Separator } from '@/components/ui/separator';
@@ -87,6 +88,7 @@ export default function HeaderBar({
   const { items, fields, collections, selectedCollectionId: storeSelectedCollectionId, setSelectedCollectionId } = useCollectionsStore();
   const { locales, selectedLocaleId, setSelectedLocaleId, translations } = useLocalisationStore();
   const { navigateToLayers, navigateToCollection, navigateToCollections, updateQueryParams, routeType } = useEditorUrl();
+  const openStudio = useStudioStore(s => s.open);
 
   // Optimistic nav button state - set immediately on click, cleared when URL catches up
   type NavButton = 'design' | 'cms' | 'forms';
@@ -487,6 +489,13 @@ export default function HeaderBar({
           >
             <Icon name="form" />
             Forms
+          </Button>
+          <Button
+            variant="ghost" size="sm"
+            onClick={openStudio} title="Studio (Shift+Option+S)"
+          >
+            <Icon name="slider" />
+            Studio
           </Button>
         </div>
       </div>

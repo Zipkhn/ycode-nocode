@@ -163,6 +163,12 @@
   --border-width--main: 0.094rem;
   --theme-light--background-2: #f5f5f5;
   --theme-dark--background-2: #2a2a2a;
+  --_text-style---trim-top-headings: 0.35em;
+  --_text-style---trim-bottom-headings: 0.34em;
+  --_text-style---trim-top-body: 0.32em;
+  --_text-style---trim-bottom-body: 0.34em;
+  --_text-style---optical-offset-headings: 0;
+  --_text-style---optical-offset-body: 0;
 /* STUDIO_THEME_END */
 }
 
@@ -201,6 +207,9 @@
 :is(#ybody, .y-canvas, [data-ycode-canvas]) h5,
 :is(#ybody, .y-canvas, [data-ycode-canvas]) h6 {
   font-family: var(--_typography---font-family-headings, inherit) !important;
+  --_text-style---trim-top: var(--_text-style---trim-top-headings, 0.35em);
+  --_text-style---trim-bottom: var(--_text-style---trim-bottom-headings, 0.34em);
+  --_text-style---optical-offset: var(--_text-style---optical-offset-headings, -0.04em);
 }
 
 /* 2. ROLE SECONDAIRE : Corps de texte */
@@ -211,6 +220,9 @@
 ),
 :is(#ybody, .y-canvas, [data-ycode-canvas]) p {
   font-family: var(--_typography---font-family-body, inherit) !important;
+  --_text-style---trim-top: var(--_text-style---trim-top-body, 0.35em);
+  --_text-style---trim-bottom: var(--_text-style---trim-bottom-body, 0.34em);
+  --_text-style---optical-offset: var(--_text-style---optical-offset-body, -0.04em);
 }
 
 /* Exception : code/pre — toujours monospace */

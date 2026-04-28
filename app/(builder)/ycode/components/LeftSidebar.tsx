@@ -8,7 +8,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 // 4. Internal components
 import LayersTree from './LayersTree';
 import LeftSidebarPages from './LeftSidebarPages';
-import { useStudioStore } from '@/components/Studio/StudioModal';
 
 // Lazy-loaded components (heavy, not needed immediately)
 const ElementLibrary = lazy(() => import('./ElementLibrary'));
@@ -283,8 +282,6 @@ const LeftSidebar = React.memo(function LeftSidebar({
     setTimeout(() => setAssetMessage(null), 3000);
   };
 
-  const openStudio = useStudioStore(s => s.open);
-
   return (
     <>
       <div className="w-64 shrink-0 bg-background border-r flex flex-col overflow-hidden p-4 pb-0">
@@ -374,18 +371,6 @@ const LeftSidebar = React.memo(function LeftSidebar({
 
           </Tabs>
         </div>
-      </div>
-
-      {/* Studio trigger button */}
-      <div className="shrink-0 px-4 pb-3 border-t border-border/50 pt-3">
-        <Button
-          variant="ghost" size="sm"
-          className="w-full justify-start gap-2 text-muted-foreground" onClick={openStudio}
-          title="Open Studio (Shift+Option+S)"
-        >
-          <Icon name="slider" className="size-3.5" />
-          Studio
-        </Button>
       </div>
 
       {/* Element Library Slide-Out (lazy loaded, always mounted to preserve state) */}

@@ -15,9 +15,9 @@ const TYPO_LEVELS = [
   { key: 'h4',        label: 'H4'        },
   { key: 'h5',        label: 'H5'        },
   { key: 'h6',        label: 'H6'        },
-  { key: 'large',     label: 'Large'     },
-  { key: 'text-main', label: 'Main'      },
-  { key: 'small',     label: 'Small'     },
+  { key: 'text-large', label: 'Large' },
+  { key: 'text-main',  label: 'Main'  },
+  { key: 'text-small', label: 'Small' },
 ];
 
 const SIZE_MODES: StudioMode[] = [
@@ -61,7 +61,9 @@ function TrimInput({ varKey, vars, setVar }: { varKey: string; vars: Record<stri
 
 export function TypographySection({ hook }: Props) {
   const { variables, setVar } = hook;
-  const fonts = useFontsStore(s => s.fonts).filter(f => f.type !== 'default');
+  const fonts = useFontsStore(s => s.fonts)
+    .filter(f => f.type !== 'default')
+    .filter((f, i, arr) => arr.findIndex(x => x.family === f.family) === i);
 
   const getValue = (rowKey: string, modeId: string) =>
     variables[`_typography---font-size--${rowKey}-${modeId}`] ?? '';

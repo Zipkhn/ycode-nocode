@@ -178,7 +178,7 @@ export function ColorsSection({ hook }: Props) {
               />
               <button
                 onClick={() => removeVar(k)}
-                className="opacity-0 group-hover:opacity-100 text-white/50 hover:text-destructive transition-all text-[10px] ml-1"
+                className="opacity-0 group-hover:opacity-100 text-white/50 hover:text-red-400 transition-all text-[10px] ml-1"
               >
                 ✕
               </button>
