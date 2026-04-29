@@ -1467,6 +1467,11 @@ export interface UpdateTranslationData {
   is_completed?: boolean;
 }
 
+export interface HreflangEntry {
+  hreflang: string; // 'fr', 'en', 'x-default'
+  href: string;
+}
+
 // Version Types (for undo/redo functionality)
 export type VersionEntityType = 'page_layers' | 'component' | 'layer_style';
 export type VersionActionType = 'create' | 'update' | 'delete';

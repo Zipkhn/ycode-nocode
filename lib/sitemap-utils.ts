@@ -1,7 +1,9 @@
 /**
  * Sitemap Utility Functions
  *
- * Generates sitemap XML for published pages with localization support
+ * Generates sitemap XML for published pages with localization support.
+ * Hreflang clusters are built via generateHreflangEntries — the same function
+ * used by generateMetadata in the page routes — guaranteeing full <head> / sitemap symmetry.
  */
 
 import type {
@@ -16,6 +18,7 @@ import type {
 import { buildSlugPath, buildLocalizedSlugPath } from './page-utils';
 import { getTranslatableKey } from './localisation-utils';
 import { shouldAppearInSitemap } from './seo-governance';
+import { buildHreflangCluster, generateHreflangEntries } from './hreflang-generator';
 
 export interface SitemapUrl {
   loc: string;
@@ -30,7 +33,14 @@ export interface SitemapAlternate {
 }
 
 /**
- * Build sitemap URLs for a static page (non-dynamic)
+ * Build sitemap URL entries for a static page (non-dynamic).
+ *
+ * Monolingue: one <url> entry, no alternates.
+ * Multilingue: one <url> entry per published locale, each carrying the full
+ * shared alternates cluster (self-reference included, x-default = default locale).
+ *
+ * The cluster is built via generateHreflangEntries — identical to what
+ * generateMetadata injects into <head> — guaranteeing <head>/sitemap symmetry.
  */
 function buildStaticPageUrls(
   page: Page,
@@ -38,65 +48,65 @@ function buildStaticPageUrls(
   baseUrl: string,
   settings: SitemapSettings,
   locales: Locale[],
-  translationsByLocale: Map<string, Record<string, Translation>>
+  translationsByLocale: Record<string, Record<string, Translation>>
 ): SitemapUrl[] {
   if (!shouldAppearInSitemap(page)) return [];
 
-  const defaultLocale = locales.find(l => l.is_default);
-  const nonDefaultLocales = locales.filter(l => !l.is_default);
+  const publishedLocales = locales.filter(l => l.is_published && !l.deleted_at);
 
-  // Build the default (base) URL
-  const defaultPath = buildSlugPath(page, folders, 'page');
-  const defaultUrl = `${baseUrl}${defaultPath}`;
-
-  const sitemapUrl: SitemapUrl = {
-    loc: defaultUrl,
-    lastmod: page.updated_at,
-    changefreq: settings.defaultChangeFrequency,
-  };
-
-  // Always add localized alternates when multiple locales exist
-  if (locales.length > 1) {
-    const alternates: SitemapAlternate[] = [];
-
-    // Add default locale alternate
-    if (defaultLocale) {
-      alternates.push({
-        hreflang: defaultLocale.code,
-        href: defaultUrl,
-      });
-    }
-
-    // Add non-default locale alternates
-    for (const locale of nonDefaultLocales) {
-      const translations = translationsByLocale.get(locale.id);
-      const localizedPath = buildLocalizedSlugPath(
-        page,
-        folders,
-        'page',
-        locale,
-        translations
-      );
-      alternates.push({
-        hreflang: locale.code,
-        href: `${baseUrl}${localizedPath}`,
-      });
-    }
-
-    // Add x-default for language negotiation
-    alternates.push({
-      hreflang: 'x-default',
-      href: defaultUrl,
-    });
-
-    sitemapUrl.alternates = alternates;
+  // Monolingue: single URL, no alternates
+  if (publishedLocales.length <= 1) {
+    const path = buildSlugPath(page, folders, 'page');
+    return [{
+      loc: `${baseUrl}${path}`,
+      lastmod: page.updated_at,
+      changefreq: settings.defaultChangeFrequency,
+    }];
   }
 
-  return [sitemapUrl];
+  // Build the shared alternates cluster — same as generateMetadata <head>
+  const hreflangEntries = generateHreflangEntries(
+    page,
+    folders,
+    publishedLocales,
+    translationsByLocale,
+    baseUrl
+  );
+
+  if (hreflangEntries.length === 0) {
+    // Fallback for edge case (shouldn't occur with publishedLocales.length > 1)
+    const path = buildSlugPath(page, folders, 'page');
+    return [{
+      loc: `${baseUrl}${path}`,
+      lastmod: page.updated_at,
+      changefreq: settings.defaultChangeFrequency,
+    }];
+  }
+
+  const alternates: SitemapAlternate[] = hreflangEntries.map(e => ({
+    hreflang: e.hreflang,
+    href: e.href,
+  }));
+
+  // One <url> per locale variant, all carrying the same cluster
+  return publishedLocales.map(locale => {
+    const translations = translationsByLocale[locale.id] ?? {};
+    const path = buildLocalizedSlugPath(page, folders, 'page', locale, translations);
+    return {
+      loc: `${baseUrl}${path}`,
+      lastmod: page.updated_at,
+      changefreq: settings.defaultChangeFrequency,
+      alternates,
+    };
+  });
 }
 
 /**
- * Build sitemap URLs for a dynamic page with collection items
+ * Build sitemap URL entries for a dynamic page (CMS collection items).
+ *
+ * Monolingue: one <url> per item, no alternates.
+ * Multilingue: one <url> per item per locale, each carrying the full shared
+ * alternates cluster for that item (same symmetry guarantee as static pages).
  */
 function buildDynamicPageUrls(
   page: Page,
@@ -105,95 +115,90 @@ function buildDynamicPageUrls(
   settings: SitemapSettings,
   collectionItems: CollectionItem[],
   slugFieldId: string,
-  itemValues: Map<string, Map<string, string>>, // itemId -> fieldId -> value
+  itemValues: Map<string, Map<string, string>>,
   locales: Locale[],
-  translationsByLocale: Map<string, Record<string, Translation>>
+  translationsByLocale: Record<string, Record<string, Translation>>
 ): SitemapUrl[] {
   if (!shouldAppearInSitemap(page)) return [];
 
+  const publishedLocales = locales.filter(l => l.is_published && !l.deleted_at);
   const urls: SitemapUrl[] = [];
-  const defaultLocale = locales.find(l => l.is_default);
-  const nonDefaultLocales = locales.filter(l => !l.is_default);
 
-  // Build folder path prefix (without the {slug} placeholder)
+  // Folder path prefix without the {slug} placeholder
   const folderPath = buildSlugPath(page, folders, 'page', '').replace(/\/$/, '');
 
   for (const item of collectionItems) {
-    // Get the slug value from item values
     const fieldValues = itemValues.get(item.id);
     const slugValue = fieldValues?.get(slugFieldId);
-
     if (!slugValue) continue;
 
-    const itemPath = folderPath ? `${folderPath}/${slugValue}` : `/${slugValue}`;
-    const itemUrl = `${baseUrl}${itemPath}`;
+    const defaultItemPath = folderPath ? `${folderPath}/${slugValue}` : `/${slugValue}`;
+    const defaultItemUrl = `${baseUrl}${defaultItemPath}`;
 
-    const sitemapUrl: SitemapUrl = {
-      loc: itemUrl,
-      lastmod: item.updated_at,
-      changefreq: settings.defaultChangeFrequency,
-    };
+    // Monolingue
+    if (publishedLocales.length <= 1) {
+      urls.push({
+        loc: defaultItemUrl,
+        lastmod: item.updated_at,
+        changefreq: settings.defaultChangeFrequency,
+      });
+      continue;
+    }
 
-    // Always add localized alternates when multiple locales exist
-    if (locales.length > 1) {
-      const alternates: SitemapAlternate[] = [];
+    // Build per-locale URLs for this item
+    const localeUrls: { locale: Locale; url: string }[] = [];
 
-      // Add default locale alternate
-      if (defaultLocale) {
-        alternates.push({
-          hreflang: defaultLocale.code,
-          href: itemUrl,
-        });
-      }
+    for (const locale of publishedLocales) {
+      const translations = translationsByLocale[locale.id] ?? {};
+      let localeItemUrl: string;
 
-      // Add non-default locale alternates
-      for (const locale of nonDefaultLocales) {
-        const translations = translationsByLocale.get(locale.id);
-        // Build localized folder path
+      if (locale.is_default) {
+        localeItemUrl = defaultItemUrl;
+      } else {
+        // Localized folder path (locale prefix + translated folder slugs)
         const localizedFolderPath = buildLocalizedSlugPath(
-          page,
-          folders,
-          'page',
-          locale,
-          translations,
-          ''
+          page, folders, 'page', locale, translations, ''
         ).replace(/\/$/, '');
 
-        // Get translated slug for the CMS item if available
+        // Translated item slug (falls back to default slug)
         const translatedSlugKey = getTranslatableKey({
           source_type: 'cms',
           source_id: item.id,
           content_key: slugFieldId,
         });
-        const translatedSlug = translations?.[translatedSlugKey]?.content_value || slugValue;
+        const translatedSlug = translations[translatedSlugKey]?.content_value || slugValue;
 
-        const localizedItemPath = localizedFolderPath
-          ? `${localizedFolderPath}/${translatedSlug}`
-          : `/${locale.code}/${translatedSlug}`;
-
-        alternates.push({
-          hreflang: locale.code,
-          href: `${baseUrl}${localizedItemPath}`,
-        });
+        localeItemUrl = localizedFolderPath
+          ? `${baseUrl}${localizedFolderPath}/${translatedSlug}`
+          : `${baseUrl}/${locale.code}/${translatedSlug}`;
       }
 
-      // Add x-default
-      alternates.push({
-        hreflang: 'x-default',
-        href: itemUrl,
-      });
-
-      sitemapUrl.alternates = alternates;
+      localeUrls.push({ locale, url: localeItemUrl });
     }
 
-    urls.push(sitemapUrl);
+    // Shared alternates cluster via buildHreflangCluster — same assembly logic as static pages
+    const hreflangEntries = buildHreflangCluster(localeUrls);
+    const alternates: SitemapAlternate[] = hreflangEntries.map(e => ({
+      hreflang: e.hreflang,
+      href: e.href,
+    }));
+
+    // One <url> per locale variant, all carrying the same cluster
+    for (const { url } of localeUrls) {
+      urls.push({
+        loc: url,
+        lastmod: item.updated_at,
+        changefreq: settings.defaultChangeFrequency,
+        alternates,
+      });
+    }
   }
 
   return urls;
 }
 
 /**
- * Generate sitemap URLs from pages and collection data
+ * Generate sitemap URLs from pages and collection data.
  */
 export function generateSitemapUrls(
   pages: Page[],
@@ -201,7 +206,7 @@ export function generateSitemapUrls(
   baseUrl: string,
   settings: SitemapSettings,
   locales: Locale[],
-  translationsByLocale: Map<string, Record<string, Translation>>,
+  translationsByLocale: Record<string, Record<string, Translation>>,
   dynamicPageData: Map<string, {
     items: CollectionItem[];
     slugFieldId: string;
@@ -212,7 +217,6 @@ export function generateSitemapUrls(
 
   for (const page of pages) {
     if (page.is_dynamic && page.settings?.cms) {
-      // Dynamic page - generate URLs for each collection item
       const data = dynamicPageData.get(page.id);
       if (data) {
         urls.push(...buildDynamicPageUrls(
@@ -228,7 +232,6 @@ export function generateSitemapUrls(
         ));
       }
     } else {
-      // Static page
       urls.push(...buildStaticPageUrls(
         page,
         folders,
@@ -244,7 +247,7 @@ export function generateSitemapUrls(
 }
 
 /**
- * Escape XML special characters
+ * Escape XML special characters.
  */
 function escapeXml(str: string): string {
   return str
@@ -256,7 +259,7 @@ function escapeXml(str: string): string {
 }
 
 /**
- * Format date for sitemap (W3C Datetime format)
+ * Format date for sitemap (W3C Datetime format).
  */
 function formatSitemapDate(dateStr: string): string {
   try {
@@ -268,7 +271,8 @@ function formatSitemapDate(dateStr: string): string {
 }
 
 /**
- * Generate XML sitemap from URLs
+ * Generate XML sitemap from URLs.
+ * Adds xmlns:xhtml namespace only when alternates are present.
  */
 export function generateSitemapXml(urls: SitemapUrl[]): string {
   const hasAlternates = urls.some(url => url.alternates && url.alternates.length > 0);
@@ -294,7 +298,6 @@ export function generateSitemapXml(urls: SitemapUrl[]): string {
       xml += `    <changefreq>${url.changefreq}</changefreq>\n`;
     }
 
-    // Add xhtml:link elements for language alternates
     if (url.alternates && url.alternates.length > 0) {
       for (const alt of url.alternates) {
         xml += `    <xhtml:link rel="alternate" hreflang="${escapeXml(alt.hreflang)}" href="${escapeXml(alt.href)}" />\n`;
@@ -310,7 +313,7 @@ export function generateSitemapXml(urls: SitemapUrl[]): string {
 }
 
 /**
- * Default sitemap settings (Ycode-generated sitemap enabled for new apps)
+ * Default sitemap settings (Ycode-generated sitemap enabled for new apps).
  */
 export function getDefaultSitemapSettings(): SitemapSettings {
   return {

@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import type { Metadata } from 'next';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { buildSlugPath } from '@/lib/page-utils';
+import { generateHreflangEntries } from '@/lib/hreflang-generator';
 import { generatePageMetadata, fetchGlobalPageSettings } from '@/lib/generate-page-metadata';
 import { generatePageJsonLd } from '@/lib/schema-generator';
 import { fetchPageByPath, fetchErrorPage } from '@/lib/page-fetcher';
@@ -217,6 +218,34 @@ async function fetchCachedFoldersForAuth() {
   }
 }
 
+async function fetchCachedTranslationsMap(): Promise<Record<string, Record<string, Translation>>> {
+  try {
+    return await unstable_cache(
+      async () => {
+        const supabase = await getSupabaseAdmin();
+        if (!supabase) return {};
+        const { data } = await supabase
+          .from('translations')
+          .select('*')
+          .eq('is_published', true)
+          .is('deleted_at', null);
+        const map: Record<string, Record<string, Translation>> = {};
+        if (data) {
+          for (const t of data) {
+            if (!map[t.locale_id]) map[t.locale_id] = {};
+            map[t.locale_id][`${t.source_type}:${t.source_id}:${t.content_key}`] = t;
+          }
+        }
+        return map;
+      },
+      ['data-for-translations-map'],
+      { tags: ['all-pages'], revalidate: false }
+    )();
+  } catch {
+    return {};
+  }
+}
+
 async function fetchCachedErrorPage(errorCode: 401 | 404) {
   try {
     return await unstable_cache(
@@ -409,19 +438,38 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     }
   }
 
-  const { meta, baseUrl } = await unstable_cache(
-    async () => ({
-      meta: await generatePageMetadata(data.page, {
-        fallbackTitle: slugPath.charAt(0).toUpperCase() + slugPath.slice(1),
-        collectionItem: data.collectionItem,
-        pagePath: '/' + slugPath,
-        globalSeoSettings: globalSettings,
+  const [translationsByLocale, { meta, baseUrl }] = await Promise.all([
+    fetchCachedTranslationsMap(),
+    unstable_cache(
+      async () => ({
+        meta: await generatePageMetadata(data.page, {
+          fallbackTitle: slugPath.charAt(0).toUpperCase() + slugPath.slice(1),
+          collectionItem: data.collectionItem,
+          pagePath: '/' + slugPath,
+          globalSeoSettings: globalSettings,
+        }),
+        baseUrl: getSiteBaseUrl({ globalCanonicalUrl: globalSettings.globalCanonicalUrl }),
       }),
-      baseUrl: getSiteBaseUrl({ globalCanonicalUrl: globalSettings.globalCanonicalUrl }),
-    }),
-    [`data-for-route-/${slugPath}-meta`],
-    { tags: ['all-pages', `route-/${slugPath}`], revalidate: false }
-  )();
+      [`data-for-route-/${slugPath}-meta`],
+      { tags: ['all-pages', `route-/${slugPath}`], revalidate: false }
+    )(),
+  ]);
+
+  // Hreflang — multilocale only, computed outside cache (uses per-publish translations)
+  if (data.availableLocales && data.availableLocales.length > 1 && baseUrl) {
+    const hreflangEntries = generateHreflangEntries(
+      data.page,
+      folders,
+      data.availableLocales,
+      translationsByLocale,
+      baseUrl
+    );
+    if (hreflangEntries.length > 0) {
+      const languages: Record<string, string> = {};
+      for (const entry of hreflangEntries) languages[entry.hreflang] = entry.href;
+      meta.alternates = { ...meta.alternates, languages };
+    }
+  }
 
   if (baseUrl) {
     try { meta.metadataBase = new URL(baseUrl); } catch { /* invalid URL */ }

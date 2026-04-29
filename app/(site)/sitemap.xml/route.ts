@@ -70,19 +70,17 @@ export async function GET() {
       p => p.error_page == null && p.deleted_at == null
     );
 
-    // Fetch translations for each locale (always include localized URLs)
-    const translationsByLocale = new Map<string, Record<string, Translation>>();
+    // Fetch translations for each non-default locale (default locale uses original slugs)
+    const translationsByLocale: Record<string, Record<string, Translation>> = {};
     if (locales.length > 1) {
       for (const locale of locales) {
         if (!locale.is_default) {
-          const translations = await getTranslationsByLocale(locale.id, true); // Get published translations
+          const translations = await getTranslationsByLocale(locale.id, true);
           const translationsMap: Record<string, Translation> = {};
           for (const t of translations) {
-            // Create key: source_type:source_id:content_key
-            const key = `${t.source_type}:${t.source_id}:${t.content_key}`;
-            translationsMap[key] = t;
+            translationsMap[`${t.source_type}:${t.source_id}:${t.content_key}`] = t;
           }
-          translationsByLocale.set(locale.id, translationsMap);
+          translationsByLocale[locale.id] = translationsMap;
         }
       }
     }
