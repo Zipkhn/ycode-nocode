@@ -649,6 +649,47 @@ export interface Page {
   deleted_at: string | null; // Soft delete timestamp
 }
 
+// ── SEO JSON-LD stub types — consumed by SchemaGenerator (Phase 2) ──────────
+
+export interface ArticleSchemaInput {
+  author?: string;
+  publisher?: string;
+  image?: string;
+  headline?: string;
+  datePublished?: string; // ISO 8601 date
+  dateModified?: string;  // ISO 8601 date
+}
+
+export interface FaqSchemaInput {
+  items: Array<{ question: string; answer: string }>;
+}
+
+export interface PersonSchemaInput {
+  name?: string;
+  url?: string;
+  image?: string;
+  sameAs?: string[];
+}
+
+export interface ProductSchemaInput {
+  name?: string;
+  description?: string;
+  image?: string;
+}
+
+export interface SeoJsonLdSettings {
+  schemas?: {
+    website?: boolean;
+    organization?: boolean;
+    article?: ArticleSchemaInput;
+    faq?: FaqSchemaInput;
+    person?: PersonSchemaInput;
+    product?: ProductSchemaInput;
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface PageSettings {
   cms?: {
     collection_id: string;
@@ -669,10 +710,39 @@ export interface PageSettings {
     password: string;
   };
   seo?: {
-    image: StringAssetId | FieldVariable | null; // Asset ID or Field Variable (image field)
+    // ── Existing fields ──────────────────────────────────────────────────────
+    image: StringAssetId | FieldVariable | null;
     title: string;
     description: string;
-    noindex: boolean; // Prevent search engines from indexing the page
+    noindex: boolean;
+
+    // ── Phase 1 — Open Graph & canonical ─────────────────────────────────────
+    /** og:type — default 'website'. Phase 1 stores it; full article/product schema is Phase 2. */
+    og_type?: 'website' | 'article' | 'profile' | 'product';
+    /** og:site_name page-level override (falls back to global og_site_name setting). */
+    og_site_name?: string;
+    /** og:locale e.g. 'fr_FR', 'en_US'. Omitted if unset. */
+    og_locale?: string;
+    /** Canonical URL override for this page. Absolute URL. Takes priority over the global computed canonical. */
+    canonical_override?: string;
+
+    // ── Phase 1 — Granular robots directives ──────────────────────────────────
+    /** max-snippet value (-1 = no limit). Only emitted when set. */
+    max_snippet?: number;
+    /** max-image-preview. Only emitted when set. */
+    max_image_preview?: 'none' | 'standard' | 'large';
+    /** max-video-preview seconds (-1 = no limit). Only emitted when set. */
+    max_video_preview?: number;
+
+    // ── Reserved for Phase 2 — JSON-LD / SchemaGenerator ─────────────────────
+    /** Short machine-oriented summary. Phase 2 use. */
+    ai_summary?: string;
+    /** ISO 8601 date. Used by Article schema. */
+    date_published?: string;
+    /** ISO 8601 date. Used by Article schema. */
+    date_modified?: string;
+    /** Typed schema configuration consumed by SchemaGenerator (Phase 2). */
+    json_ld?: SeoJsonLdSettings;
   };
   custom_code?: {
     head: string;

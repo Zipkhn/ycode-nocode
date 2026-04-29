@@ -6,6 +6,7 @@ import PasswordForm from '@/components/PasswordForm';
 import { generatePageMetadata, fetchGlobalPageSettings } from '@/lib/generate-page-metadata';
 import { parseAuthCookie, getPasswordProtection, fetchFoldersForAuth } from '@/lib/page-auth';
 import { getSiteBaseUrl } from '@/lib/url-utils';
+import { generatePageJsonLd } from '@/lib/schema-generator';
 import type { Metadata } from 'next';
 
 // Static by default for performance, dynamic only when pagination is requested
@@ -163,6 +164,16 @@ export default async function Home() {
     }
   }
 
+  const baseUrl = getSiteBaseUrl({ globalCanonicalUrl: globalSettings.globalCanonicalUrl });
+  const jsonLdScripts = generatePageJsonLd({
+    baseUrl,
+    pageCanonicalUrl: baseUrl || null,
+    ogSiteName: globalSettings.ogSiteName,
+    schemaOrgName: globalSettings.schemaOrgName,
+    schemaOrgLogoUrl: globalSettings.schemaOrgLogoUrl,
+    govCtx: { page: data.page },
+  });
+
   // Render homepage
   return (
     <PageRenderer
@@ -178,6 +189,7 @@ export default async function Home() {
       globalCustomCodeHead={globalSettings.globalCustomCodeHead}
       globalCustomCodeBody={globalSettings.globalCustomCodeBody}
       ycodeBadge={globalSettings.ycodeBadge}
+      jsonLdScripts={jsonLdScripts}
     />
   );
 }

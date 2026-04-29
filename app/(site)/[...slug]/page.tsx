@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { buildSlugPath } from '@/lib/page-utils';
 import { generatePageMetadata, fetchGlobalPageSettings } from '@/lib/generate-page-metadata';
+import { generatePageJsonLd } from '@/lib/schema-generator';
 import { fetchPageByPath, fetchErrorPage } from '@/lib/page-fetcher';
 import PageRenderer from '@/components/PageRenderer';
 import PasswordForm from '@/components/PasswordForm';
@@ -339,6 +340,16 @@ export default async function Page({ params }: PageProps) {
     }
   }
 
+  const baseUrl = getSiteBaseUrl({ globalCanonicalUrl: globalSettings.globalCanonicalUrl });
+  const jsonLdScripts = generatePageJsonLd({
+    baseUrl,
+    pageCanonicalUrl: baseUrl ? `${baseUrl}/${slugPath}` : null,
+    ogSiteName: globalSettings.ogSiteName,
+    schemaOrgName: globalSettings.schemaOrgName,
+    schemaOrgLogoUrl: globalSettings.schemaOrgLogoUrl,
+    govCtx: { page },
+  });
+
   return (
     <PageRenderer
       page={page}
@@ -357,6 +368,7 @@ export default async function Page({ params }: PageProps) {
       globalCustomCodeHead={globalSettings.globalCustomCodeHead}
       globalCustomCodeBody={globalSettings.globalCustomCodeBody}
       ycodeBadge={globalSettings.ycodeBadge}
+      jsonLdScripts={jsonLdScripts}
     />
   );
 }

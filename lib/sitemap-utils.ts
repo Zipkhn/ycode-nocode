@@ -15,6 +15,7 @@ import type {
 } from '@/types';
 import { buildSlugPath, buildLocalizedSlugPath } from './page-utils';
 import { getTranslatableKey } from './localisation-utils';
+import { shouldAppearInSitemap } from './seo-governance';
 
 export interface SitemapUrl {
   loc: string;
@@ -39,15 +40,7 @@ function buildStaticPageUrls(
   locales: Locale[],
   translationsByLocale: Map<string, Record<string, Translation>>
 ): SitemapUrl[] {
-  // Always skip pages with noindex
-  if (page.settings?.seo?.noindex) {
-    return [];
-  }
-
-  // Skip error pages (401, 404, 500)
-  if (page.error_page != null) {
-    return [];
-  }
+  if (!shouldAppearInSitemap(page)) return [];
 
   const defaultLocale = locales.find(l => l.is_default);
   const nonDefaultLocales = locales.filter(l => !l.is_default);
@@ -116,15 +109,7 @@ function buildDynamicPageUrls(
   locales: Locale[],
   translationsByLocale: Map<string, Record<string, Translation>>
 ): SitemapUrl[] {
-  // Always skip error pages (401, 404, 500)
-  if (page.error_page != null) {
-    return [];
-  }
-
-  // Always skip pages with noindex
-  if (page.settings?.seo?.noindex) {
-    return [];
-  }
+  if (!shouldAppearInSitemap(page)) return [];
 
   const urls: SitemapUrl[] = [];
   const defaultLocale = locales.find(l => l.is_default);

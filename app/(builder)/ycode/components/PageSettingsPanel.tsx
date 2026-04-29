@@ -20,8 +20,10 @@ import {
   Field,
   FieldContent,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
   FieldSet
 } from '@/components/ui/field';
 import {
@@ -48,6 +50,8 @@ import RichTextEditor from './RichTextEditor';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { getFieldIcon, IMAGE_FIELD_TYPES, RICH_TEXT_FIELD_TYPES } from '@/lib/collection-field-utils';
+import { analyzePage, type SeoIssue } from '@/lib/seo-analyzer';
+import { extractPageText } from '@/lib/page-text-extractor';
 
 export interface PageSettingsPanelHandle {
   checkUnsavedChanges: () => Promise<boolean>;
@@ -122,6 +126,22 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
   const [seoDescription, setSeoDescription] = useState('');
   const [seoImage, setSeoImage] = useState<string | FieldVariable | null>(null);
   const [seoNoindex, setSeoNoindex] = useState(false);
+  const [ogType, setOgType] = useState<'website' | 'article' | 'profile' | 'product' | ''>('');
+  const [ogSiteName, setOgSiteName] = useState('');
+  const [ogLocale, setOgLocale] = useState('');
+  // Phase 4 — AI SEO generation
+  const [aiSummary, setAiSummary] = useState('');
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [aiPreview, setAiPreview] = useState<{ description: string; aiSummary: string } | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  // Phase 3D — per-page JSON-LD schema
+  const [jsonLdArticleEnabled, setJsonLdArticleEnabled] = useState(false);
+  const [jsonLdArticleAuthor, setJsonLdArticleAuthor] = useState('');
+  const [jsonLdArticleDatePublished, setJsonLdArticleDatePublished] = useState('');
+  const [jsonLdArticleDateModified, setJsonLdArticleDateModified] = useState('');
+  const [jsonLdFaqEnabled, setJsonLdFaqEnabled] = useState(false);
+  const [jsonLdFaqItems, setJsonLdFaqItems] = useState<Array<{ question: string; answer: string }>>([]);
   const { openFileManager } = useEditorStore();
 
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -210,6 +230,16 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
     seoDescription: string;
     seoImage: string | FieldVariable | null;
     seoNoindex: boolean;
+    aiSummary: string;
+    ogType: string;
+    ogSiteName: string;
+    ogLocale: string;
+    jsonLdArticleEnabled: boolean;
+    jsonLdArticleAuthor: string;
+    jsonLdArticleDatePublished: string;
+    jsonLdArticleDateModified: string;
+    jsonLdFaqEnabled: boolean;
+    jsonLdFaqItems: Array<{ question: string; answer: string }>;
     customCodeHead: string;
     customCodeBody: string;
     authEnabled: boolean;
@@ -222,9 +252,19 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
 
   const pages = usePagesStore((state) => state.pages);
   const folders = usePagesStore((state) => state.folders);
+  const draftsByPageId = usePagesStore((state) => state.draftsByPageId);
 
   const isErrorPage = useMemo(() => currentPage?.error_page !== null, [currentPage]);
   const isDynamicPage = useMemo(() => currentPage?.is_dynamic === true, [currentPage]);
+  // og_locale must be empty OR match language_REGION (e.g. fr_FR, en_US)
+  const isOgLocaleValid = !ogLocale || /^[a-z]{2}_[A-Z]{2}$/.test(ogLocale);
+
+  const seoIssues = useMemo<SeoIssue[]>(() => {
+    if (!currentPage?.id) return [];
+    const layers = draftsByPageId[currentPage.id]?.layers ?? [];
+    const seo = currentPage.settings?.seo;
+    return analyzePage(layers, seo, { isErrorPage: !!isErrorPage, isDynamicPage });
+  }, [currentPage, draftsByPageId, isErrorPage, isDynamicPage]);
 
   // Get collection fields for variable insertion
   const collectionFields = useMemo(() => {
@@ -362,6 +402,16 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
       seoDescription !== initial.seoDescription ||
       !compareSeoImage(seoImage, initial.seoImage) ||
       seoNoindex !== initial.seoNoindex ||
+      aiSummary !== initial.aiSummary ||
+      ogType !== initial.ogType ||
+      ogSiteName !== initial.ogSiteName ||
+      ogLocale !== initial.ogLocale ||
+      jsonLdArticleEnabled !== initial.jsonLdArticleEnabled ||
+      jsonLdArticleAuthor !== initial.jsonLdArticleAuthor ||
+      jsonLdArticleDatePublished !== initial.jsonLdArticleDatePublished ||
+      jsonLdArticleDateModified !== initial.jsonLdArticleDateModified ||
+      jsonLdFaqEnabled !== initial.jsonLdFaqEnabled ||
+      JSON.stringify(jsonLdFaqItems) !== JSON.stringify(initial.jsonLdFaqItems) ||
       customCodeHead !== initial.customCodeHead ||
       customCodeBody !== initial.customCodeBody ||
       authEnabled !== initial.authEnabled ||
@@ -379,7 +429,7 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
 
     return hasChanges;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, slug, pageFolderId, isIndex, seoTitle, seoDescription, seoImage, seoNoindex, customCodeHead, customCodeBody, authEnabled, authPassword, collectionId, slugFieldId, nextPrevSortBy, nextPrevSortOrder, saveCounter]);
+  }, [name, slug, pageFolderId, isIndex, seoTitle, seoDescription, seoImage, seoNoindex, aiSummary, ogType, ogSiteName, ogLocale, jsonLdArticleEnabled, jsonLdArticleAuthor, jsonLdArticleDatePublished, jsonLdArticleDateModified, jsonLdFaqEnabled, jsonLdFaqItems, customCodeHead, customCodeBody, authEnabled, authPassword, collectionId, slugFieldId, nextPrevSortBy, nextPrevSortOrder, saveCounter]);
 
   // Expose method to check for unsaved changes externally
   useImperativeHandle(ref, () => ({
@@ -460,6 +510,20 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
           initialValuesRef.current.seoDescription = settings?.seo?.description || '';
           initialValuesRef.current.seoImage = settings?.seo?.image || null;
           initialValuesRef.current.seoNoindex = isPageErrorPage ? true : (settings?.seo?.noindex || false);
+          initialValuesRef.current.aiSummary = settings?.seo?.ai_summary || '';
+          initialValuesRef.current.ogType = settings?.seo?.og_type || '';
+          initialValuesRef.current.ogSiteName = settings?.seo?.og_site_name || '';
+          initialValuesRef.current.ogLocale = settings?.seo?.og_locale || '';
+          {
+            const art = settings?.seo?.json_ld?.schemas?.article;
+            initialValuesRef.current.jsonLdArticleEnabled = !!art;
+            initialValuesRef.current.jsonLdArticleAuthor = art?.author || '';
+            initialValuesRef.current.jsonLdArticleDatePublished = art?.datePublished || '';
+            initialValuesRef.current.jsonLdArticleDateModified = art?.dateModified || '';
+            const faq = settings?.seo?.json_ld?.schemas?.faq;
+            initialValuesRef.current.jsonLdFaqEnabled = !!faq;
+            initialValuesRef.current.jsonLdFaqItems = faq?.items ?? [];
+          }
           initialValuesRef.current.customCodeHead = settings?.custom_code?.head || '';
           initialValuesRef.current.customCodeBody = settings?.custom_code?.body || '';
           initialValuesRef.current.authEnabled = settings?.auth?.enabled || false;
@@ -492,6 +556,13 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
       seoDescription !== initialValuesRef.current.seoDescription ||
       !compareSeoImage(seoImage, initialValuesRef.current.seoImage) ||
       seoNoindex !== initialValuesRef.current.seoNoindex ||
+      aiSummary !== initialValuesRef.current.aiSummary ||
+      jsonLdArticleEnabled !== initialValuesRef.current.jsonLdArticleEnabled ||
+      jsonLdArticleAuthor !== initialValuesRef.current.jsonLdArticleAuthor ||
+      jsonLdArticleDatePublished !== initialValuesRef.current.jsonLdArticleDatePublished ||
+      jsonLdArticleDateModified !== initialValuesRef.current.jsonLdArticleDateModified ||
+      jsonLdFaqEnabled !== initialValuesRef.current.jsonLdFaqEnabled ||
+      JSON.stringify(jsonLdFaqItems) !== JSON.stringify(initialValuesRef.current.jsonLdFaqItems) ||
       customCodeHead !== initialValuesRef.current.customCodeHead ||
       customCodeBody !== initialValuesRef.current.customCodeBody ||
       authEnabled !== initialValuesRef.current.authEnabled ||
@@ -535,6 +606,18 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
       const initialSeoDescription = settings?.seo?.description || '';
       const initialSeoImage = settings?.seo?.image || null; // Asset ID or FieldVariable
       const initialSeoNoindex = isErrorPage ? true : (settings?.seo?.noindex || false);
+      const initialAiSummary = settings?.seo?.ai_summary || '';
+      const initialOgType = settings?.seo?.og_type || '';
+      const initialOgSiteName = settings?.seo?.og_site_name || '';
+      const initialOgLocale = settings?.seo?.og_locale || '';
+      const initialJsonLdArticle = settings?.seo?.json_ld?.schemas?.article;
+      const initialJsonLdArticleEnabled = !!initialJsonLdArticle;
+      const initialJsonLdArticleAuthor = initialJsonLdArticle?.author || '';
+      const initialJsonLdArticleDatePublished = initialJsonLdArticle?.datePublished || '';
+      const initialJsonLdArticleDateModified = initialJsonLdArticle?.dateModified || '';
+      const initialJsonLdFaq = settings?.seo?.json_ld?.schemas?.faq;
+      const initialJsonLdFaqEnabled = !!initialJsonLdFaq;
+      const initialJsonLdFaqItems = initialJsonLdFaq?.items ?? [];
       const initialCustomCodeHead = settings?.custom_code?.head || '';
       const initialCustomCodeBody = settings?.custom_code?.body || '';
       const initialAuthEnabled = settings?.auth?.enabled || false;
@@ -556,6 +639,16 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
         seoDescription: initialSeoDescription,
         seoImage: initialSeoImage,
         seoNoindex: initialSeoNoindex,
+        aiSummary: initialAiSummary,
+        ogType: initialOgType,
+        ogSiteName: initialOgSiteName,
+        ogLocale: initialOgLocale,
+        jsonLdArticleEnabled: initialJsonLdArticleEnabled,
+        jsonLdArticleAuthor: initialJsonLdArticleAuthor,
+        jsonLdArticleDatePublished: initialJsonLdArticleDatePublished,
+        jsonLdArticleDateModified: initialJsonLdArticleDateModified,
+        jsonLdFaqEnabled: initialJsonLdFaqEnabled,
+        jsonLdFaqItems: initialJsonLdFaqItems,
         customCodeHead: initialCustomCodeHead,
         customCodeBody: initialCustomCodeBody,
         authEnabled: initialAuthEnabled,
@@ -574,6 +667,16 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
       setSeoDescription(initialSeoDescription);
       setSeoImage(initialSeoImage);
       setSeoNoindex(initialSeoNoindex);
+      setAiSummary(initialAiSummary);
+      setOgType(initialOgType as typeof ogType);
+      setOgSiteName(initialOgSiteName);
+      setOgLocale(initialOgLocale);
+      setJsonLdArticleEnabled(initialJsonLdArticleEnabled);
+      setJsonLdArticleAuthor(initialJsonLdArticleAuthor);
+      setJsonLdArticleDatePublished(initialJsonLdArticleDatePublished);
+      setJsonLdArticleDateModified(initialJsonLdArticleDateModified);
+      setJsonLdFaqEnabled(initialJsonLdFaqEnabled);
+      setJsonLdFaqItems(initialJsonLdFaqItems);
       setCustomCodeHead(initialCustomCodeHead);
       setCustomCodeBody(initialCustomCodeBody);
       setAuthEnabled(initialAuthEnabled);
@@ -593,6 +696,16 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
         seoDescription: '',
         seoImage: null,
         seoNoindex: false,
+        aiSummary: '',
+        ogType: '',
+        ogSiteName: '',
+        ogLocale: '',
+        jsonLdArticleEnabled: false,
+        jsonLdArticleAuthor: '',
+        jsonLdArticleDatePublished: '',
+        jsonLdArticleDateModified: '',
+        jsonLdFaqEnabled: false,
+        jsonLdFaqItems: [],
         customCodeHead: '',
         customCodeBody: '',
         authEnabled: false,
@@ -611,6 +724,13 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
       setSeoDescription('');
       setSeoImage(null);
       setSeoNoindex(false);
+      setAiSummary('');
+      setJsonLdArticleEnabled(false);
+      setJsonLdArticleAuthor('');
+      setJsonLdArticleDatePublished('');
+      setJsonLdArticleDateModified('');
+      setJsonLdFaqEnabled(false);
+      setJsonLdFaqItems([]);
       setCustomCodeHead('');
       setCustomCodeBody('');
       setAuthEnabled(false);
@@ -865,6 +985,16 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
         setSeoDescription(initialValuesRef.current.seoDescription);
         setSeoImage(initialValuesRef.current.seoImage);
         setSeoNoindex(initialValuesRef.current.seoNoindex);
+        setAiSummary(initialValuesRef.current.aiSummary);
+        setOgType(initialValuesRef.current.ogType as typeof ogType);
+        setOgSiteName(initialValuesRef.current.ogSiteName);
+        setOgLocale(initialValuesRef.current.ogLocale);
+        setJsonLdArticleEnabled(initialValuesRef.current.jsonLdArticleEnabled);
+        setJsonLdArticleAuthor(initialValuesRef.current.jsonLdArticleAuthor);
+        setJsonLdArticleDatePublished(initialValuesRef.current.jsonLdArticleDatePublished);
+        setJsonLdArticleDateModified(initialValuesRef.current.jsonLdArticleDateModified);
+        setJsonLdFaqEnabled(initialValuesRef.current.jsonLdFaqEnabled);
+        setJsonLdFaqItems(initialValuesRef.current.jsonLdFaqItems);
         setCustomCodeHead(initialValuesRef.current.customCodeHead);
         setCustomCodeBody(initialValuesRef.current.customCodeBody);
         setAuthEnabled(initialValuesRef.current.authEnabled);
@@ -894,6 +1024,13 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
         setSeoDescription(initialValuesRef.current.seoDescription);
         setSeoImage(initialValuesRef.current.seoImage);
         setSeoNoindex(initialValuesRef.current.seoNoindex);
+        setAiSummary(initialValuesRef.current.aiSummary);
+        setJsonLdArticleEnabled(initialValuesRef.current.jsonLdArticleEnabled);
+        setJsonLdArticleAuthor(initialValuesRef.current.jsonLdArticleAuthor);
+        setJsonLdArticleDatePublished(initialValuesRef.current.jsonLdArticleDatePublished);
+        setJsonLdArticleDateModified(initialValuesRef.current.jsonLdArticleDateModified);
+        setJsonLdFaqEnabled(initialValuesRef.current.jsonLdFaqEnabled);
+        setJsonLdFaqItems(initialValuesRef.current.jsonLdFaqItems);
         setCustomCodeHead(initialValuesRef.current.customCodeHead);
         setCustomCodeBody(initialValuesRef.current.customCodeBody);
         setAuthEnabled(initialValuesRef.current.authEnabled);
@@ -1054,6 +1191,26 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
           description: seoDescription.trim(),
           image: isErrorPage ? null : seoImage,
           noindex: isErrorPage ? true : seoNoindex,
+          ...(aiSummary.trim() ? { ai_summary: aiSummary.trim() } : {}),
+          ...(ogType ? { og_type: ogType } : {}),
+          ...(ogSiteName.trim() ? { og_site_name: ogSiteName.trim() } : {}),
+          ...(ogLocale.trim() ? { og_locale: ogLocale.trim() } : {}),
+          ...((jsonLdArticleEnabled || jsonLdFaqEnabled) ? {
+            json_ld: {
+              schemas: {
+                ...(jsonLdArticleEnabled ? {
+                  article: {
+                    ...(jsonLdArticleAuthor.trim() ? { author: jsonLdArticleAuthor.trim() } : {}),
+                    ...(jsonLdArticleDatePublished ? { datePublished: jsonLdArticleDatePublished } : {}),
+                    ...(jsonLdArticleDateModified ? { dateModified: jsonLdArticleDateModified } : {}),
+                  },
+                } : {}),
+                ...(jsonLdFaqEnabled ? {
+                  faq: { items: jsonLdFaqItems.filter(i => i.question.trim() && i.answer.trim()) },
+                } : {}),
+              },
+            },
+          } : { json_ld: undefined }),
         },
         custom_code: {
           head: customCodeHead.trim(),
@@ -1122,6 +1279,16 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
         seoDescription: trimmedSeoDescription,
         seoImage: normalizedSeoImage,
         seoNoindex: normalizedSeoNoindex,
+        aiSummary: aiSummary.trim(),
+        ogType,
+        ogSiteName: ogSiteName.trim(),
+        ogLocale: ogLocale.trim(),
+        jsonLdArticleEnabled,
+        jsonLdArticleAuthor: jsonLdArticleAuthor.trim(),
+        jsonLdArticleDatePublished,
+        jsonLdArticleDateModified,
+        jsonLdFaqEnabled,
+        jsonLdFaqItems: jsonLdFaqItems.filter(i => i.question.trim() && i.answer.trim()),
         customCodeHead: trimmedCustomCodeHead,
         customCodeBody: trimmedCustomCodeBody,
         authEnabled,
@@ -1139,6 +1306,45 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
       setError(err instanceof Error ? err.message : 'Failed to save page');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleGenerateAI = async () => {
+    if (!currentPage) return;
+    setIsGeneratingAI(true);
+    setAiError(null);
+    setAiPreview(null);
+
+    const layers = draftsByPageId[currentPage.id]?.layers ?? [];
+    const content = extractPageText(layers);
+
+    const body = {
+      pageName: currentPage.name,
+      slug: currentPage.slug || '',
+      // Prefer live form value (not yet saved) so generation reflects current intent
+      locale: (isOgLocaleValid && ogLocale.trim()) || currentPage.settings?.seo?.og_locale || null,
+      currentTitle: seoTitle.trim() || currentPage.name,
+      currentDescription: seoDescription.trim(),
+      pageType: ogType || currentPage.settings?.seo?.og_type || null,
+      content,
+    };
+
+    try {
+      const res = await fetch('/api/ai-seo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiError(data.error || 'Generation failed.');
+      } else {
+        setAiPreview({ description: data.description, aiSummary: data.aiSummary });
+      }
+    } catch {
+      setAiError('Network error — please try again.');
+    } finally {
+      setIsGeneratingAI(false);
     }
   };
 
@@ -1597,7 +1803,55 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
 
             <TabsContent value="seo">
               <FieldGroup>
+
+                {/* ── SEO Issues ────────────────────────────────────────────── */}
+                {seoIssues.length > 0 && (
+                  <div className="flex flex-col gap-1">
+                    {seoIssues.map((issue, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          'flex items-start gap-2 rounded-md px-3 py-2 text-xs',
+                          issue.level === 'error' && 'bg-destructive/10 text-destructive',
+                          issue.level === 'warning' && 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
+                          issue.level === 'info' && 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        <Icon
+                          name={issue.level === 'error' ? 'x' : issue.level === 'warning' ? 'zap' : 'info'}
+                          className="size-3.5 mt-0.5 shrink-0"
+                        />
+                        <span className="flex-1">{issue.message}</span>
+                        <span className="shrink-0 font-medium opacity-50">
+                          {issue.origin === 'structure' ? 'Layers' : 'Settings'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* ── Meta ──────────────────────────────────────────────────── */}
                 <FieldSet>
+                  <FieldLegend className="flex items-center justify-between">
+                    <span>Meta</span>
+                    {!isErrorPage && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleGenerateAI}
+                        disabled={isGeneratingAI}
+                        className="h-6 gap-1 text-xs font-normal"
+                      >
+                        {isGeneratingAI ? (
+                          <Spinner className="size-3" />
+                        ) : (
+                          <Icon name="zap" className="size-3" />
+                        )}
+                        {isGeneratingAI ? 'Generating…' : 'Generate with AI'}
+                      </Button>
+                    )}
+                  </FieldLegend>
                   <FieldGroup>
                     <Field>
                       <FieldLabel>Page title</FieldLabel>
@@ -1672,94 +1926,340 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
                     </Field>
 
                     {!isErrorPage && (
-                      <>
-                        <Field>
-                          <FieldLabel>Social preview</FieldLabel>
-                          <FieldDescription>Recommended image size is at least 1,200 x 630 pixels.</FieldDescription>
-                          <div>
-                            <div className="bg-input rounded-lg w-full aspect-[1.91/1] flex items-center justify-center overflow-hidden relative">
-                              {isSeoImageFieldVariable(seoImage) ? null : (() => {
-                                const imageUrl = seoImageAsset?.public_url;
-                                return imageUrl ? (
-                                  <Image
-                                    className="object-cover"
-                                    src={imageUrl}
-                                    alt="Social preview"
-                                    fill
-                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                  />
-                                ) : null;
-                              })()}
+                      <Field orientation="horizontal" className="flex flex-row-reverse!">
+                        <FieldContent>
+                          <FieldLabel htmlFor="noindex" className="cursor-pointer">
+                            Exclude this page from search engine results
+                          </FieldLabel>
+                          <FieldDescription>
+                            Prevent search engines like Google from indexing this page.
+                          </FieldDescription>
+                        </FieldContent>
+                        <Checkbox
+                          id="noindex"
+                          checked={seoNoindex}
+                          onCheckedChange={(checked) => setSeoNoindex(checked === true)}
+                        />
+                      </Field>
+                    )}
 
-                              {(() => {
-                                const hasFieldVariable = isSeoImageFieldVariable(seoImage);
+                    {!isErrorPage && (
+                      <Field>
+                        <FieldLabel>AI summary</FieldLabel>
+                        <FieldDescription>
+                          Short summary for AI-powered search engines (Perplexity, SGE). Not shown in standard search results.
+                        </FieldDescription>
+                        <Textarea
+                          value={aiSummary}
+                          onChange={(e) => setAiSummary(e.target.value)}
+                          placeholder="A concise summary of this page for AI search engines."
+                        />
+                      </Field>
+                    )}
 
-                                return (
-                                  <div className="flex items-center gap-2 relative z-10">
-                                    {hasSelectedAsset ? (
-                                      <Button
-                                        variant="overlay"
-                                        size="sm"
-                                        onClick={handleOpenFileManager}
-                                      >
-                                        <Icon name="refresh" />
-                                        Replace
-                                      </Button>
-                                    ) : (
-                                      <>
-                                        {!hasFieldVariable && (
-                                          <Button
-                                            variant={hasImage ? 'overlay' : 'secondary'}
-                                            size="sm"
-                                            onClick={handleOpenFileManager}
-                                          >
-                                            Choose image
-                                          </Button>
-                                        )}
+                    {/* AI error */}
+                    {aiError && (
+                      <Alert variant="warning">
+                        <AlertDescription>{aiError}</AlertDescription>
+                      </Alert>
+                    )}
 
-                                        {isDynamicPage && !hasFieldVariable && !hasSelectedAsset && <span className="text-muted-foreground">or</span>}
+                    {/* AI preview — user must confirm before values are applied */}
+                    {aiPreview && (
+                      <div className="rounded-lg border border-border bg-muted/40 p-3 flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium flex items-center gap-1.5">
+                            <Icon name="zap" className="size-3 text-muted-foreground" />
+                            AI suggestion
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setAiPreview(null)}
+                          >
+                            <Icon name="x" className="size-3.5" />
+                          </Button>
+                        </div>
 
-                                        {!hasSelectedAsset && renderImageFieldSelect()}
-                                      </>
-                                    )}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-xs text-muted-foreground font-medium">Description</span>
+                          <p className="text-xs leading-relaxed">{aiPreview.description}</p>
+                        </div>
 
-                                    {(hasSelectedAsset || hasFieldVariable) && (
-                                      <Button
-                                        variant={hasSelectedAsset ? 'overlay' : 'secondary'}
-                                        size="sm"
-                                        onClick={handleRemoveImage}
-                                      >
-                                        <Icon name="trash" />
-                                        Remove
-                                      </Button>
-                                    )}
-                                  </div>
-                                );
-                              })()}
-                            </div>
+                        {aiPreview.aiSummary && (
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-xs text-muted-foreground font-medium">AI summary</span>
+                            <p className="text-xs leading-relaxed">{aiPreview.aiSummary}</p>
                           </div>
-                        </Field>
+                        )}
 
-                        <Field orientation="horizontal" className="flex flex-row-reverse!">
-                          <FieldContent>
-                            <FieldLabel htmlFor="noindex" className="cursor-pointer">
-                              Exclude this page from search engine results
-                            </FieldLabel>
-                            <FieldDescription>
-                              Prevent search engines like Google from indexing this page.
-                            </FieldDescription>
-                          </FieldContent>
-
-                          <Checkbox
-                            id="noindex"
-                            checked={seoNoindex}
-                            onCheckedChange={(checked) => setSeoNoindex(checked === true)}
-                          />
-                        </Field>
-                      </>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              setSeoDescription(aiPreview.description);
+                              if (aiPreview.aiSummary) setAiSummary(aiPreview.aiSummary);
+                              setAiPreview(null);
+                            }}
+                          >
+                            Apply
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setAiPreview(null)}
+                          >
+                            Dismiss
+                          </Button>
+                        </div>
+                      </div>
                     )}
                   </FieldGroup>
                 </FieldSet>
+
+                {/* ── Schema (JSON-LD) ──────────────────────────────────────── */}
+                {!isErrorPage && (
+                  <FieldSet>
+                    <FieldLegend>Schema</FieldLegend>
+                    <FieldGroup>
+
+                      {/* Article */}
+                      <Field orientation="horizontal" className="flex flex-row-reverse!">
+                        <FieldContent>
+                          <FieldLabel htmlFor="jsonLdArticle" className="cursor-pointer">Article schema</FieldLabel>
+                          <FieldDescription>Adds <code className="text-[11px]">Article</code> structured data to this page.</FieldDescription>
+                        </FieldContent>
+                        <Checkbox
+                          id="jsonLdArticle"
+                          checked={jsonLdArticleEnabled}
+                          onCheckedChange={(checked) => setJsonLdArticleEnabled(checked === true)}
+                        />
+                      </Field>
+
+                      {jsonLdArticleEnabled && (
+                        <div className="flex flex-col gap-2 pl-4 border-l border-border">
+                          <Field>
+                            <FieldLabel>Author</FieldLabel>
+                            <Input
+                              type="text"
+                              value={jsonLdArticleAuthor}
+                              onChange={(e) => setJsonLdArticleAuthor(e.target.value)}
+                              placeholder="Author name"
+                            />
+                          </Field>
+                          <Field data-invalid={!jsonLdArticleDatePublished ? true : undefined}>
+                            <FieldLabel>Date published</FieldLabel>
+                            <Input
+                              type="date"
+                              value={jsonLdArticleDatePublished}
+                              onChange={(e) => setJsonLdArticleDatePublished(e.target.value)}
+                              aria-required="true"
+                            />
+                            {!jsonLdArticleDatePublished && (
+                              <FieldError>Required — Article schema will not be generated without a publication date.</FieldError>
+                            )}
+                          </Field>
+                          <Field>
+                            <FieldLabel>Date modified</FieldLabel>
+                            <Input
+                              type="date"
+                              value={jsonLdArticleDateModified}
+                              onChange={(e) => setJsonLdArticleDateModified(e.target.value)}
+                            />
+                          </Field>
+                        </div>
+                      )}
+
+                      {/* FAQ */}
+                      <Field orientation="horizontal" className="flex flex-row-reverse!">
+                        <FieldContent>
+                          <FieldLabel htmlFor="jsonLdFaq" className="cursor-pointer">FAQ schema</FieldLabel>
+                          <FieldDescription>Adds <code className="text-[11px]">FAQPage</code> structured data to this page.</FieldDescription>
+                        </FieldContent>
+                        <Checkbox
+                          id="jsonLdFaq"
+                          checked={jsonLdFaqEnabled}
+                          onCheckedChange={(checked) => setJsonLdFaqEnabled(checked === true)}
+                        />
+                      </Field>
+
+                      {jsonLdFaqEnabled && (
+                        <div className="flex flex-col gap-3 pl-4 border-l border-border">
+                          <p className="text-xs text-muted-foreground">
+                            Search engines require that every question and answer listed here is also visible as text content on the published page.
+                          </p>
+                          {jsonLdFaqItems.map((item, idx) => (
+                            <div key={idx} className="flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-muted-foreground">Q{idx + 1}</span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() => setJsonLdFaqItems(prev => prev.filter((_, i) => i !== idx))}
+                                >
+                                  <Icon name="trash" className="size-3.5" />
+                                </Button>
+                              </div>
+                              <Input
+                                type="text"
+                                value={item.question}
+                                onChange={(e) => setJsonLdFaqItems(prev => prev.map((it, i) => i === idx ? { ...it, question: e.target.value } : it))}
+                                placeholder="Question"
+                              />
+                              <Textarea
+                                value={item.answer}
+                                onChange={(e) => setJsonLdFaqItems(prev => prev.map((it, i) => i === idx ? { ...it, answer: e.target.value } : it))}
+                                placeholder="Answer"
+                              />
+                            </div>
+                          ))}
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setJsonLdFaqItems(prev => [...prev, { question: '', answer: '' }])}
+                          >
+                            <Icon name="plus" className="size-3.5" />
+                            Add question
+                          </Button>
+                        </div>
+                      )}
+
+                    </FieldGroup>
+                  </FieldSet>
+                )}
+
+                {/* ── Social ────────────────────────────────────────────────── */}
+                {!isErrorPage && (
+                  <FieldSet>
+                    <FieldLegend>Social</FieldLegend>
+                    <FieldGroup>
+                      <Field>
+                        <FieldLabel>Preview image</FieldLabel>
+                        <FieldDescription>Recommended size: at least 1,200 × 630 px.</FieldDescription>
+                        <div>
+                          <div className="bg-input rounded-lg w-full aspect-[1.91/1] flex items-center justify-center overflow-hidden relative">
+                            {isSeoImageFieldVariable(seoImage) ? null : (() => {
+                              const imageUrl = seoImageAsset?.public_url;
+                              return imageUrl ? (
+                                <Image
+                                  className="object-cover"
+                                  src={imageUrl}
+                                  alt="Social preview"
+                                  fill
+                                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                />
+                              ) : null;
+                            })()}
+
+                            {(() => {
+                              const hasFieldVariable = isSeoImageFieldVariable(seoImage);
+                              return (
+                                <div className="flex items-center gap-2 relative z-10">
+                                  {hasSelectedAsset ? (
+                                    <Button
+                                      variant="overlay" size="sm"
+                                      onClick={handleOpenFileManager}
+                                    >
+                                      <Icon name="refresh" />
+                                      Replace
+                                    </Button>
+                                  ) : (
+                                    <>
+                                      {!hasFieldVariable && (
+                                        <Button
+                                          variant={hasImage ? 'overlay' : 'secondary'}
+                                          size="sm"
+                                          onClick={handleOpenFileManager}
+                                        >
+                                          Choose image
+                                        </Button>
+                                      )}
+                                      {isDynamicPage && !hasFieldVariable && !hasSelectedAsset && (
+                                        <span className="text-muted-foreground">or</span>
+                                      )}
+                                      {!hasSelectedAsset && renderImageFieldSelect()}
+                                    </>
+                                  )}
+                                  {(hasSelectedAsset || hasFieldVariable) && (
+                                    <Button
+                                      variant={hasSelectedAsset ? 'overlay' : 'secondary'}
+                                      size="sm"
+                                      onClick={handleRemoveImage}
+                                    >
+                                      <Icon name="trash" />
+                                      Remove
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </Field>
+
+                      <Field>
+                        <FieldLabel>OG type</FieldLabel>
+                        <FieldDescription>
+                          Open Graph content type. Defaults to <code className="text-[11px]">website</code>.
+                        </FieldDescription>
+                        <Select
+                          value={ogType || 'website'}
+                          onValueChange={(v) => setOgType(v === 'website' ? '' : v as typeof ogType)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="website">website</SelectItem>
+                              <SelectItem value="article">article</SelectItem>
+                              <SelectItem value="profile">profile</SelectItem>
+                              <SelectItem value="product">product</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+
+                      <Field>
+                        <FieldLabel>Site name</FieldLabel>
+                        <FieldDescription>
+                          Overrides the global site name for this page. Leave empty to use the global setting.
+                        </FieldDescription>
+                        <Input
+                          type="text"
+                          value={ogSiteName}
+                          onChange={(e) => setOgSiteName(e.target.value)}
+                          placeholder="Your site name"
+                        />
+                      </Field>
+
+                      <Field data-invalid={ogLocale && !isOgLocaleValid ? true : undefined}>
+                        <FieldLabel>OG locale</FieldLabel>
+                        <FieldDescription>
+                          Language and region code, e.g. <code className="text-[11px]">fr_FR</code> or <code className="text-[11px]">en_US</code>. Leave empty to omit.
+                        </FieldDescription>
+                        <Input
+                          type="text"
+                          value={ogLocale}
+                          onChange={(e) => setOgLocale(e.target.value)}
+                          placeholder="fr_FR"
+                          aria-invalid={!isOgLocaleValid}
+                        />
+                        {ogLocale && !isOgLocaleValid && (
+                          <FieldError>
+                            Format must be <code className="text-[11px]">language_REGION</code>, e.g. <code className="text-[11px]">fr_FR</code> or <code className="text-[11px]">en_US</code>.
+                          </FieldError>
+                        )}
+                      </Field>
+                    </FieldGroup>
+                  </FieldSet>
+                )}
+
               </FieldGroup>
             </TabsContent>
 

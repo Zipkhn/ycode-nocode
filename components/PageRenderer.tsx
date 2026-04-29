@@ -133,6 +133,8 @@ interface PageRendererProps {
   globalCustomCodeBody?: string | null;
   ycodeBadge?: boolean;
   passwordProtection?: PasswordProtectionContext;
+  /** Pre-serialized JSON-LD strings, one per schema (WebSite, Organization, …). */
+  jsonLdScripts?: string[];
 }
 
 /**
@@ -175,6 +177,7 @@ export default async function PageRenderer({
   globalCustomCodeBody,
   ycodeBadge = true,
   passwordProtection,
+  jsonLdScripts,
 }: PageRendererProps) {
   // Check if this is a 401 error page that needs password form
   const is401Page = page.error_page === 401;
@@ -409,6 +412,15 @@ export default async function PageRenderer({
           dangerouslySetInnerHTML={{ __html: initialAnimationCSS }}
         />
       )}
+
+      {/* Inject JSON-LD structured data (WebSite, Organization, …) */}
+      {jsonLdScripts && jsonLdScripts.map((script, i) => (
+        <script
+          key={`json-ld-${i}`}
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: script }}
+        />
+      ))}
 
       {/* Inject Google Analytics script (non-preview only) */}
       {gaMeasurementId && (
