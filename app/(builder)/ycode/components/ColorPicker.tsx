@@ -973,6 +973,81 @@ function SortableVariableItem({ variable, isActive, onSelect, onStartEdit, onDel
   );
 }
 
+// ─── Studio Gradients Section ───────────────────────────────────────
+
+/** Convert a gradient CSS string to the picker's internal format (rgba, no spaces).
+ *  Prevents removeSpaces() in BackgroundsControls from merging hex digits into position numbers.
+ */
+function normalizeGradientForPicker(css: string): string {
+  return css
+    .replace(/#([0-9a-fA-F]{8})\s*([\d.]+%)/g, (_, hex, pos) => {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      const a = parseInt(hex.slice(6, 8), 16) / 255;
+      return `rgba(${r},${g},${b},${Math.round(a * 100) / 100})${pos}`;
+    })
+    .replace(/#([0-9a-fA-F]{6})\s*([\d.]+%)/g, (_, hex, pos) => {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r},${g},${b},1)${pos}`;
+    })
+    .replace(/#([0-9a-fA-F]{3})\s*([\d.]+%)/g, (_, hex, pos) => {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      return `rgba(${r},${g},${b},1)${pos}`;
+    })
+    .replace(/,\s+/g, ',')
+    .replace(/\(\s+/g, '(');
+}
+
+function StudioGradientsSection({
+  gradients,
+  activeValue,
+  onSelect,
+}: {
+  gradients: { key: string; css: string }[];
+  activeValue: string;
+  onSelect: (css: string) => void;
+}) {
+  if (gradients.length === 0) return null;
+  return (
+    <SettingsPanel
+      title="Studio gradients"
+      isOpen={true}
+      onToggle={() => {}}
+      collapsible={false}
+      className="pt-2"
+    >
+      <div className="-mt-3 -mb-3 max-h-20 overflow-y-auto flex flex-col gap-0.5 no-scrollbar">
+        {gradients.map(({ key, css }) => {
+          const normalized = normalizeGradientForPicker(css);
+          const isActive = activeValue === normalized;
+          const label = key.replace('gradient--', '').replace(/-/g, ' ');
+          return (
+            <button
+              key={key}
+              onClick={() => onSelect(normalized)}
+              className={cn(
+                'flex items-center gap-2 rounded px-2 py-1 text-left text-xs w-full transition-colors',
+                isActive ? 'bg-white/10' : 'hover:bg-white/5'
+              )}
+            >
+              <div
+                className="w-5 h-4 rounded shrink-0 border border-white/10"
+                style={{ background: css }}
+              />
+              <span className="truncate capitalize text-foreground/80">{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </SettingsPanel>
+  );
+}
+
 interface ColorVariablesSectionProps {
   colorVariables: import('@/types').ColorVariable[];
   activeVariableId: string | null;
@@ -1141,6 +1216,23 @@ export default function ColorPicker({
 }: ColorPickerProps) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'solid' | 'linear' | 'radial' | 'image'>('solid');
+
+  // Studio gradients (fetched from /api/studio when picker opens)
+  const [studioGradients, setStudioGradients] = useState<{ key: string; css: string }[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/studio')
+      .then(r => r.json())
+      .then((data: { variables?: Record<string, string> }) => {
+        const vars = data.variables ?? {};
+        setStudioGradients(
+          Object.entries(vars)
+            .filter(([k]) => k.startsWith('gradient--'))
+            .map(([k, css]) => ({ key: k, css }))
+        );
+      })
+      .catch(() => {});
+  }, [open]);
 
   // Color variables store
   const colorVariables = useColorVariablesStore((s) => s.colorVariables);
@@ -1987,7 +2079,8 @@ export default function ColorPicker({
       <PopoverContent
         className={cn('w-56 p-2 relative z-50', activeTab !== 'image' && 'pb-0')}
         align="end"
-        collisionPadding={16}
+        sideOffset={6}
+        collisionPadding={8}
         onKeyDown={handleKeyDown}
       >
         <Tabs
@@ -2461,6 +2554,12 @@ export default function ColorPicker({
               immediateOnChange(`color:var(--${varId})`);
             }
           }}
+        />
+
+        <StudioGradientsSection
+          gradients={studioGradients}
+          activeValue={displayValue}
+          onSelect={(css) => immediateOnChange(css)}
         />
         </>
         )}

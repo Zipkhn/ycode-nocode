@@ -179,7 +179,9 @@
   --large-text-wrap: balance;
   --body-text-wrap: balance;
   --small-text-wrap: balance;
-  --gradient--prim: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --gradient--prim: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+  --theme-light--gradient-gradient-primary: var(--gradient--prim);
+  --theme-dark--gradient-gradient-primary: var(--gradient--prim);
 /* STUDIO_THEME_END */
 }
 
