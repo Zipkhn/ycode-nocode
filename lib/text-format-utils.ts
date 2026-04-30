@@ -715,7 +715,7 @@ function renderRichTextComponentBlock(
   }
 
   const component = components?.find(c => c.id === componentId);
-  if (!component || !component.layers?.length) {
+  if (!component) {
     return React.createElement('span', { key, className: 'text-xs text-muted-foreground' }, '[missing component]');
   }
 
@@ -730,6 +730,11 @@ function renderRichTextComponentBlock(
   // Use pre-resolved layers (from server-side resolveRichTextCollections) when available
   if (block.attrs._resolvedLayers) {
     return renderComponentBlock(component, block.attrs._resolvedLayers, overrides, key, updatedAncestors);
+  }
+
+  // Fallback: resolve from component definition (edit mode)
+  if (!component.layers?.length) {
+    return React.createElement('span', { key, className: 'text-xs text-muted-foreground' }, '[missing component]');
   }
 
   const withOverrides = applyComponentOverrides(

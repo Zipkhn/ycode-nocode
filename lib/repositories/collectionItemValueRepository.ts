@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { SUPABASE_QUERY_LIMIT } from '@/lib/supabase-constants';
+import { getKnexClient } from '@/lib/knex-client';
 import type { CollectionItemValue, CollectionFieldType } from '@/types';
 import { castValue, valueToString } from '../collection-utils';
 import { generateCollectionItemContentHash } from '../hash-utils';
@@ -85,7 +86,9 @@ export interface UpdateCollectionItemValueData {
  */
 export async function getValuesByItemIds(
   item_ids: string[],
-  is_published: boolean = false
+  is_published: boolean = false,
+  knownFieldTypes?: Record<string, string>,
+  fieldIds?: string[],
 ): Promise<Record<string, Record<string, any>>> {
   const client = await getSupabaseAdmin();
 
@@ -97,34 +100,85 @@ export async function getValuesByItemIds(
     return {};
   }
 
-  // Batch into chunks to avoid exceeding PostgREST URL length limits.
-  // Keep chunks small enough that total value rows stay under Supabase's
-  // default 1000-row response limit (50 items × ~20 fields = ~1000 rows).
-  const CHUNK_SIZE = 50;
   const valuesByItem: Record<string, Record<string, any>> = {};
+  let allRows: Array<{ item_id: string; field_id: string; value: string }> = [];
 
-  for (let i = 0; i < item_ids.length; i += CHUNK_SIZE) {
-    const chunk = item_ids.slice(i, i + CHUNK_SIZE);
-
-    const { data, error } = await client
-      .from('collection_item_values')
-      .select('item_id, field_id, value, collection_fields!inner(type)')
-      .in('item_id', chunk)
-      .eq('is_published', is_published)
-      .is('deleted_at', null)
-      .limit(5000);
-
-    if (error) {
-      throw new Error(`Failed to fetch item values: ${error.message}`);
+  // Fresh path: prefer direct DB query (Knex) for large EAV reads.
+  // This avoids PostgREST overhead and URL-size chunking behavior.
+  try {
+    const knex = await getKnexClient();
+    let query = knex('collection_item_values')
+      .select('item_id', 'field_id', 'value')
+      .whereIn('item_id', item_ids)
+      .andWhere('is_published', is_published)
+      .whereNull('deleted_at');
+    if (fieldIds) {
+      query = query.whereIn('field_id', fieldIds);
+    }
+    allRows = await query;
+  } catch {
+    // Fallback: Supabase chunked reads
+    const CHUNK_SIZE = 50;
+    const chunks: string[][] = [];
+    for (let i = 0; i < item_ids.length; i += CHUNK_SIZE) {
+      chunks.push(item_ids.slice(i, i + CHUNK_SIZE));
     }
 
-    data?.forEach((row: any) => {
-      if (!valuesByItem[row.item_id]) {
-        valuesByItem[row.item_id] = {};
+    const chunkResults = await Promise.all(
+      chunks.map(async (chunk) => {
+        let q = client
+          .from('collection_item_values')
+          .select('item_id, field_id, value')
+          .in('item_id', chunk)
+          .eq('is_published', is_published)
+          .is('deleted_at', null);
+        if (fieldIds) {
+          q = q.in('field_id', fieldIds);
+        }
+        const { data, error } = await q.limit(5000);
+
+        if (error) {
+          throw new Error(`Failed to fetch item values: ${error.message}`);
+        }
+
+        return data || [];
+      })
+    );
+
+    for (const rows of chunkResults) {
+      for (const row of rows) {
+        allRows.push(row);
       }
-      const fieldType = row.collection_fields?.type;
-      valuesByItem[row.item_id][row.field_id] = castValue(row.value, fieldType || 'text');
-    });
+    }
+  }
+
+  // Collect unique field IDs (only needed if caller didn't provide types)
+  const discoveredFieldIds = new Set<string>();
+  if (!knownFieldTypes) {
+    for (const row of allRows) {
+      discoveredFieldIds.add(row.field_id);
+    }
+  }
+
+  // Use caller-provided field types, or fetch them in a single query
+  let fieldTypeMap = knownFieldTypes;
+  if (!fieldTypeMap) {
+    fieldTypeMap = {};
+    if (discoveredFieldIds.size > 0) {
+      const { data: fields } = await client
+        .from('collection_fields')
+        .select('id, type')
+        .in('id', Array.from(discoveredFieldIds));
+
+      fields?.forEach((f: any) => { fieldTypeMap![f.id] = f.type; });
+    }
+  }
+
+  for (const row of allRows) {
+    if (!valuesByItem[row.item_id]) {
+      valuesByItem[row.item_id] = {};
+    }
+    valuesByItem[row.item_id][row.field_id] = castValue(row.value, (fieldTypeMap[row.field_id] || 'text') as any);
   }
 
   return valuesByItem;

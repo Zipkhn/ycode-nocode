@@ -463,11 +463,17 @@ export function collectLayerAssetIds(
         childAncestors.add(cid);
         const overrides = node.attrs.componentOverrides ?? undefined;
         scanOverrideAssets(overrides, childAncestors);
-        const comp = components.find(c => c.id === cid);
-        if (comp?.layers?.length) {
-          const resolved = applyComponentOverrides(comp.layers, overrides, comp.variables);
-          resolved.forEach(l => scanLayer(l, childAncestors));
-          scanVariableDefaults(comp.variables, childAncestors);
+
+        // Use pre-resolved layers when available (SSR path with slimmed components)
+        if (node.attrs._resolvedLayers?.length) {
+          (node.attrs._resolvedLayers as any[]).forEach(l => scanLayer(l, childAncestors));
+        } else {
+          const comp = components.find(c => c.id === cid);
+          if (comp?.layers?.length) {
+            const resolved = applyComponentOverrides(comp.layers, overrides, comp.variables);
+            resolved.forEach(l => scanLayer(l, childAncestors));
+            scanVariableDefaults(comp.variables, childAncestors);
+          }
         }
       }
     }
