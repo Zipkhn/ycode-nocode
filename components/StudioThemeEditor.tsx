@@ -2207,7 +2207,7 @@ export default function StudioThemeEditor() {
                       />
                     </svg>
                   )}
-                  {syncStatus === 'idle'    && '⇄ Sync → Ycode'}
+                  {syncStatus === 'idle'    && 'Save'}
                   {syncStatus === 'syncing' && 'Syncing…'}
                   {syncStatus === 'done'    && '✓ Synced!'}
                   {syncStatus === 'error'   && '✗ Erreur'}

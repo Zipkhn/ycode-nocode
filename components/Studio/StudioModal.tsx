@@ -142,7 +142,7 @@ export function StudioModal() {
               onClick={handleSync} disabled={syncStatus === 'syncing'}
               className="px-2.5 py-1 rounded bg-primary text-primary-foreground text-[11px] font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
             >
-              {syncStatus === 'idle'    && '⇄ Sync → Ycode'}
+              {syncStatus === 'idle'    && 'Save'}
               {syncStatus === 'syncing' && 'Syncing…'}
               {syncStatus === 'done'    && '✓ Synced'}
               {syncStatus === 'error'   && '✗ Erreur'}
