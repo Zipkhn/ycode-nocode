@@ -75,6 +75,22 @@ interface ColorPickerProps {
   imageLabel?: string;
 }
 
+function oklchToRgb(l: number, c: number, h: number): { r: number; g: number; b: number } {
+  const hRad = (h * Math.PI) / 180;
+  const a = c * Math.cos(hRad);
+  const b_ = c * Math.sin(hRad);
+  const l_ = l + 0.3963377774 * a + 0.2158037573 * b_;
+  const m_ = l - 0.1055613458 * a - 0.0638541728 * b_;
+  const s_ = l - 0.0894841775 * a - 1.2914855480 * b_;
+  const lc = l_ * l_ * l_, mc = m_ * m_ * m_, sc = s_ * s_ * s_;
+  const toSrgb = (x: number) => { const v = Math.max(0, Math.min(1, x)); return v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055; };
+  return {
+    r: Math.round(toSrgb(+4.0767416621 * lc - 3.3077115913 * mc + 0.2309699292 * sc) * 255),
+    g: Math.round(toSrgb(-1.2684380046 * lc + 2.6097574011 * mc - 0.3413193965 * sc) * 255),
+    b: Math.round(toSrgb(-0.0041960863 * lc - 0.7034186147 * mc + 1.7076147010 * sc) * 255),
+  };
+}
+
 // Helper to convert hex/rgba to RgbaColor object
 // Supports formats: #hex, #hex/opacity, #rrggbbaa (8-char with alpha), rgba(...)
 function parseColor(colorString: string): { r: number; g: number; b: number; a: number } {
@@ -113,6 +129,18 @@ function parseColor(colorString: string): { r: number; g: number; b: number; a: 
       b: parseInt(rgbaMatch[3]),
       a: rgbaMatch[4] ? parseFloat(rgbaMatch[4]) : 1,
     };
+  }
+
+  // OKLCH color
+  const oklchMatch = colorString.match(/^oklch\(\s*([\d.]+%?)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\s*\)/i);
+  if (oklchMatch) {
+    let l = parseFloat(oklchMatch[1]);
+    if (oklchMatch[1].endsWith('%')) l /= 100;
+    const c = parseFloat(oklchMatch[2]);
+    const h = parseFloat(oklchMatch[3]);
+    let a = 1;
+    if (oklchMatch[4]) a = oklchMatch[4].endsWith('%') ? parseFloat(oklchMatch[4]) / 100 : parseFloat(oklchMatch[4]);
+    return { ...oklchToRgb(l, c, h), a };
   }
 
   return { r: 255, g: 255, b: 255, a: 1 };

@@ -1,8 +1,31 @@
 export const COLOR_SCALE_STEPS = [900, 800, 700, 600, 500, 400, 300, 200, 100, 50] as const;
 
+function oklchToRgb(l: number, c: number, h: number): { r: number; g: number; b: number } {
+  const hRad = (h * Math.PI) / 180;
+  const a = c * Math.cos(hRad);
+  const b_ = c * Math.sin(hRad);
+  const l_ = l + 0.3963377774 * a + 0.2158037573 * b_;
+  const m_ = l - 0.1055613458 * a - 0.0638541728 * b_;
+  const s_ = l - 0.0894841775 * a - 1.2914855480 * b_;
+  const lc = l_ * l_ * l_, mc = m_ * m_ * m_, sc = s_ * s_ * s_;
+  const toSrgb = (x: number) => { const v = Math.max(0, Math.min(1, x)); return v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055; };
+  return {
+    r: Math.round(toSrgb(+4.0767416621 * lc - 3.3077115913 * mc + 0.2309699292 * sc) * 255),
+    g: Math.round(toSrgb(-1.2684380046 * lc + 2.6097574011 * mc - 0.3413193965 * sc) * 255),
+    b: Math.round(toSrgb(-0.0041960863 * lc - 0.7034186147 * mc + 1.7076147010 * sc) * 255),
+  };
+}
+
 export function resolveVarToHex(value: string, vars: Record<string, string>, depth = 0): string {
   if (depth > 4 || !value) return '';
   if (/^#[0-9a-f]{6}$/i.test(value)) return value;
+  const oklchMatch = value.match(/^oklch\(\s*([\d.]+%?)\s+([\d.]+)\s+([\d.]+)/i);
+  if (oklchMatch) {
+    let l = parseFloat(oklchMatch[1]);
+    if (oklchMatch[1].endsWith('%')) l /= 100;
+    const { r, g, b } = oklchToRgb(l, parseFloat(oklchMatch[2]), parseFloat(oklchMatch[3]));
+    return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+  }
   const m = value.match(/^var\(--(.+?)\)$/);
   if (!m) return '';
   return resolveVarToHex(vars[m[1]] || '', vars, depth + 1);
