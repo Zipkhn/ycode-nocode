@@ -84,7 +84,6 @@ async function downloadAndUploadAsset(url: string): Promise<UploadedAsset | null
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
 interface PreparedValue {
   item_id: string;
   field_id: string;
@@ -192,17 +191,58 @@ function prepareRow(
 const BATCH_SIZE = 20;
 
 /**
+ * Fallback: download and parse the CSV from Supabase Storage.
+ * Used when the client doesn't provide rows directly (e.g. resume after page reload).
+ */
+async function loadRowsFromStorage(
+  csvMeta: { storage_path?: string } | null,
+  startIndex: number,
+): Promise<{ rows: Record<string, string>[]; supabase: Awaited<ReturnType<typeof getSupabaseAdmin>> }> {
+  if (!csvMeta?.storage_path) {
+    throw new Error('Import job has no CSV file reference');
+  }
+
+  const supabase = await getSupabaseAdmin();
+  if (!supabase) {
+    throw new Error('Storage not configured');
+  }
+
+  const { data: fileBlob, error: downloadError } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .download(csvMeta.storage_path);
+
+  if (downloadError || !fileBlob) {
+    console.error('Failed to download CSV from storage:', downloadError);
+    throw new Error('Failed to read CSV file from storage');
+  }
+
+  const csvText = await fileBlob.text();
+  const parsed = parseCSVText(csvText);
+
+  return {
+    rows: parsed.rows.slice(startIndex, startIndex + BATCH_SIZE),
+    supabase,
+  };
+}
+
+/**
  * POST /ycode/api/collections/import/process
  * Process the next batch of rows for an import job.
- * Reads the CSV file directly from Supabase Storage — no row data in the request body.
+ *
+ * The client can provide rows directly (preferred — avoids re-downloading the CSV)
+ * or omit them to fall back to reading from Supabase Storage.
  *
  * Body:
  *  - importId: string - The import job to process
+ *  - rows?: Record<string, string>[] - Optional batch of CSV rows to process
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { importId } = body;
+    const { importId, rows: clientRows } = body as {
+      importId?: string;
+      rows?: Record<string, string>[];
+    };
 
     if (!importId) {
       return noCache({ error: 'importId is required' }, 400);
@@ -242,35 +282,22 @@ export async function POST(request: NextRequest) {
     }
     importJob = freshImportJob;
 
-    // Read CSV from Supabase Storage
-    const csvMeta = importJob.csv_data as { storage_path?: string } | null;
-    if (!csvMeta?.storage_path) {
-      return noCache({ error: 'Import job has no CSV file reference' }, 400);
-    }
-
-    const supabase = await getSupabaseAdmin();
-    if (!supabase) {
-      return noCache({ error: 'Storage not configured' }, 500);
-    }
-
-    const { data: fileBlob, error: downloadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .download(csvMeta.storage_path);
-
-    if (downloadError || !fileBlob) {
-      console.error('Failed to download CSV from storage:', downloadError);
-      return noCache({ error: 'Failed to read CSV file from storage' }, 500);
-    }
-
-    const csvText = await fileBlob.text();
-    const parsed = parseCSVText(csvText);
-
-    // Determine which rows to process in this batch
     const startIndex = importJob.processed_rows + importJob.failed_rows;
-    const rowsToProcess = parsed.rows.slice(startIndex, startIndex + BATCH_SIZE);
+    const csvMeta = importJob.csv_data as { storage_path?: string } | null;
+
+    // Resolve rows: use client-provided rows or fall back to storage download
+    let rowsToProcess: Record<string, string>[];
+    let supabaseForCleanup: Awaited<ReturnType<typeof getSupabaseAdmin>> = null;
+
+    if (clientRows && Array.isArray(clientRows) && clientRows.length > 0) {
+      rowsToProcess = clientRows;
+    } else {
+      const storageResult = await loadRowsFromStorage(csvMeta, startIndex);
+      rowsToProcess = storageResult.rows;
+      supabaseForCleanup = storageResult.supabase;
+    }
 
     if (rowsToProcess.length === 0) {
-      // All rows have been processed
       const errors = importJob.errors || [];
       await completeImport(importJob.id, importJob.processed_rows, importJob.failed_rows, errors);
       return noCache({
@@ -482,9 +509,14 @@ export async function POST(request: NextRequest) {
       await completeImport(importJob.id, processedCount, failedCount, errors);
 
       // Clean up the CSV file from storage
-      try {
-        await supabase.storage.from(STORAGE_BUCKET).remove([csvMeta.storage_path]);
-      } catch { /* best-effort cleanup */ }
+      if (csvMeta?.storage_path) {
+        try {
+          const supabase = supabaseForCleanup || await getSupabaseAdmin();
+          if (supabase) {
+            await supabase.storage.from(STORAGE_BUCKET).remove([csvMeta.storage_path]);
+          }
+        } catch { /* best-effort cleanup */ }
+      }
     }
 
     return noCache({

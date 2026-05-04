@@ -273,17 +273,43 @@ export function CSVImportDialog({
     }
   };
 
-  // Poll the server to process batches until complete.
-  // The server reads CSV from storage and manages its own batch size.
+  // Vercel serverless body limit is 4.5MB; stay well under it.
+  const MAX_BODY_BYTES = 3_500_000;
+  const MAX_BATCH_SIZE = 20;
+
+  /** Build the next batch of rows that fits within the body size limit. */
+  const buildBatch = (startIndex: number): Record<string, string>[] => {
+    const batch: Record<string, string>[] = [];
+    let estimatedSize = 0;
+
+    for (let i = startIndex; i < rows.length && batch.length < MAX_BATCH_SIZE; i++) {
+      const row = rows[i];
+      const rowSize = Object.values(row).reduce((sum, v) => sum + v.length, 0) * 2;
+      if (batch.length > 0 && estimatedSize + rowSize > MAX_BODY_BYTES) break;
+      batch.push(row);
+      estimatedSize += rowSize;
+    }
+
+    return batch;
+  };
+
+  // Send row batches from local state to the server for processing.
+  // Rows that exceed the body limit are omitted so the server falls back to storage.
   const processImport = async (id: string) => {
     abortRef.current = false;
+    let currentIndex = 0;
 
-    while (!abortRef.current) {
+    while (!abortRef.current && currentIndex < rows.length) {
+      const batch = buildBatch(currentIndex);
+
+      // If even one row exceeds the limit, omit rows so the server reads from storage
+      const sendRows = batch.length > 0;
+
       try {
         const response = await fetch('/ycode/api/collections/import/process', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ importId: id }),
+          body: JSON.stringify(sendRows ? { importId: id, rows: batch } : { importId: id }),
         });
 
         const data = await response.json();
@@ -293,6 +319,10 @@ export function CSVImportDialog({
         }
 
         setImportStatus(data.data);
+
+        // Advance index by however many the server processed this round
+        const serverProcessed = (data.data.processedRows ?? 0) + (data.data.failedRows ?? 0);
+        currentIndex = serverProcessed;
 
         // Yield to the browser so React can paint the progress update
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -309,6 +339,22 @@ export function CSVImportDialog({
         setStep('complete');
         return;
       }
+    }
+
+    // All rows sent — send one final call so the server can finalize
+    if (!abortRef.current) {
+      try {
+        const response = await fetch('/ycode/api/collections/import/process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ importId: id }),
+        });
+        const data = await response.json();
+        if (response.ok) setImportStatus(data.data);
+      } catch { /* best-effort finalization */ }
+      setImporting(false);
+      setStep('complete');
+      onImportComplete?.();
     }
   };
 
