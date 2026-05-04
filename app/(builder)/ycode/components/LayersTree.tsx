@@ -76,7 +76,11 @@ function getLayerDisplayLabel(
     return layer.customName!;
   }
 
-  if (!isTextLayer && layer.customName) {
+  // Component instances: prefer the component's name over the underlying
+  // block's default customName (e.g. a `section` layer converted to a
+  // component would otherwise display as "Section" instead of the
+  // component's actual name).
+  if (!isTextLayer && !layer.componentId && layer.customName) {
     return layer.customName;
   }
 
@@ -1927,8 +1931,10 @@ export default function LayersTree({
         n => n.sublayer && n.sublayer.kind === 'content' && n.parentId === selectedLayerId && n.index === storeActiveSublayerIndex
       );
       activeSublayerNodeId = contentMatch?.id ?? null;
-    } else if (hasStyleSublayerActive) {
-      // Direct style sublayers (text/heading) or nested mark sublayers
+    }
+
+    // Fall through to style matching when no content sublayer matched (non-CMS rich text)
+    if (!activeSublayerNodeId && hasStyleSublayerActive) {
       activeSublayerNodeId = flattenedNodes.find(
         n => n.sublayer && n.sublayer.kind === 'style' && n.sublayer.styleKey === storeActiveTextStyleKey && n.layer.id === selectedLayerId
       )?.id ?? null;

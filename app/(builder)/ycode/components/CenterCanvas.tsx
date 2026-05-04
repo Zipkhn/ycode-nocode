@@ -34,6 +34,7 @@ import {
 
 // 4. Hooks
 import { useEditorUrl } from '@/hooks/use-editor-url';
+import { useEditComponent } from '@/hooks/use-edit-component';
 import { useZoom } from '@/hooks/use-zoom';
 import { useUndoRedo } from '@/hooks/use-undo-redo';
 
@@ -59,7 +60,7 @@ import RichTextEditorSheet from './RichTextEditorSheet';
 import { buildLocalizedSlugPath, buildLocalizedDynamicPageUrl } from '@/lib/page-utils';
 import { getTranslationValue } from '@/lib/localisation-utils';
 import { cn } from '@/lib/utils';
-import { getCollectionVariable, canDeleteLayer, findLayerById, findParentCollectionLayer, canLayerHaveLink, updateLayerProps, removeRichTextSublayer } from '@/lib/layer-utils';
+import { getCollectionVariable, canDeleteLayer, findLayerById, findParentCollectionLayer, canLayerHaveLink, updateLayerProps, removeRichTextSublayer, isRichTextLayer, getLayerCmsFieldBinding } from '@/lib/layer-utils';
 import { CANVAS_BORDER, CANVAS_PADDING, updateViewportOverrides } from '@/lib/canvas-utils';
 import { BREAKPOINTS } from '@/lib/breakpoint-utils';
 import { buildFieldGroupsForLayer, flattenFieldGroups, filterFieldGroupsByType, SIMPLE_TEXT_FIELD_TYPES } from '@/lib/collection-field-utils';
@@ -680,13 +681,9 @@ const CenterCanvas = React.memo(function CenterCanvas({
     }
   }, [richTextSheetLayerId, selectedLayerId, closeRichTextSheet]);
 
-  // Load draft when page changes (ensure draft exists before rendering)
-  const loadDraft = usePagesStore((state) => state.loadDraft);
-  useEffect(() => {
-    if (currentPageId && !currentDraft) {
-      loadDraft(currentPageId);
-    }
-  }, [currentPageId, loadDraft, currentDraft]);
+  // Draft loading is owned by LeftSidebar (wrapped in startTransition).
+  // The store-level in-flight guard in loadDraft makes any concurrent call
+  // a no-op if LeftSidebar is not mounted.
 
   // Reset content height when page changes to force Canvas to recalculate
   useEffect(() => {
@@ -1325,12 +1322,15 @@ const CenterCanvas = React.memo(function CenterCanvas({
 
       if (event) {
         let target = event.target as HTMLElement;
+        let blockLevelStyleKey: string | null = null;
 
-        // Walk up the DOM tree to find data-style, data-block-index, data-list-item-index
+        // Walk up the DOM tree to find data-style, data-block-index, data-list-item-index.
+        // The textStyleKey from the element with data-block-index is the actual content
+        // block type (e.g. blockquote), not an inner element's style (e.g. paragraph).
         while (target && target !== event.currentTarget) {
-          if (!textStyleKey) {
-            const styleAttr = target.getAttribute?.('data-style');
-            if (styleAttr) textStyleKey = styleAttr;
+          const styleAttr = target.getAttribute?.('data-style');
+          if (styleAttr && !textStyleKey) {
+            textStyleKey = styleAttr;
           }
           if (listItemIndex === null) {
             const listItemAttr = target.getAttribute?.('data-list-item-index');
@@ -1338,20 +1338,45 @@ const CenterCanvas = React.memo(function CenterCanvas({
           }
           if (blockIndex === null) {
             const blockAttr = target.getAttribute?.('data-block-index');
-            if (blockAttr !== null) blockIndex = parseInt(blockAttr, 10);
+            if (blockAttr !== null) {
+              blockIndex = parseInt(blockAttr, 10);
+              if (styleAttr) blockLevelStyleKey = styleAttr;
+            }
           }
           target = target.parentElement as HTMLElement;
         }
+
+        // Prefer the block-level style over structural inner elements (e.g.
+        // paragraph inside blockquote), but keep inline marks and sub-block
+        // styles like listItem that shouldn't be overridden by their container
+        const INNER_STYLE_KEYS = new Set(['bold', 'italic', 'underline', 'strike', 'link', 'subscript', 'superscript']);
+        if (blockLevelStyleKey && (!textStyleKey || !INNER_STYLE_KEYS.has(textStyleKey))) {
+          textStyleKey = blockLevelStyleKey;
+        }
       }
 
-      // Use atomic state update to prevent transient null activeTextStyleKey
+      // For non-CMS-bound rich text, sublayers are style-based (unique types),
+      // so skip block-level sublayerIndex/listItemIndex — only set textStyleKey
+      let resolvedSublayerIndex = Number.isFinite(blockIndex) ? blockIndex : null;
+      let resolvedListItemIndex = Number.isFinite(listItemIndex) ? listItemIndex : null;
+      if (resolvedSublayerIndex !== null && textStyleKey) {
+        const layers = editingComponentId
+          ? (componentDrafts[editingComponentId] || [])
+          : (currentDraft?.layers || []);
+        const layer = findLayerById(layers, layerId);
+        if (layer && isRichTextLayer(layer) && !getLayerCmsFieldBinding(layer)) {
+          resolvedSublayerIndex = null;
+          resolvedListItemIndex = null;
+        }
+      }
+
       selectLayerWithSublayer(layerId, {
         textStyleKey,
-        sublayerIndex: Number.isFinite(blockIndex) ? blockIndex : null,
-        listItemIndex: Number.isFinite(listItemIndex) ? listItemIndex : null,
+        sublayerIndex: resolvedSublayerIndex,
+        listItemIndex: resolvedListItemIndex,
       });
     }
-  }, [isPreviewMode, setActiveSidebarTab, selectLayerWithSublayer]);
+  }, [isPreviewMode, setActiveSidebarTab, selectLayerWithSublayer, editingComponentId, componentDrafts, currentDraft]);
 
   const handleCanvasLayerUpdate = useCallback((layerId: string, updates: Partial<Layer>) => {
     if (editingComponentId) {
@@ -1504,6 +1529,13 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const handleCanvasLayerHover = useCallback((layerId: string | null) => {
     setHoveredLayerId(layerId);
   }, [setHoveredLayerId]);
+
+  // Open the master component when a component instance is double-clicked.
+  // Mirrors the "Edit component" sidebar button.
+  const editComponent = useEditComponent();
+  const handleCanvasComponentEdit = useCallback((componentId: string, instanceLayerId: string) => {
+    editComponent(componentId, { returnToLayerId: instanceLayerId });
+  }, [editComponent]);
 
   // Undo/Redo handlers
   // Note: We don't auto-save after undo/redo to preserve the redo stack
@@ -2413,6 +2445,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
                         onIframeReady={handleIframeReady}
                         onLayerHover={handleCanvasLayerHover}
                         onCanvasClick={handleCanvasClick}
+                        onComponentEdit={handleCanvasComponentEdit}
                         editingComponentVariables={editingComponentVariables}
                         disableEditorHiddenLayers={!!activeInteractionTriggerLayerId}
                         zoom={zoom}

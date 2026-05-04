@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  staticPageGenerationTimeout: 120,
   experimental: {
     proxyClientMaxBodySize: '500mb',
   },

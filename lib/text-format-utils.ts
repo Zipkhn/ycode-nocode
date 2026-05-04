@@ -154,14 +154,14 @@ export const DEFAULT_TEXT_STYLES: Record<string, TextStyle> = {
     },
   },
   bulletList: {
-    label: 'Bullet List',
+    label: 'Bullet list',
     classes: 'ml-[8px] pl-[16px] list-disc',
     design: {
       spacing: { marginLeft: '8px', paddingLeft: '16px' },
     },
   },
   orderedList: {
-    label: 'Ordered List',
+    label: 'Ordered list',
     classes: 'ml-[8px] pl-[20px] list-decimal',
     design: {
       spacing: { marginLeft: '8px', paddingLeft: '20px' },
@@ -206,7 +206,7 @@ export const DEFAULT_TEXT_STYLES: Record<string, TextStyle> = {
     },
   },
   tableHeader: {
-    label: 'Table Header Cell',
+    label: 'Table header cell',
     classes: 'text-left font-[500] pt-[12px] pr-[12px] pb-[12px] pl-[12px] bg-[#000000]/5',
     design: {
       borders: { isActive: true, borderWidthMode: 'all' },
@@ -216,7 +216,7 @@ export const DEFAULT_TEXT_STYLES: Record<string, TextStyle> = {
     },
   },
   tableCell: {
-    label: 'Table Cell',
+    label: 'Table cell',
     classes: 'pt-[12px] pr-[12px] pb-[12px] pl-[12px]',
     design: {
       borders: { isActive: true, borderWidthMode: 'individual', borderRadiusMode: 'individual' },
@@ -226,7 +226,7 @@ export const DEFAULT_TEXT_STYLES: Record<string, TextStyle> = {
     },
   },
   tableRow: {
-    label: 'Table Row',
+    label: 'Table row',
     classes: '',
     design: {
       borders: { isActive: true },
@@ -715,7 +715,7 @@ function renderRichTextComponentBlock(
   }
 
   const component = components?.find(c => c.id === componentId);
-  if (!component || !component.layers?.length) {
+  if (!component) {
     return React.createElement('span', { key, className: 'text-xs text-muted-foreground' }, '[missing component]');
   }
 
@@ -730,6 +730,11 @@ function renderRichTextComponentBlock(
   // Use pre-resolved layers (from server-side resolveRichTextCollections) when available
   if (block.attrs._resolvedLayers) {
     return renderComponentBlock(component, block.attrs._resolvedLayers, overrides, key, updatedAncestors);
+  }
+
+  // Fallback: resolve from component definition (edit mode)
+  if (!component.layers?.length) {
+    return React.createElement('span', { key, className: 'text-xs text-muted-foreground' }, '[missing component]');
   }
 
   const withOverrides = applyComponentOverrides(

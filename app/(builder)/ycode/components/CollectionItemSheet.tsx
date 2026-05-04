@@ -33,6 +33,14 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import RichTextEditor from './RichTextEditor';
 import RichTextEditorSheet from './RichTextEditorSheet';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
@@ -53,7 +61,10 @@ import { toast } from 'sonner';
 import ReferenceFieldCombobox from './ReferenceFieldCombobox';
 import CollectionLinkFieldInput from './CollectionLinkFieldInput';
 import ColorFieldInput from './ColorFieldInput';
-import AssetFieldCard from './AssetFieldCard';
+import AssetFieldCard, { SortableAssetFieldCard } from './AssetFieldCard';
+import { DndContext, closestCenter, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import type { Asset, CollectionItemWithValues } from '@/types';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Label } from '@/components/ui/label';
@@ -104,6 +115,10 @@ export default function CollectionItemSheet({
   const [expandedRichTextField, setExpandedRichTextField] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const pendingStatusActionRef = useRef<StatusAction | null>(null);
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   const collection = collections.find(c => c.id === collectionId);
   const collectionFields = useMemo(
@@ -736,21 +751,51 @@ export default function CollectionItemSheet({
                                 formField.onChange(JSON.stringify(assetIds.filter(id => id !== assetId)));
                               };
 
+                              const handleAssetDragEnd = (event: DragEndEvent) => {
+                                const { active, over } = event;
+                                if (!over || active.id === over.id) return;
+                                const oldIndex = assetIds.indexOf(String(active.id));
+                                const newIndex = assetIds.indexOf(String(over.id));
+                                if (oldIndex === -1 || newIndex === -1) return;
+                                formField.onChange(JSON.stringify(arrayMove(assetIds, oldIndex, newIndex)));
+                              };
+
                               return (
                                 <div className="space-y-2">
-                                  {assetIds.length > 0 && (
+                                  {assetIds.length > 1 ? (
+                                    <DndContext
+                                      sensors={dndSensors}
+                                      collisionDetection={closestCenter}
+                                      onDragEnd={handleAssetDragEnd}
+                                    >
+                                      <SortableContext
+                                        items={assetIds}
+                                        strategy={rectSortingStrategy}
+                                      >
+                                        <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))]">
+                                          {assetIds.map((assetId) => (
+                                            <SortableAssetFieldCard
+                                              key={assetId}
+                                              id={assetId}
+                                              asset={getAsset(assetId)}
+                                              fieldType={field.type}
+                                              onChangeFile={() => handleReplaceAsset(assetId)}
+                                              onRemove={() => handleRemoveAsset(assetId)}
+                                            />
+                                          ))}
+                                        </div>
+                                      </SortableContext>
+                                    </DndContext>
+                                  ) : assetIds.length === 1 ? (
                                     <div className="grid gap-2 grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))]">
-                                      {assetIds.map((assetId) => (
-                                        <AssetFieldCard
-                                          key={assetId}
-                                          asset={getAsset(assetId)}
-                                          fieldType={field.type}
-                                          onChangeFile={() => handleReplaceAsset(assetId)}
-                                          onRemove={() => handleRemoveAsset(assetId)}
-                                        />
-                                      ))}
+                                      <AssetFieldCard
+                                        asset={getAsset(assetIds[0])}
+                                        fieldType={field.type}
+                                        onChangeFile={() => handleReplaceAsset(assetIds[0])}
+                                        onRemove={() => handleRemoveAsset(assetIds[0])}
+                                      />
                                     </div>
-                                  )}
+                                  ) : null}
                                   <Button
                                     type="button"
                                     variant="secondary"
@@ -828,6 +873,52 @@ export default function CollectionItemSheet({
                                 Value is set to <span className="text-foreground">{formField.value === 'true' ? 'YES' : 'NO'}</span>
                               </Label>
                             </div>
+                          ) : field.type === 'option' ? (
+                            (() => {
+                              const options = field.data?.options ?? [];
+                              const currentValue = formField.value || '';
+                              const hasMatchingOption = options.some(o => o.name.trim() === currentValue);
+                              return (
+                                <Select
+                                  value={currentValue || '__none__'}
+                                  onValueChange={(value) => {
+                                    // Radix Select renders a hidden native <select> for form
+                                    // integration that dispatches a spurious change event with
+                                    // an empty value when the controlled `value` prop changes
+                                    // externally (e.g. via form.reset) before the SelectItem
+                                    // for that value has registered (the items live in a
+                                    // Portal that mounts only when the select is open).
+                                    // Ignore that spurious empty change so it can't clobber
+                                    // the loaded form value. SelectItem disallows value="",
+                                    // so an empty string is never user-initiated.
+                                    if (value === '') return;
+                                    formField.onChange(value === '__none__' ? '' : value);
+                                  }}
+                                  disabled={options.length === 0}
+                                >
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder={options.length === 0 ? 'No options available' : `Select ${field.name.toLowerCase()}...`} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectGroup>
+                                      <SelectItem value="__none__">None</SelectItem>
+                                      {options
+                                        .filter(o => o.name.trim().length > 0)
+                                        .map((option) => (
+                                          <SelectItem key={option.id} value={option.name.trim()}>
+                                            {option.name.trim()}
+                                          </SelectItem>
+                                        ))}
+                                      {currentValue && !hasMatchingOption && (
+                                        <SelectItem value={currentValue} disabled>
+                                          {currentValue} (deleted)
+                                        </SelectItem>
+                                      )}
+                                    </SelectGroup>
+                                  </SelectContent>
+                                </Select>
+                              );
+                            })()
                           ) : field.key === 'name' ? (
                             <Input
                               ref={nameInputRef}

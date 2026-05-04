@@ -1,6 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
-import { fetchHomepage, fetchErrorPage } from '@/lib/page-fetcher';
+import { fetchHomepage, fetchErrorPage, splitPageData, reassemblePageData, slimPageData } from '@/lib/page-fetcher';
+import type { PageData } from '@/lib/page-fetcher';
 import PageRenderer from '@/components/PageRenderer';
 import PasswordForm from '@/components/PasswordForm';
 import { generatePageMetadata, fetchGlobalPageSettings } from '@/lib/generate-page-metadata';
@@ -16,24 +17,32 @@ export const revalidate = false; // Cache indefinitely until publish invalidates
  * Cached with tag-based revalidation (no time-based stale cache)
  */
 async function fetchPublishedHomepage() {
-  try {
-    return await unstable_cache(
-      async () => fetchHomepage(true),
-      ['data-for-route-/'],
-      {
-        tags: ['all-pages', 'route-/'], // all-pages for full publish invalidation, route-/ for targeted
-        revalidate: false,
-      }
-    )();
-  } catch {
-    // Fallback to uncached fetch when data exceeds cache size limit (2MB).
-    // If runtime credentials are unavailable (e.g. build-time), return null.
-    try {
-      return await fetchHomepage(true);
-    } catch {
-      return null;
-    }
-  }
+  const tags = ['all-pages', 'route-/'];
+  const opts = { tags, revalidate: false as const };
+
+  const [core, layers] = await Promise.all([
+    unstable_cache(
+      async () => {
+        const data = await fetchHomepage(true);
+        if (!data) return null;
+        return splitPageData(data as PageData).core;
+      },
+      ['core-/'],
+      opts
+    )(),
+    unstable_cache(
+      async () => {
+        const data = await fetchHomepage(true);
+        if (!data) return null;
+        return splitPageData(data as PageData).layers;
+      },
+      ['layers-/'],
+      opts
+    )(),
+  ]);
+
+  if (!core) return null;
+  return reassemblePageData(core, layers || []);
 }
 
 async function fetchCachedGlobalSettings() {
@@ -72,15 +81,14 @@ async function fetchCachedFoldersForAuth() {
 }
 
 async function fetchCachedErrorPage(errorCode: 401) {
-  try {
-    return await unstable_cache(
-      async () => fetchErrorPage(errorCode, true),
-      [`data-for-error-page-${errorCode}`],
-      { tags: ['all-pages'], revalidate: false }
-    )();
-  } catch {
-    return null;
-  }
+  return unstable_cache(
+    async () => {
+      const data = await fetchErrorPage(errorCode, true);
+      return data ? slimPageData(data) : null;
+    },
+    [`error-${errorCode}`],
+    { tags: ['all-pages'], revalidate: false }
+  )();
 }
 
 export default async function Home() {

@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { buildSlugPath } from '@/lib/page-utils';
 import { generatePageMetadata, fetchGlobalPageSettings } from '@/lib/generate-page-metadata';
-import { fetchPageByPath, fetchErrorPage } from '@/lib/page-fetcher';
+import { fetchPageByPath, fetchPageByPathForMetadata, fetchErrorPage, splitPageData, reassemblePageData, slimPageData } from '@/lib/page-fetcher';
 import PageRenderer from '@/components/PageRenderer';
 import PasswordForm from '@/components/PasswordForm';
 import { getSettingByKey } from '@/lib/repositories/settingsRepository';
@@ -149,24 +149,40 @@ export async function generateStaticParams() {
  * Cached per slug and page for revalidation
  */
 async function fetchPublishedPageWithLayers(slugPath: string) {
-  try {
-    return await unstable_cache(
-      async () => fetchPageByPath(slugPath, true),
-      [`data-for-route-/${slugPath}`],
-      {
-        tags: ['all-pages', `route-/${slugPath}`], // all-pages for full publish invalidation
-        revalidate: false,
-      }
-    )();
-  } catch {
-    // Fallback to uncached fetch when data exceeds cache size limit (2MB).
-    // If runtime credentials are unavailable (e.g. build-time), return null.
-    try {
-      return await fetchPageByPath(slugPath, true);
-    } catch {
-      return null;
-    }
-  }
+  const tags = ['all-pages', `route-/${slugPath}`];
+  const opts = { tags, revalidate: false as const };
+
+  const [core, layers] = await Promise.all([
+    unstable_cache(
+      async () => {
+        const data = await fetchPageByPath(slugPath, true);
+        if (!data) return null;
+        return splitPageData(data).core;
+      },
+      [`core-/${slugPath}`],
+      opts
+    )(),
+    unstable_cache(
+      async () => {
+        const data = await fetchPageByPath(slugPath, true);
+        if (!data) return null;
+        return splitPageData(data).layers;
+      },
+      [`layers-/${slugPath}`],
+      opts
+    )(),
+  ]);
+
+  if (!core) return null;
+  return reassemblePageData(core, layers || []);
+}
+
+async function fetchPublishedPageForMetadata(slugPath: string) {
+  return unstable_cache(
+    async () => fetchPageByPathForMetadata(slugPath, true),
+    [`metadata-/${slugPath}`],
+    { tags: ['all-pages', `route-/${slugPath}`], revalidate: false }
+  )();
 }
 
 async function fetchCachedRedirects(): Promise<RedirectType[] | null> {
@@ -217,15 +233,14 @@ async function fetchCachedFoldersForAuth() {
 }
 
 async function fetchCachedErrorPage(errorCode: 401 | 404) {
-  try {
-    return await unstable_cache(
-      async () => fetchErrorPage(errorCode, true),
-      [`data-for-error-page-${errorCode}`],
-      { tags: ['all-pages'], revalidate: false }
-    )();
-  } catch {
-    return null;
-  }
+  return unstable_cache(
+    async () => {
+      const data = await fetchErrorPage(errorCode, true);
+      return data ? slimPageData(data) : null;
+    },
+    [`error-${errorCode}`],
+    { tags: ['all-pages'], revalidate: false }
+  )();
 }
 
 interface PageProps {
@@ -254,11 +269,11 @@ export default async function Page({ params }: PageProps) {
     }
   }
 
-  // Cache-first slug path; pagination is served through internal dynamic routes.
-  const data = await fetchPublishedPageWithLayers(slugPath);
-
-  // Load all global settings early so error pages also get global custom code
-  const globalSettings = await fetchCachedGlobalSettings();
+  // Fetch page data and global settings in parallel
+  const [data, globalSettings] = await Promise.all([
+    fetchPublishedPageWithLayers(slugPath),
+    fetchCachedGlobalSettings(),
+  ]);
 
   // If page not found, try to show custom 404 error page
   if (!data) {
@@ -370,7 +385,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
   // Fetch page and global settings in parallel
   const [data, globalSettings] = await Promise.all([
-    fetchPublishedPageWithLayers(slugPath),
+    fetchPublishedPageForMetadata(slugPath),
     fetchCachedGlobalSettings(),
   ]);
 

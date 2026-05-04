@@ -46,6 +46,7 @@ export const FIELD_TYPES = [
   { value: 'date', label: 'Date & Time', icon: 'calendar', category: 'basic', hasDefault: true },
   { value: 'date_only', label: 'Date', icon: 'calendar', category: 'basic', hasDefault: true },
   { value: 'color', label: 'Color', icon: 'droplet', category: 'basic', hasDefault: true },
+  { value: 'option', label: 'Option', icon: 'select', category: 'basic', hasDefault: true },
   { value: 'email', label: 'Email', icon: 'email', category: 'contact', hasDefault: true },
   { value: 'phone', label: 'Phone', icon: 'phone', category: 'contact', hasDefault: true },
   { value: 'link', label: 'Link', icon: 'link', category: 'contact', hasDefault: true },
@@ -554,7 +555,7 @@ export const VIDEO_FIELD_TYPES: CollectionFieldType[] = ['video'];
 export const VIDEO_ID_FIELD_TYPES: CollectionFieldType[] = ['text'];
 
 /** Field types that can be bound to simple text content (excludes rich_text and media/asset types) */
-export const SIMPLE_TEXT_FIELD_TYPES: CollectionFieldType[] = ['text', 'number', 'date', 'date_only', 'email', 'phone'];
+export const SIMPLE_TEXT_FIELD_TYPES: CollectionFieldType[] = ['text', 'number', 'date', 'date_only', 'email', 'phone', 'option'];
 
 /** Field types that can be bound to rich text content (excludes media/asset types) */
 export const RICH_TEXT_FIELD_TYPES: CollectionFieldType[] = [...SIMPLE_TEXT_FIELD_TYPES, 'rich_text'];
