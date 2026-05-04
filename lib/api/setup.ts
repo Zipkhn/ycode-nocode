@@ -35,6 +35,7 @@ export async function connectSupabase(
       service_role_key: config.serviceRoleKey,
       connection_url: config.connectionUrl,
       db_password: config.dbPassword,
+      ...(config.supabaseUrl ? { supabase_url: config.supabaseUrl } : {}),
     }),
   });
 
