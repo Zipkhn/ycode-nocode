@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import FileManagerDialog from './FileManagerDialog';
-import { extractPlainTextFromTiptap } from '@/lib/tiptap-utils';
+import { extractPlainTextFromTiptap, extractMultilinePlainTextFromTiptap } from '@/lib/tiptap-utils';
 import { stringToTiptapContent } from '@/lib/text-format-utils';
 import { useAsset } from '@/hooks/use-asset';
 import { useAssetsStore } from '@/stores/useAssetsStore';
@@ -76,11 +76,17 @@ export default function SidebarTranslationRow({
 
   // Display value for the source textarea: convert Tiptap JSON → plain text so
   // the user sees readable content instead of raw JSON for rich-text fields.
+  // In preview-only mode (rich-text element layers) we keep block-level
+  // structure as newlines so headings/paragraphs render the way they do on
+  // the canvas; the editable textarea path stays single-line so it round-trips
+  // cleanly through stringToTiptapContent on save.
   const sourceDisplayValue = (() => {
     if (!isRichText || !item.content_value) return item.content_value || '';
     try {
       const parsed = JSON.parse(item.content_value);
-      return extractPlainTextFromTiptap(parsed);
+      return previewOnly
+        ? extractMultilinePlainTextFromTiptap(parsed)
+        : extractPlainTextFromTiptap(parsed);
     } catch {
       return item.content_value;
     }
@@ -95,7 +101,9 @@ export default function SidebarTranslationRow({
     if (!isRichText || !storeValue) return storeValue || '';
     try {
       const parsed = JSON.parse(storeValue);
-      return extractPlainTextFromTiptap(parsed);
+      return previewOnly
+        ? extractMultilinePlainTextFromTiptap(parsed)
+        : extractPlainTextFromTiptap(parsed);
     } catch {
       return storeValue;
     }

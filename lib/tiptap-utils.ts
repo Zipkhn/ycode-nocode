@@ -291,3 +291,89 @@ export function extractPlainTextFromTiptap(content: any): string {
 
   return result.trim();
 }
+
+/**
+ * Extract plain text from Tiptap JSON, preserving block-level boundaries as
+ * newlines. Useful for multi-line previews (e.g. read-only translation
+ * textareas) where collapsing paragraphs/headings into a single line would
+ * misrepresent the structure of the original content.
+ *
+ * Inline marks (bold, italic, links) are dropped — only the textual content
+ * and dynamic-variable labels survive.
+ */
+export function extractMultilinePlainTextFromTiptap(content: any): string {
+  if (!content || typeof content !== 'object') return '';
+
+  // Block-level nodes that should each occupy their own line in the preview.
+  const BLOCK_TYPES = new Set([
+    'paragraph',
+    'heading',
+    'blockquote',
+    'codeBlock',
+    'listItem',
+    'horizontalRule',
+    'richTextHtmlEmbed',
+    'richTextImage',
+    'richTextComponent',
+  ]);
+
+  const lines: string[] = [];
+
+  const collectInline = (node: any, into: { text: string }): void => {
+    if (!node) return;
+    if (node.type === 'text' && node.text) {
+      into.text += node.text;
+      return;
+    }
+    if (node.type === 'dynamicVariable' && node.attrs?.label) {
+      into.text += `[${node.attrs.label}]`;
+      return;
+    }
+    if (node.type === 'hardBreak') {
+      into.text += '\n';
+      return;
+    }
+    if (Array.isArray(node.content)) {
+      node.content.forEach((child: any) => collectInline(child, into));
+    }
+  };
+
+  const visit = (node: any): void => {
+    if (!node) return;
+    if (node.type === 'horizontalRule') {
+      lines.push('');
+      return;
+    }
+    if (BLOCK_TYPES.has(node.type)) {
+      const acc = { text: '' };
+      if (Array.isArray(node.content)) {
+        node.content.forEach((child: any) => {
+          // Nested block nodes (e.g. a paragraph inside a listItem) get their
+          // own line so list bullets / quotes still read naturally.
+          if (BLOCK_TYPES.has(child?.type)) {
+            visit(child);
+          } else {
+            collectInline(child, acc);
+          }
+        });
+      }
+      if (acc.text) {
+        lines.push(acc.text);
+      }
+      return;
+    }
+    if (Array.isArray(node.content)) {
+      node.content.forEach(visit);
+    }
+  };
+
+  if (content.type === 'doc' && Array.isArray(content.content)) {
+    content.content.forEach(visit);
+  } else if (Array.isArray(content)) {
+    content.forEach(visit);
+  } else {
+    visit(content);
+  }
+
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
