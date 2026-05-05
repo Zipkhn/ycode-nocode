@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
@@ -27,6 +28,14 @@ interface SidebarTranslationRowProps {
   getTranslationByKey: (localeId: string, key: string) => Translation | undefined;
   createTranslation: (data: CreateTranslationData) => Promise<Translation | null>;
   updateTranslation: (translation: Translation, data: UpdateTranslationData) => Promise<void>;
+  /**
+   * When true, both source and translation textareas are read-only previews.
+   * Used for rich-text layers where editing happens in a dedicated overlay
+   * (the RichTextEditorSheet) opened via `onExpand`.
+   */
+  previewOnly?: boolean;
+  /** Click handler for the "Expand to edit" button shown in preview-only mode. */
+  onExpand?: () => void;
 }
 
 /**
@@ -52,6 +61,8 @@ export default function SidebarTranslationRow({
   getTranslationByKey,
   createTranslation,
   updateTranslation,
+  previewOnly = false,
+  onExpand,
 }: SidebarTranslationRowProps) {
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false);
 
@@ -247,7 +258,9 @@ export default function SidebarTranslationRow({
         )}
       </div>
 
-      {/* Translation (current locale, editable) */}
+      {/* Translation (current locale). Editable for plain text/asset rows;
+          read-only preview + Expand button when caller opted into previewOnly
+          mode (rich-text layers, which edit in the dedicated overlay). */}
       <div className="flex flex-col gap-1.5">
         <Label className="text-xs font-medium">{currentLocaleLabel}</Label>
         {isAsset ? (
@@ -257,6 +270,15 @@ export default function SidebarTranslationRow({
           >
             {displayedAsset && renderAssetPreview(displayedAsset)}
           </div>
+        ) : previewOnly ? (
+          <Textarea
+            value={translationDisplayValue}
+            readOnly
+            tabIndex={-1}
+            placeholder={sourceDisplayValue || 'No translation yet'}
+            className="resize-none text-muted-foreground"
+            rows={3}
+          />
         ) : (
           <Textarea
             value={translationDisplayValue}
@@ -266,6 +288,18 @@ export default function SidebarTranslationRow({
             className="resize-none"
             rows={3}
           />
+        )}
+        {previewOnly && onExpand && (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="gap-2.5 mt-1"
+            onClick={onExpand}
+          >
+            Expand to edit
+            <span><Icon name="expand" className="size-2.5" /></span>
+          </Button>
         )}
       </div>
 

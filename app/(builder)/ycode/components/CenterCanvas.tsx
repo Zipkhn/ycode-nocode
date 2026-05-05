@@ -645,7 +645,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const activeInteractionTriggerLayerId = useEditorStore((state) => state.activeInteractionTriggerLayerId);
   const richTextSheetLayerId = useEditorStore((state) => state.richTextSheetLayerId);
   const closeRichTextSheet = useEditorStore((state) => state.closeRichTextSheet);
-  const openRichTextSheet = useEditorStore((state) => state.openRichTextSheet);
   const activeSublayerIndex = useEditorStore((state) => state.activeSublayerIndex);
   const setActiveSublayerIndex = useEditorStore((state) => state.setActiveSublayerIndex);
   const activeListItemIndex = useEditorStore((state) => state.activeListItemIndex);
@@ -1642,32 +1641,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
       });
     }
   }, [richTextSheetLayerId, updateLayer, richTextTranslationContext, selectedLocaleId, flushRichTextTranslationSave]);
-
-  // Auto-open the rich-text editor sheet when a rich-text layer is selected
-  // while localizing — the sheet is the translation surface for rich text, so
-  // it replaces the regular sidebar editor for these layers. We only fire on
-  // selection transitions so the user is free to close the sheet without it
-  // immediately re-opening for the same selection.
-  const lastAutoOpenedRichTextLayerRef = useRef<string | null>(null);
-  useEffect(() => {
-    const isLocalizing = !!(selectedLocale && !selectedLocale.is_default);
-    if (!isLocalizing || !selectedLayerId) {
-      lastAutoOpenedRichTextLayerRef.current = null;
-      return;
-    }
-    if (lastAutoOpenedRichTextLayerRef.current === selectedLayerId) return;
-
-    const sourceLayers: Layer[] = editingComponentId
-      ? (componentDrafts[editingComponentId] || [])
-      : (currentDraft?.layers || []);
-    const layer = findLayerById(sourceLayers, selectedLayerId);
-    if (layer && isRichTextLayer(layer)) {
-      lastAutoOpenedRichTextLayerRef.current = selectedLayerId;
-      openRichTextSheet(selectedLayerId);
-    } else {
-      lastAutoOpenedRichTextLayerRef.current = null;
-    }
-  }, [selectedLocale, selectedLayerId, editingComponentId, componentDrafts, currentDraft, openRichTextSheet]);
 
   // Handle iframe ready callback (for SelectionOverlay)
   const handleIframeReady = useCallback((iframeElement: HTMLIFrameElement) => {

@@ -298,20 +298,11 @@ const RightSidebar = React.memo(function RightSidebar({
 
   const translatableItemsForSelectedLayer = useMemo(() => {
     if (!selectedLayer || !translationSource) return [];
-    const items = extractLayerTranslatableItemsShallow(
+    return extractLayerTranslatableItemsShallow(
       selectedLayer,
       translationSource.sourceType,
       translationSource.sourceId,
     );
-    // For the dedicated richText element we route translations through the
-    // RichTextEditorSheet overlay (auto-opened by CenterCanvas), so suppress
-    // its sidebar entry to avoid a duplicate plain-text editor. Headings,
-    // paragraphs, etc. that happen to use the rich-text variable type keep
-    // their textarea editor here — only the `richText` element is special.
-    if (isRichTextLayer(selectedLayer)) {
-      return items.filter((item) => item.content_type !== 'richtext');
-    }
-    return items;
   }, [selectedLayer, translationSource]);
 
   const hasCustomAttributes = !!(selectedLayer?.settings?.customAttributes &&
@@ -2054,53 +2045,41 @@ const RightSidebar = React.memo(function RightSidebar({
             {isLocalizing && selectedLayer && currentLocale && (
               <div className="flex flex-col gap-6 py-5">
                 {translatableItemsForSelectedLayer.length === 0 ? (
-                  // Rich text translations are routed through the
-                  // RichTextEditorSheet overlay. Mirror the regular Element →
-                  // Content row used for non-localizing rich text editing so
-                  // the user can re-open the editor after closing it.
-                  isRichTextLayer(selectedLayer) ? (
-                    <div className="grid grid-cols-3 items-center">
-                      <Label variant="muted">Content</Label>
-                      <div className="col-span-2 *:w-full">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          className="gap-2.5"
-                          onClick={() => selectedLayerId && openRichTextSheet(selectedLayerId)}
-                        >
-                          Expand
-                          <span><Icon name="expand" className="size-2.5" /></span>
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Empty>
-                      <EmptyMedia variant="icon">
-                        <Icon name="globe" />
-                      </EmptyMedia>
-                      <EmptyTitle>Nothing to translate</EmptyTitle>
-                      <EmptyDescription>
-                        This layer has no translatable content. Select a text or media element.
-                      </EmptyDescription>
-                    </Empty>
-                  )
+                  <Empty>
+                    <EmptyMedia variant="icon">
+                      <Icon name="globe" />
+                    </EmptyMedia>
+                    <EmptyTitle>Nothing to translate</EmptyTitle>
+                    <EmptyDescription>
+                      This layer has no translatable content. Select a text or media element.
+                    </EmptyDescription>
+                  </Empty>
                 ) : (
-                  translatableItemsForSelectedLayer.map((item) => (
-                    <SidebarTranslationRow
-                      key={item.key}
-                      item={item}
-                      selectedLocaleId={selectedLocaleId}
-                      defaultLocaleLabel={defaultLocale?.label || 'Default'}
-                      currentLocaleLabel={currentLocale.label}
-                      localInputValues={translationLocalInputValues}
-                      onLocalValueChange={handleTranslationLocalValueChange}
-                      onLocalValueClear={handleTranslationLocalValueClear}
-                      getTranslationByKey={getTranslationByKey}
-                      createTranslation={createTranslation}
-                      updateTranslation={updateTranslation}
-                    />
-                  ))
+                  translatableItemsForSelectedLayer.map((item) => {
+                    // Rich-text element layers are previewed read-only here
+                    // and edited in the dedicated RichTextEditorSheet overlay,
+                    // launched via the per-row "Expand to edit" button.
+                    const isRichTextElementContent = isRichTextLayer(selectedLayer) && item.content_type === 'richtext';
+                    return (
+                      <SidebarTranslationRow
+                        key={item.key}
+                        item={item}
+                        selectedLocaleId={selectedLocaleId}
+                        defaultLocaleLabel={defaultLocale?.label || 'Default'}
+                        currentLocaleLabel={currentLocale.label}
+                        localInputValues={translationLocalInputValues}
+                        onLocalValueChange={handleTranslationLocalValueChange}
+                        onLocalValueClear={handleTranslationLocalValueClear}
+                        getTranslationByKey={getTranslationByKey}
+                        createTranslation={createTranslation}
+                        updateTranslation={updateTranslation}
+                        previewOnly={isRichTextElementContent}
+                        onExpand={isRichTextElementContent && selectedLayerId
+                          ? () => openRichTextSheet(selectedLayerId)
+                          : undefined}
+                      />
+                    );
+                  })
                 )}
               </div>
             )}
