@@ -492,14 +492,6 @@ export default function HeaderBar({
       </div>
 
       <div className="flex gap-1.5 items-center justify-center">
-        {/* Subtle 'Translating' badge so the user always knows the canvas is
-            in read-only translation mode (canvas mutations are disabled,
-            sidebar shows the per-layer Translate panel instead of Design). */}
-        {selectedLocale && !selectedLocale.is_default && (
-          <Badge variant="secondary" className="text-[10px] uppercase">
-            Translating
-          </Badge>
-        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="xs" variant="ghost">
