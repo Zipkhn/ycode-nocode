@@ -930,6 +930,7 @@ export interface SupabaseConfig {
   serviceRoleKey: string;
   connectionUrl: string; // With [YOUR-PASSWORD] placeholder
   dbPassword: string; // Actual password to replace [YOUR-PASSWORD]
+  supabaseUrl?: string; // Explicit API URL for self-hosted instances (e.g. https://supabase.my-company.com)
 }
 
 // Internal credentials structure (derived from SupabaseConfig)
@@ -940,7 +941,7 @@ export interface SupabaseCredentials {
   dbPassword: string;
   // Derived properties
   projectId: string;
-  projectUrl: string; // API URL: https://[PROJECT_ID].supabase.co
+  projectUrl: string; // API URL — explicit or derived from project ID
   dbHost: string;
   dbPort: number;
   dbName: string;
@@ -1166,7 +1167,7 @@ export interface CollectionImport {
   processed_rows: number;
   failed_rows: number;
   column_mapping: Record<string, string>; // csvColumn -> fieldId
-  csv_data: Record<string, string>[]; // Array of row objects
+  csv_data: { storage_path: string } | Record<string, string>[] | null;
   errors: string[] | null;
   created_at: string;
   updated_at: string;

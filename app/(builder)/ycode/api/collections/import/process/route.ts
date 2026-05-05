@@ -1,12 +1,11 @@
 import { NextRequest } from 'next/server';
 import {
-  getPendingImports,
   getImportById,
   updateImportStatus,
   updateImportProgress,
   completeImport,
 } from '@/lib/repositories/collectionImportRepository';
-import { createItemsBulk, getMaxIdValue, getMaxManualOrder } from '@/lib/repositories/collectionItemRepository';
+import { createItemsBulk, deleteItem, getMaxIdValue, getMaxManualOrder } from '@/lib/repositories/collectionItemRepository';
 import { insertValuesBulk } from '@/lib/repositories/collectionItemValueRepository';
 import { getFieldsByCollectionId } from '@/lib/repositories/collectionFieldRepository';
 import {
@@ -24,6 +23,8 @@ import { uploadFile } from '@/lib/file-upload';
 import { findAssetsByFilenames } from '@/lib/repositories/assetRepository';
 import { generateCollectionItemContentHash } from '@/lib/hash-utils';
 import { noCache } from '@/lib/api-response';
+import { getSupabaseAdmin } from '@/lib/supabase-server';
+import { STORAGE_BUCKET } from '@/lib/asset-constants';
 import { randomUUID } from 'crypto';
 import type { CollectionField } from '@/types';
 
@@ -82,10 +83,6 @@ async function downloadAndUploadAsset(url: string): Promise<UploadedAsset | null
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-const BATCH_SIZE_DEFAULT = 50;
-const BATCH_SIZE_WITH_ASSETS = 10;
-
 interface PreparedValue {
   item_id: string;
   field_id: string;
@@ -191,68 +188,68 @@ function prepareRow(
 }
 
 /**
- * Fallback: insert rows one by one to pinpoint which row(s) caused the DB error.
- * Only called when the bulk insert fails.
+ * Load a batch of rows from a JSON file in Supabase Storage.
+ * Used when rows are too large for the request body — the client uploads
+ * each batch as a small JSON file instead of sending the full CSV.
  */
-async function insertRowByRow(
-  preparedRows: PreparedRow[],
-  errors: string[]
-): Promise<{ succeeded: number; failed: number }> {
-  let succeeded = 0;
-  let failed = 0;
-
-  for (const row of preparedRows) {
-    try {
-      await createItemsBulk([row.item]);
-
-      if (row.values.length > 0) {
-        await insertValuesBulk(row.values);
-      }
-
-      succeeded++;
-    } catch (error) {
-      failed++;
-      errors.push(`Row ${row.rowNumber}: DB insert failed — ${getErrorMessage(error)}`);
-    }
+async function loadBatchFromStorage(
+  batchPath: string,
+): Promise<{ rows: Record<string, string>[]; supabase: Awaited<ReturnType<typeof getSupabaseAdmin>> }> {
+  const supabase = await getSupabaseAdmin();
+  if (!supabase) {
+    throw new Error('Storage not configured');
   }
 
-  return { succeeded, failed };
+  const { data: fileBlob, error: downloadError } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .download(batchPath);
+
+  if (downloadError || !fileBlob) {
+    console.error('Failed to download batch from storage:', downloadError);
+    throw new Error('Failed to read batch file from storage');
+  }
+
+  const text = await fileBlob.text();
+  console.warn(`[csv-import] Downloaded batch from storage: ${(text.length / 1024).toFixed(0)}KB`);
+  const rows = JSON.parse(text) as Record<string, string>[];
+
+  // Clean up the batch file immediately
+  try {
+    await supabase.storage.from(STORAGE_BUCKET).remove([batchPath]);
+  } catch { /* best-effort */ }
+
+  return { rows, supabase };
 }
 
 /**
  * POST /ycode/api/collections/import/process
- * Process pending import jobs in batches.
- * Uses bulk INSERT operations to minimize DB round-trips,
- * with row-by-row fallback for precise error identification.
+ * Process the next batch of rows for an import job.
  *
- * Body (optional):
- *  - importId: string - Process specific import (otherwise processes next pending)
+ * Row delivery methods (in order of preference):
+ *  1. rows[] in body — for batches that fit under Vercel's 4.5MB body limit
+ *  2. batchStoragePath in body — client uploaded the batch as a JSON file to storage
+ *
+ * Body:
+ *  - importId: string - The import job to process
+ *  - rows?: Record<string, string>[] - Batch of CSV rows (small batches)
+ *  - batchStoragePath?: string - Path to a batch JSON file in storage (large rows)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { importId } = body;
+    const { importId, rows: clientRows, batchStoragePath } = body as {
+      importId?: string;
+      rows?: Record<string, string>[];
+      batchStoragePath?: string;
+    };
 
-    let importJob;
+    if (!importId) {
+      return noCache({ error: 'importId is required' }, 400);
+    }
 
-    if (importId) {
-      // Process specific import
-      importJob = await getImportById(importId);
-      if (!importJob) {
-        return noCache(
-          { error: 'Import job not found' },
-          404
-        );
-      }
-    } else {
-      // Get next pending import
-      const pendingImports = await getPendingImports(1);
-      if (pendingImports.length === 0) {
-        return noCache({
-          data: { message: 'No pending imports' }
-        });
-      }
-      importJob = pendingImports[0];
+    let importJob = await getImportById(importId);
+    if (!importJob) {
+      return noCache({ error: 'Import job not found' }, 404);
     }
 
     // Skip if already completed or failed
@@ -282,8 +279,42 @@ export async function POST(request: NextRequest) {
         }
       });
     }
-    // Use the fresh data
     importJob = freshImportJob;
+
+    const startIndex = importJob.processed_rows + importJob.failed_rows;
+    const csvMeta = importJob.csv_data as { storage_path?: string } | null;
+
+    // Resolve rows: body → batch file in storage
+    let rowsToProcess: Record<string, string>[];
+    let supabaseForCleanup: Awaited<ReturnType<typeof getSupabaseAdmin>> = null;
+
+    if (clientRows && Array.isArray(clientRows) && clientRows.length > 0) {
+      rowsToProcess = clientRows;
+      console.warn(`[csv-import] Client body: ${clientRows.length} rows, startIndex=${startIndex}`);
+    } else if (batchStoragePath) {
+      console.warn(`[csv-import] Batch from storage: ${batchStoragePath}, startIndex=${startIndex}`);
+      const storageResult = await loadBatchFromStorage(batchStoragePath);
+      rowsToProcess = storageResult.rows;
+      supabaseForCleanup = storageResult.supabase;
+    } else {
+      rowsToProcess = [];
+    }
+
+    if (rowsToProcess.length === 0) {
+      const errors = importJob.errors || [];
+      await completeImport(importJob.id, importJob.processed_rows, importJob.failed_rows, errors);
+      return noCache({
+        data: {
+          importId: importJob.id,
+          status: 'completed',
+          totalRows: importJob.total_rows,
+          processedRows: importJob.processed_rows,
+          failedRows: importJob.failed_rows,
+          isComplete: true,
+          errors: errors.slice(-10),
+        }
+      });
+    }
 
     // Get collection fields (1 query, reused for all rows)
     const fields = await getFieldsByCollectionId(importJob.collection_id, false);
@@ -304,18 +335,6 @@ export async function POST(request: NextRequest) {
     let currentMaxId = currentMaxIdResult;
     const manualOrderOffset = currentMaxOrderResult + 1;
 
-    // Use smaller batches when asset downloads are needed (slower per row)
-    const mappedFieldIds = new Set(Object.values(importJob.column_mapping).filter(Boolean));
-    const hasAssetFields = fields.some(f =>
-      mappedFieldIds.has(f.id) && (isAssetFieldType(f.type) || f.type === 'rich_text')
-    );
-    const batchSize = hasAssetFields ? BATCH_SIZE_WITH_ASSETS : BATCH_SIZE_DEFAULT;
-
-    // Calculate which rows to process
-    const startIndex = importJob.processed_rows;
-    const endIndex = Math.min(startIndex + batchSize, importJob.total_rows);
-    const rowsToProcess = importJob.csv_data.slice(startIndex, endIndex);
-
     const errors: string[] = [...(importJob.errors || [])];
     let processedCount = importJob.processed_rows;
     let failedCount = importJob.failed_rows;
@@ -332,7 +351,7 @@ export async function POST(request: NextRequest) {
         const { prepared, newMaxId } = prepareRow(
           row, rowNumber, importJob.collection_id,
           importJob.column_mapping, fieldMap, autoFields,
-          currentMaxId, manualOrderOffset + startIndex + i, now, errors
+          currentMaxId, manualOrderOffset + i, now, errors
         );
         currentMaxId = newMaxId;
         preparedRows.push(prepared);
@@ -365,14 +384,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Merge all unique URLs from both asset fields and rich-text images
     const allUniqueUrls = new Set([
       ...allPendingAssets.map(a => a.asset.url),
       ...richTextImageUrls,
     ]);
 
     if (allUniqueUrls.size > 0) {
-      // 1) Extract filenames from all URLs and batch-query existing assets (1 DB query)
+      console.warn(`[csv-import] Processing ${allUniqueUrls.size} unique asset URLs`);
+
       const urlToFilename = new Map<string, string>();
       const filenamesToCheck: string[] = [];
       for (const url of allUniqueUrls) {
@@ -385,7 +404,6 @@ export async function POST(request: NextRequest) {
 
       const existingAssets = await findAssetsByFilenames(filenamesToCheck);
 
-      // 2) Resolve URLs: reuse existing assets or mark for download
       const urlToUploadedAsset = new Map<string, UploadedAsset>();
       const urlsToDownload: string[] = [];
 
@@ -399,8 +417,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 3) Download + upload only the URLs not already in the DB (parallel, batched)
-      const ASSET_CONCURRENCY = 20;
+      const ASSET_CONCURRENCY = 10;
       for (let i = 0; i < urlsToDownload.length; i += ASSET_CONCURRENCY) {
         const batch = urlsToDownload.slice(i, i + ASSET_CONCURRENCY);
         const results = await Promise.allSettled(
@@ -416,7 +433,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 4) Assign asset IDs back to asset field values
       for (const { row, asset } of allPendingAssets) {
         const uploaded = urlToUploadedAsset.get(asset.url);
         if (uploaded) {
@@ -428,7 +444,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 5) Replace image URLs in rich-text field values
       if (richTextImageUrls.size > 0) {
         const rtUrlToAsset = new Map<string, { assetId: string; publicUrl: string }>();
         for (const url of richTextImageUrls) {
@@ -457,24 +472,21 @@ export async function POST(request: NextRequest) {
     }
 
     if (preparedRows.length > 0) {
-      try {
-        // Bulk insert items with content_hash (1 query)
-        await createItemsBulk(preparedRows.map(r => r.item));
+      await createItemsBulk(preparedRows.map(r => r.item));
 
-        // Bulk insert values (1 query)
-        const allValues = preparedRows.flatMap(r => r.values);
-        if (allValues.length > 0) {
-          await insertValuesBulk(allValues);
+      for (const row of preparedRows) {
+        try {
+          if (row.values.length > 0) {
+            await insertValuesBulk(row.values);
+          }
+          processedCount++;
+        } catch (error) {
+          failedCount++;
+          errors.push(`Row ${row.rowNumber}: DB insert failed — ${getErrorMessage(error)}`);
+          try {
+            await deleteItem(row.itemId);
+          } catch { /* best-effort cleanup */ }
         }
-
-        processedCount += preparedRows.length;
-      } catch (bulkError) {
-        // Bulk failed — fall back to row-by-row to identify the culprit(s)
-        console.error('Bulk insert failed, falling back to row-by-row:', bulkError);
-
-        const { succeeded, failed } = await insertRowByRow(preparedRows, errors);
-        processedCount += succeeded;
-        failedCount += failed;
       }
     }
 
@@ -494,6 +506,16 @@ export async function POST(request: NextRequest) {
 
     if (isComplete) {
       await completeImport(importJob.id, processedCount, failedCount, errors);
+
+      // Clean up the CSV file from storage
+      if (csvMeta?.storage_path) {
+        try {
+          const supabase = supabaseForCleanup || await getSupabaseAdmin();
+          if (supabase) {
+            await supabase.storage.from(STORAGE_BUCKET).remove([csvMeta.storage_path]);
+          }
+        } catch { /* best-effort cleanup */ }
+      }
     }
 
     return noCache({

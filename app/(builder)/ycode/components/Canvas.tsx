@@ -98,6 +98,8 @@ interface CanvasProps {
   onLayerHover?: (layerId: string | null) => void;
   /** Callback when any click occurs inside the canvas (for closing panels) */
   onCanvasClick?: () => void;
+  /** Callback when a component instance is double-clicked on the canvas */
+  onComponentEdit?: (componentId: string, instanceLayerId: string) => void;
   /** Component variables when editing a component (for default value display) */
   editingComponentVariables?: ComponentVariable[];
   /** Disable editor hidden layers (e.g., when Interactions panel is active) */
@@ -128,6 +130,7 @@ interface CanvasContentProps {
   editorHiddenLayerIds?: Map<string, Breakpoint[]>;
   editorBreakpoint?: Breakpoint;
   zoom?: number;
+  onComponentEdit?: (componentId: string, instanceLayerId: string) => void;
 }
 
 function CanvasContent({
@@ -147,6 +150,7 @@ function CanvasContent({
   editorHiddenLayerIds,
   editorBreakpoint,
   zoom = 100,
+  onComponentEdit,
 }: CanvasContentProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
@@ -278,6 +282,7 @@ function CanvasContent({
           editorHiddenLayerIds={editorHiddenLayerIds}
           editorBreakpoint={editorBreakpoint}
           ancestorComponentIds={initialAncestorIds}
+          onComponentEdit={onComponentEdit}
         />
       </div>
     </CanvasPortalProvider>
@@ -322,6 +327,7 @@ export default function Canvas({
   onIframeReady,
   onLayerHover,
   onCanvasClick,
+  onComponentEdit,
   editingComponentVariables,
   disableEditorHiddenLayers = false,
   zoom = 100,
@@ -563,6 +569,7 @@ export default function Canvas({
         editorHiddenLayerIds={editorHiddenLayerIds}
         editorBreakpoint={breakpoint}
         zoom={zoom}
+        onComponentEdit={onComponentEdit}
       />
     );
   // selectedLayerId and hoveredLayerId are intentionally excluded from deps:
@@ -585,6 +592,7 @@ export default function Canvas({
     editorHiddenLayerIds,
     breakpoint,
     zoom,
+    onComponentEdit,
   ]);
 
   // Handle keyboard events from iframe
