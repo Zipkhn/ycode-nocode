@@ -297,14 +297,20 @@ const RightSidebar = React.memo(function RightSidebar({
 
   const translatableItemsForSelectedLayer = useMemo(() => {
     if (!selectedLayer || !translationSource) return [];
-    // Rich text translations are edited in the dedicated RichTextEditorSheet
-    // overlay (auto-opened by CenterCanvas), so we hide them from the sidebar
-    // to avoid a duplicate, less-capable plain-text editor for the same field.
-    return extractLayerTranslatableItemsShallow(
+    const items = extractLayerTranslatableItemsShallow(
       selectedLayer,
       translationSource.sourceType,
       translationSource.sourceId,
-    ).filter((item) => item.content_type !== 'richtext');
+    );
+    // For the dedicated richText element we route translations through the
+    // RichTextEditorSheet overlay (auto-opened by CenterCanvas), so suppress
+    // its sidebar entry to avoid a duplicate plain-text editor. Headings,
+    // paragraphs, etc. that happen to use the rich-text variable type keep
+    // their textarea editor here — only the `richText` element is special.
+    if (isRichTextLayer(selectedLayer)) {
+      return items.filter((item) => item.content_type !== 'richtext');
+    }
+    return items;
   }, [selectedLayer, translationSource]);
 
   const hasCustomAttributes = !!(selectedLayer?.settings?.customAttributes &&
