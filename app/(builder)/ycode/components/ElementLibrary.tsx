@@ -280,6 +280,7 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   const { addLayerFromTemplate, updateLayer, setDraftLayers, draftsByPageId, pages } = usePagesStore();
   const { currentPageId, selectedLayerId, setSelectedLayerId, editingComponentId, activeBreakpoint, pushComponentNavigation, startCanvasDrag, endCanvasDrag } = useEditorStore();
   const { isLocalizing } = useLocalizationMode();
+  const leftSidebarWidth = useEditorStore((state) => state.leftSidebarWidth);
   const { components, componentDrafts, updateComponentDraft, deleteComponent, getDeletePreview, loadComponentDraft, getComponentById, loadComponents } = useComponentsStore();
   const { openComponent } = useEditorActions();
 
@@ -1415,9 +1416,10 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   return (
     <div
       className={cn(
-        'fixed left-64 top-14 bottom-0 w-64 bg-background border-r z-50 flex flex-col',
+        'fixed top-14 bottom-0 w-64 bg-background border-r z-50 flex flex-col',
         !isOpen && 'hidden'
       )}
+      style={{ left: `${leftSidebarWidth}px` }}
     >
         {/* Tabs */}
         <Tabs
