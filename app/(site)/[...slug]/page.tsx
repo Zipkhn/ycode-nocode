@@ -288,6 +288,7 @@ export default async function Page({ params }: PageProps) {
           layers={errorPageLayers.layers || []}
           components={errorComponents}
           generatedCss={globalSettings.publishedCss || undefined}
+          colorVariablesCss={globalSettings.colorVariablesCss || undefined}
           globalCustomCodeHead={globalSettings.globalCustomCodeHead}
           globalCustomCodeBody={globalSettings.globalCustomCodeBody}
         />
@@ -323,6 +324,7 @@ export default async function Page({ params }: PageProps) {
             layers={errorPageLayers.layers || []}
             components={errorComponents}
             generatedCss={globalSettings.publishedCss || undefined}
+            colorVariablesCss={globalSettings.colorVariablesCss || undefined}
             globalCustomCodeHead={globalSettings.globalCustomCodeHead}
             globalCustomCodeBody={globalSettings.globalCustomCodeBody}
             passwordProtection={{

@@ -5,6 +5,7 @@ import PageRenderer from '@/components/PageRenderer';
 import PasswordForm from '@/components/PasswordForm';
 import { fetchGlobalPageSettings } from '@/lib/generate-page-metadata';
 import { getSettingByKey } from '@/lib/repositories/settingsRepository';
+import { generateColorVariablesCss } from '@/lib/repositories/colorVariableRepository';
 import { parseAuthCookie, getPasswordProtection, fetchFoldersForAuth } from '@/lib/page-auth';
 import type { Redirect as RedirectType } from '@/types';
 
@@ -61,7 +62,10 @@ export default async function DynamicSlugPage({ params, searchParams }: DynamicS
     const errorPageData = await fetchErrorPage(404, true);
     if (errorPageData) {
       const { page, pageLayers, components } = errorPageData;
-      const publishedCSS = await getSettingByKey('published_css');
+      const [publishedCSS, colorVariablesCss] = await Promise.all([
+        getSettingByKey('published_css'),
+        generateColorVariablesCss(),
+      ]);
 
       return (
         <PageRenderer
@@ -69,6 +73,7 @@ export default async function DynamicSlugPage({ params, searchParams }: DynamicS
           layers={pageLayers.layers || []}
           components={components}
           generatedCss={publishedCSS}
+          colorVariablesCss={colorVariablesCss || undefined}
         />
       );
     }
@@ -87,7 +92,10 @@ export default async function DynamicSlugPage({ params, searchParams }: DynamicS
 
     if (!protection.isUnlocked) {
       const errorPageData = await fetchErrorPage(401, true);
-      const publishedCSS = await getSettingByKey('published_css');
+      const [publishedCSS, colorVariablesCss] = await Promise.all([
+        getSettingByKey('published_css'),
+        generateColorVariablesCss(),
+      ]);
 
       if (errorPageData) {
         const { page: errorPage, pageLayers: errorPageLayers, components: errorComponents } = errorPageData;
@@ -98,6 +106,7 @@ export default async function DynamicSlugPage({ params, searchParams }: DynamicS
             layers={errorPageLayers.layers || []}
             components={errorComponents}
             generatedCss={publishedCSS}
+            colorVariablesCss={colorVariablesCss || undefined}
             passwordProtection={{
               pageId: protection.protectedBy === 'page' ? protection.protectedById : undefined,
               folderId: protection.protectedBy === 'folder' ? protection.protectedById : undefined,
