@@ -2,7 +2,7 @@ import AnimationInitializer from '@/components/AnimationInitializer';
 import BodyClassApplier from '@/components/BodyClassApplier';
 import ContentHeightReporter from '@/components/ContentHeightReporter';
 import CustomCodeInjector from '@/components/CustomCodeInjector';
-import LayerRenderer from '@/components/LayerRenderer';
+import LayerRendererPublic from '@/components/LayerRendererPublic';
 import SliderInitializer from '@/components/SliderInitializer';
 import LightboxInitializer from '@/components/LightboxInitializer';
 import PasswordForm from '@/components/PasswordForm';
@@ -16,6 +16,7 @@ import { getAllPages } from '@/lib/repositories/pageRepository';
 import { getAllPageFolders } from '@/lib/repositories/pageFolderRepository';
 import { getMapboxAccessToken, getGoogleMapsEmbedApiKey } from '@/lib/map-server';
 import { getAllColorVariables } from '@/lib/repositories/colorVariableRepository';
+import { getSettingByKey } from '@/lib/repositories/settingsRepository';
 import { getItemsWithValues, getItemsWithValuesByIds } from '@/lib/repositories/collectionItemRepository';
 import { getFieldsByCollectionId } from '@/lib/repositories/collectionFieldRepository';
 import { REF_PAGE_PREFIX, REF_COLLECTION_PREFIX, isCollectionItemKeyword } from '@/lib/link-utils';
@@ -377,11 +378,12 @@ export default async function PageRenderer({
     console.error('[PageRenderer] Error loading fonts:', error);
   }
 
-  // Fetch server-side settings needed by LayerRenderer (map tokens, color variables)
-  const [mapboxToken, googleMapsEmbedKey, serverColorVariables] = await Promise.all([
+  // Fetch server-side settings needed by LayerRenderer (map tokens, color variables, timezone)
+  const [mapboxToken, googleMapsEmbedKey, serverColorVariables, timezoneSetting] = await Promise.all([
     getMapboxAccessToken(),
     getGoogleMapsEmbedApiKey(),
     getAllColorVariables(),
+    getSettingByKey('timezone').catch(() => null),
   ]);
   const serverSettings: Record<string, unknown> = {};
   if (mapboxToken) {
@@ -392,6 +394,9 @@ export default async function PageRenderer({
   }
   if (serverColorVariables.length > 0) {
     serverSettings.color_variables = serverColorVariables;
+  }
+  if (typeof timezoneSetting === 'string' && timezoneSetting) {
+    serverSettings.timezone = timezoneSetting;
   }
 
   // Pre-resolve all asset URLs for SSR (images, videos, audio, icons, and field values)
@@ -526,9 +531,8 @@ export default async function PageRenderer({
         data-layer-type="div"
         data-is-empty={hasLayers ? 'false' : 'true'}
       >
-        <LayerRenderer
+        <LayerRendererPublic
           layers={childLayers}
-          isEditMode={false}
           isPublished={page.is_published}
           pageCollectionItemId={collectionItem?.id}
           pageCollectionItemData={collectionItem?.values || undefined}
