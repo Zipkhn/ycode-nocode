@@ -561,8 +561,17 @@ export function collectLayerAssetIds(
     // Collection item values on resolved collection layers
     if (layer._collectionItemValues) {
       for (const value of Object.values(layer._collectionItemValues)) {
-        if (typeof value === 'string' && isValidUUID(value)) {
-          assetIds.add(value);
+        if (typeof value === 'string') {
+          if (isValidUUID(value)) {
+            assetIds.add(value);
+          } else if (value.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(value);
+              if (parsed?.type === 'asset' && parsed?.asset?.id && isValidUUID(parsed.asset.id)) {
+                assetIds.add(parsed.asset.id);
+              }
+            } catch { /* not valid JSON, skip */ }
+          }
         }
         // Scan rich_text values (Tiptap JSON) for embedded image assets
         if (value && typeof value === 'object' && (value as any).type === 'doc') {

@@ -1838,32 +1838,37 @@ const CMS = React.memo(function CMS() {
                       // Link fields - format for display
                       if (field.type === 'link') {
                         let displayValue = '-';
+                        let isAssetLink = false;
                         if (value) {
                           try {
                             const linkValue = typeof value === 'string' ? parseCollectionLinkValue(value) : value;
                             if (linkValue) {
-                              // Build collectionItemSlugs map for dynamic page resolution
-                              const collectionItemSlugs: Record<string, string> = {};
-                              collectionItems.forEach(item => {
-                                const slugField = collectionFields.find(f => f.key === 'slug');
-                                if (slugField && item.values[slugField.id]) {
-                                  collectionItemSlugs[item.id] = item.values[slugField.id];
-                                }
-                              });
+                              if (linkValue.type === 'asset' && linkValue.asset?.id) {
+                                const asset = getAsset(linkValue.asset.id);
+                                displayValue = asset?.filename || linkValue.asset.id;
+                                isAssetLink = true;
+                              } else {
+                                // Build collectionItemSlugs map for dynamic page resolution
+                                const collectionItemSlugs: Record<string, string> = {};
+                                collectionItems.forEach(item => {
+                                  const slugField = collectionFields.find(f => f.key === 'slug');
+                                  if (slugField && item.values[slugField.id]) {
+                                    collectionItemSlugs[item.id] = item.values[slugField.id];
+                                  }
+                                });
 
-                              // Resolve the link to get the actual URL
-                              const resolvedUrl = resolveCollectionLinkValue(linkValue, {
-                                pages,
-                                folders,
-                                collectionItemSlugs,
-                                isPreview: false,
-                                locale: undefined,
-                              });
+                                const resolvedUrl = resolveCollectionLinkValue(linkValue, {
+                                  pages,
+                                  folders,
+                                  collectionItemSlugs,
+                                  isPreview: false,
+                                  locale: undefined,
+                                });
 
-                              displayValue = resolvedUrl || '-';
+                                displayValue = resolvedUrl || '-';
+                              }
                             }
                           } catch {
-                            // Invalid JSON, show as-is
                             displayValue = String(value);
                           }
                         }
@@ -1873,8 +1878,14 @@ const CMS = React.memo(function CMS() {
                             className="px-4 py-5 text-muted-foreground max-w-50"
                             onClick={() => handleEditItem(item)}
                           >
-                            <span className="block truncate">
-                              {displayValue}
+                            <span className="flex items-center gap-1.5 truncate">
+                              {isAssetLink && (
+                                <Icon
+                                  name="paperclip"
+                                  className="size-3 shrink-0"
+                                />
+                              )}
+                              <span className="truncate">{displayValue}</span>
                             </span>
                           </td>
                         );
@@ -1929,7 +1940,7 @@ const CMS = React.memo(function CMS() {
                           >
                             {value ? (
                               <Badge variant="secondary" className="font-normal">
-                                <span className="line-clamp-1 truncate max-w-[200px]">{value}</span>
+                                <span className="line-clamp-1 truncate max-w-50">{value}</span>
                               </Badge>
                             ) : (
                               <span className="text-muted-foreground">-</span>
