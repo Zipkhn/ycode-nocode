@@ -16,7 +16,7 @@ import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/templates/utilitie
 import { useCanvasSlider } from '@/hooks/use-canvas-slider';
 import { resolveFieldFromSources } from '@/lib/cms-variables-utils';
 import { getDynamicTextContent, getImageUrlFromVariable, getVideoUrlFromVariable, getIframeUrlFromVariable, isFieldVariable, isAssetVariable, isStaticTextVariable, isDynamicTextVariable, getAssetId, getStaticTextContent, createAssetVariable, createDynamicTextVariable, resolveDesignStyles } from '@/lib/variable-utils';
-import { getTranslatedAssetId, getTranslatedText, applyCmsTranslations } from '@/lib/localisation-utils';
+import { getTranslatedAssetId, getTranslatedText, applyCmsTranslations, injectTranslatedText } from '@/lib/localisation-utils';
 import { isValidLinkSettings } from '@/lib/link-utils';
 import { DEFAULT_ASSETS, ASSET_CATEGORIES, isAssetOfType } from '@/lib/asset-utils';
 import { parseMultiAssetFieldValue, buildAssetVirtualValues } from '@/lib/multi-asset-utils';
@@ -1168,13 +1168,24 @@ const LayerItem: React.FC<{
   const component = (isEditMode && layer.componentId) ? getComponentById(layer.componentId) : null;
 
   // Transform component layers for this instance to ensure unique IDs per instance
-  // This enables animations to target the correct elements when multiple instances exist
+  // This enables animations to target the correct elements when multiple instances exist.
+  //
+  // Also inject translations for the active locale: in edit mode the component
+  // is re-resolved here from the store, bypassing the canvas-level
+  // injectTranslatedText pass on the serialized page layers. Without injecting
+  // here, component content would always render in the default language even
+  // when the user previews a non-default locale on a page.
   const transformedComponentLayers = useMemo(() => {
-    if (isEditMode && component && component.layers && component.layers.length > 0) {
-      return transformLayerIdsForInstance(component.layers, layer.id);
+    if (!isEditMode || !component?.layers?.length) return null;
+    const transformed = transformLayerIdsForInstance(component.layers, layer.id);
+    if (!currentLocale || currentLocale.is_default || !translations) {
+      return transformed;
     }
-    return null;
-  }, [isEditMode, component, layer.id]);
+    return injectTranslatedText(transformed, pageId || component.id, translations, {
+      includeIncomplete: true,
+      defaultMasterComponentId: component.id,
+    });
+  }, [isEditMode, component, layer.id, currentLocale, translations, pageId]);
 
   // Collect hidden layer IDs from the component's transformed layers
   // Needed because Canvas computes editorHiddenLayerIds from serializeLayers (different ID transform)

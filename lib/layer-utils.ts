@@ -2348,6 +2348,21 @@ function remapInteractionLayerIds(
 }
 
 /**
+ * Recursively tag a layer subtree with `_masterComponentId` so translation
+ * lookups in `injectTranslatedText` resolve to component-scoped keys.
+ * Mirrors `tagLayersWithComponentId` in `lib/resolve-components.ts`.
+ */
+function tagLayerSubtreeWithComponentId(layer: Layer, componentId: string): Layer {
+  return {
+    ...layer,
+    _masterComponentId: componentId,
+    children: layer.children
+      ? layer.children.map(child => tagLayerSubtreeWithComponentId(child, componentId))
+      : layer.children,
+  };
+}
+
+/**
  * Transform component layers with instance-specific IDs
  * This ensures each component instance has unique layer IDs for proper targeting
  */
@@ -2377,6 +2392,9 @@ function transformLayersForInstance(
     const transformedLayer: Layer = {
       ...layer,
       id: newId,
+      // Preserve the original layer ID so injectTranslatedText can resolve
+      // component-scoped translation keys (which use the template layer ID).
+      _originalLayerId: layer._originalLayerId || layer.id,
     };
 
     // Remap interaction IDs and tween layer_id references
@@ -2483,8 +2501,20 @@ function resolveComponentsInLayers(
           component.variables,
         );
 
+        // Tag children with the master component ID so injectTranslatedText
+        // resolves component-scoped translation keys (component:{componentId}:...)
+        // instead of falling back to page scope. Mirrors the server-side
+        // resolveComponents pipeline so the canvas matches what the published
+        // page renders.
+        const taggedChildren = overriddenChildren.map(child =>
+          tagLayerSubtreeWithComponentId(child, component.id)
+        );
+
         // Return the wrapper with the component's content merged in
         // IMPORTANT: Keep componentId so LayerRenderer knows this is a component instance
+        // _originalLayerId is the component's root template ID — translations on the
+        // root wrapper itself are stored under that ID, while the runtime ID is the
+        // page-instance ID.
         const resolved = {
           ...layer,
           ...componentContent, // Merge the component's properties (classes, design, etc.)
@@ -2492,7 +2522,9 @@ function resolveComponentsInLayers(
           componentId: layer.componentId, // Keep the original componentId for selection
           componentOverrides: layer.componentOverrides, // Keep instance overrides
           interactions: remappedInteractions, // Use remapped interactions
-          children: overriddenChildren,
+          children: taggedChildren,
+          _masterComponentId: component.id,
+          _originalLayerId: componentContent.id,
         };
 
         return resolved;
@@ -4276,4 +4308,28 @@ export function updateLayerProps(
     }
     return layer;
   });
+}
+
+/**
+ * Find all layers with a custom anchor ID (settings.id takes priority over attributes.id).
+ * Used by link settings to populate anchor selection dropdowns.
+ */
+export function findLayersWithAnchorId(layers: Layer[]): Array<{ layer: Layer; id: string }> {
+  const result: Array<{ layer: Layer; id: string }> = [];
+  const stack: Layer[] = [...layers];
+
+  while (stack.length > 0) {
+    const layer = stack.pop()!;
+
+    const layerId = layer.settings?.id || layer.attributes?.id;
+    if (layerId) {
+      result.push({ layer, id: layerId });
+    }
+
+    if (layer.children) {
+      stack.push(...layer.children);
+    }
+  }
+
+  return result;
 }

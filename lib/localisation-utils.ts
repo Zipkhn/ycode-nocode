@@ -1,6 +1,6 @@
 import type { Layer, Page, Translation, Locale, LocaleOption, CollectionField } from '@/types';
 import { getLayerIcon, getLayerName } from '@/lib/layer-utils';
-import { createDynamicTextVariable, createDynamicRichTextVariable, createAssetVariable } from '@/lib/variable-utils';
+import { createDynamicTextVariable, createDynamicRichTextVariable, createDynamicRichTextVariableFromPlainText, createAssetVariable } from '@/lib/variable-utils';
 import { castValue } from '@/lib/collection-utils';
 import { tiptapDocHasFormatting, tiptapDocToCanonicalString, hasVariableNode, hasAnyTextOrVariable } from '@/lib/tiptap-utils';
 import { looksLikeFormattedHtml } from '@/lib/translation-classification';
@@ -837,12 +837,18 @@ export function getTranslatedText(
  *
  * Shared between the server-side page fetcher (preview / published) and the
  * builder canvas so both paths produce identical output.
+ *
+ * @param defaultMasterComponentId - When provided, any layer that doesn't carry
+ *   `_masterComponentId` is treated as belonging to this component. Used by the
+ *   builder canvas while editing a component definition (where the rendered
+ *   layers are the component's raw layers, not a resolved instance), so
+ *   translations stored under `component:{componentId}:...` apply.
  */
 export function injectTranslatedText(
   layers: Layer[],
   pageId: string,
   translations: Record<string, Translation>,
-  options?: { includeIncomplete?: boolean }
+  options?: { includeIncomplete?: boolean; defaultMasterComponentId?: string }
 ): Layer[] {
   const valueOptions = options?.includeIncomplete ? { includeIncomplete: true } : undefined;
   return layers.map(layer => {
@@ -853,7 +859,8 @@ export function injectTranslatedText(
     // child layer IDs are transformed to instance-specific IDs (e.g., "instanceId-childId")
     // but translations are stored with the original component layer IDs.
     const translationLayerId = (layer as any)._originalLayerId || layer.id;
-    const masterComponentId = (layer as any)._masterComponentId as string | undefined;
+    const masterComponentId =
+      ((layer as any)._masterComponentId as string | undefined) ?? options?.defaultMasterComponentId;
 
     // 1. Inject text translation
     const textTranslationKey = buildLayerTranslationKey(pageId, `layer:${translationLayerId}:text`, masterComponentId);
@@ -861,9 +868,17 @@ export function injectTranslatedText(
 
     const textValue = getTranslationValue(textTranslation, valueOptions);
     if (textValue) {
-      // Preserve the original variable type (dynamic_text or dynamic_rich_text)
+      // Preserve the original variable type (dynamic_text or dynamic_rich_text).
+      // Use the translation's stored content_type to decide whether the value is
+      // a JSON-serialized Tiptap doc or plain text — when a rich-text source has
+      // no formatting, it's stored as plain text (see classifyLayerTextForTranslation),
+      // so blindly JSON.parse-ing it would log noisy errors on every render.
       if (layer.variables?.text?.type === 'dynamic_rich_text') {
-        (variableUpdates as any).text = createDynamicRichTextVariable(textValue);
+        if (textTranslation?.content_type === 'richtext') {
+          (variableUpdates as any).text = createDynamicRichTextVariable(textValue);
+        } else {
+          (variableUpdates as any).text = createDynamicRichTextVariableFromPlainText(textValue);
+        }
       } else {
         (variableUpdates as any).text = createDynamicTextVariable(textValue);
       }
