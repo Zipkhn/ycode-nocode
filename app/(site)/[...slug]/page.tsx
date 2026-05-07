@@ -290,6 +290,7 @@ export default async function Page({ params }: PageProps) {
           generatedCss={globalSettings.publishedCss || undefined}
           globalCustomCodeHead={globalSettings.globalCustomCodeHead}
           globalCustomCodeBody={globalSettings.globalCustomCodeBody}
+          ycodeBadge={globalSettings.ycodeBadge}
         />
       );
     }
@@ -325,6 +326,7 @@ export default async function Page({ params }: PageProps) {
             generatedCss={globalSettings.publishedCss || undefined}
             globalCustomCodeHead={globalSettings.globalCustomCodeHead}
             globalCustomCodeBody={globalSettings.globalCustomCodeBody}
+            ycodeBadge={globalSettings.ycodeBadge}
             passwordProtection={{
               pageId: protection.protectedBy === 'page' ? protection.protectedById : undefined,
               folderId: protection.protectedBy === 'folder' ? protection.protectedById : undefined,

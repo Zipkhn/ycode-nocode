@@ -19,10 +19,8 @@ export default function Error({ error, reset }: ErrorProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Log the error
     console.error('Preview page error:', error);
 
-    // Fetch custom 500 error page (draft version)
     async function fetchErrorPage() {
       try {
         const response = await fetch('/ycode/api/error-page?code=500&published=false');
