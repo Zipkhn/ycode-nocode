@@ -17,10 +17,9 @@ import React, { useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import type { Layer, Locale, FormSettings, Component, DesignColorVariable } from '@/types';
 import { getLayerHtmlTag, getClassesString, getText, resolveFieldValue, isTextContentLayer, getCollectionVariable, filterDisabledSliderLayers } from '@/lib/layer-utils';
 import { getMapIframeProps, DEFAULT_MAP_SETTINGS, resolveMarkerColor } from '@/lib/map-utils';
-import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/templates/utilities';
-import { useCanvasSlider } from '@/hooks/use-canvas-slider';
+import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/slider-constants';
 import { getDynamicTextContent, getImageUrlFromVariable, getVideoUrlFromVariable, getIframeUrlFromVariable, isFieldVariable, isAssetVariable, isStaticTextVariable, isDynamicTextVariable, getStaticTextContent, getAssetId, resolveDesignStyles } from '@/lib/variable-utils';
-import { getTranslatedAssetId, getTranslatedText } from '@/lib/localisation-utils';
+import { getTranslatedAssetId, getTranslatedText } from '@/lib/locale-runtime';
 import { isValidLinkSettings, generateLinkHref, resolveLinkAttrs, isLinkAtCollectionBoundary, type LinkResolutionContext } from '@/lib/link-utils';
 import { DEFAULT_ASSETS, generateImageSrcset, getImageSizes, getOptimizedImageUrl } from '@/lib/asset-utils';
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
@@ -35,6 +34,15 @@ import { useFilterStore } from '@/stores/useFilterStore';
 import type { HiddenLayerInfo } from '@/lib/animation-utils';
 import AnimationInitializer from '@/components/AnimationInitializer';
 import { transformLayerIdsForInstance } from '@/lib/resolve-components';
+
+/** True if any layer in the tree has at least one interaction configured. */
+function layerTreeHasInteractions(layers: Layer[]): boolean {
+  for (const layer of layers) {
+    if (layer.interactions?.length) return true;
+    if (layer.children && layerTreeHasInteractions(layer.children)) return true;
+  }
+  return false;
+}
 
 /**
  * Build a map of layerId -> anchor value (attributes.id) for O(1) anchor resolution
@@ -88,6 +96,13 @@ interface LayerRendererPublicProps {
   ancestorComponentIds?: Set<string>;
   isSlideChild?: boolean;
   serverSettings?: Record<string, unknown>;
+  /**
+   * Layer id of the LCP candidate image, detected server-side. When this image
+   * is rendered we override the template's default `loading="lazy"` with
+   * `loading="eager"` + `fetchpriority="high"` so the browser starts downloading
+   * the hero image during the HTML parse rather than after CSS/layout.
+   */
+  lcpCandidateLayerId?: string | null;
 }
 
 const LayerRendererPublic: React.FC<LayerRendererPublicProps> = ({
@@ -118,6 +133,7 @@ const LayerRendererPublic: React.FC<LayerRendererPublicProps> = ({
   ancestorComponentIds,
   isSlideChild: isSlideChildProp,
   serverSettings,
+  lcpCandidateLayerId,
 }) => {
   const anchorMap = useMemo(() => {
     return anchorMapProp || buildAnchorMap(layers);
@@ -222,6 +238,7 @@ const LayerRendererPublic: React.FC<LayerRendererPublicProps> = ({
         ancestorComponentIds={ancestorComponentIds}
         isSlideChild={isSlideChildProp}
         serverSettings={serverSettings}
+        lcpCandidateLayerId={lcpCandidateLayerId}
       />
     );
   };
@@ -262,6 +279,7 @@ const LayerItem: React.FC<{
   ancestorComponentIds?: Set<string>;
   isSlideChild?: boolean;
   serverSettings?: Record<string, unknown>;
+  lcpCandidateLayerId?: string | null;
 }> = ({
   layer,
   isPublished,
@@ -290,6 +308,7 @@ const LayerItem: React.FC<{
   ancestorComponentIds,
   isSlideChild,
   serverSettings,
+  lcpCandidateLayerId,
 }) => {
   const classesString = getClassesString(layer);
   const collectionLayerItemId = layer._collectionItemId || collectionItemId;
@@ -346,7 +365,8 @@ const LayerItem: React.FC<{
     resolvedAssets,
     components: componentsProp,
     serverSettings,
-  }), [isPublished, pageId, collectionLayerData, collectionLayerItemId, effectiveLayerDataMap, pageCollectionItemId, pageCollectionItemData, pageCollectionSortedItemIds, hiddenLayerInfo, currentLocale, availableLocales, localeSelectorFormat, isInsideForm, isInsideLink, parentFormSettings, pages, folders, collectionItemSlugs, isPreview, translations, anchorMap, resolvedAssets, componentsProp, serverSettings]);
+    lcpCandidateLayerId,
+  }), [isPublished, pageId, collectionLayerData, collectionLayerItemId, effectiveLayerDataMap, pageCollectionItemId, pageCollectionItemData, pageCollectionSortedItemIds, hiddenLayerInfo, currentLocale, availableLocales, localeSelectorFormat, isInsideForm, isInsideLink, parentFormSettings, pages, folders, collectionItemSlugs, isPreview, translations, anchorMap, resolvedAssets, componentsProp, serverSettings, lcpCandidateLayerId]);
 
   const renderComponentBlock: RenderComponentBlockFn = useCallback(
     (comp, resolvedLayers, _overrides, key, innerAncestorIds) => {
@@ -354,6 +374,9 @@ const LayerItem: React.FC<{
         resolvedLayers,
         `${layer.id}-rtc-${key}`
       );
+      // Only mount AnimationInitializer (which pulls in GSAP + plugins) when
+      // the embedded component actually has interactions configured.
+      const componentHasInteractions = layerTreeHasInteractions(uniqueLayers);
       return (
         <React.Fragment key={key}>
           <LayerRendererPublic
@@ -361,10 +384,12 @@ const LayerItem: React.FC<{
             {...sharedRendererProps}
             ancestorComponentIds={innerAncestorIds}
           />
-          <AnimationInitializer
-            layers={uniqueLayers}
-            injectInitialCSS
-          />
+          {componentHasInteractions && (
+            <AnimationInitializer
+              layers={uniqueLayers}
+              injectInitialCSS
+            />
+          )}
         </React.Fragment>
       );
     },
@@ -807,9 +832,8 @@ const LayerItem: React.FC<{
     htmlTag = 'div';
   }
 
-  // Canvas slider: init Swiper on slider layers and handle slide navigation
-  const sliderRef = useRef<HTMLElement | null>(null);
-  useCanvasSlider(sliderRef, layer, false);
+  // Public renderer never needs the canvas slider hook; live sliders are
+  // initialized by SliderInitializer (loaded only when slider layers exist).
 
   // For rich text elements, add paragraph default classes when tag is <p>
   const paragraphClasses = !isSimpleTextLayer && htmlTag === 'p' && layer.variables?.text
@@ -954,9 +978,6 @@ const LayerItem: React.FC<{
       if (isFilterLayer) {
         (filterLayerRef as React.MutableRefObject<HTMLDivElement | null>).current = node as HTMLDivElement | null;
       }
-      if (layer.name === 'slider') {
-        sliderRef.current = node;
-      }
     };
 
     const elementProps: Record<string, unknown> = {
@@ -1093,21 +1114,38 @@ const LayerItem: React.FC<{
         }
       }
 
-      const imgLoading = layer.attributes?.loading as string | undefined;
+      const isLcpCandidate = !!lcpCandidateLayerId && layer.id === lcpCandidateLayerId;
+      const imgLoadingAttr = layer.attributes?.loading as string | undefined;
+      // LCP candidate always loads eagerly with high fetchpriority — overrides
+      // the image template's default `loading="lazy"`. Other images keep
+      // whatever the user/template set.
+      const effectiveLoading = isLcpCandidate ? 'eager' : imgLoadingAttr;
 
       const optimizedSrc = getOptimizedImageUrl(finalImageUrl, 1920, 85);
       const srcset = generateImageSrcset(finalImageUrl);
-      const sizes = getImageSizes();
+
+      // Prefer an explicit `sizes` attribute. Otherwise, if we have an
+      // intrinsic pixel width, emit a media-aware sizes string so browsers
+      // download a more appropriately sized variant on desktop. Falls back
+      // to `100vw` when width is unknown.
+      const explicitSizes = (layer.attributes?.sizes as string | undefined)?.trim();
+      const widthForSizes = imgWidth && /^\d+(\.\d+)?(px)?$/i.test(imgWidth)
+        ? imgWidth.replace(/px$/i, '')
+        : null;
+      const sizes = explicitSizes
+        || (widthForSizes ? `(max-width: 768px) 100vw, ${widthForSizes}px` : getImageSizes());
 
       const imageProps: Record<string, any> = {
         ...elementProps,
         alt: imageAlt,
         src: optimizedSrc,
+        decoding: 'async',
       };
 
       if (imgWidth) imageProps.width = imgWidth;
       if (imgHeight) imageProps.height = imgHeight;
-      if (imgLoading) imageProps.loading = imgLoading;
+      if (effectiveLoading) imageProps.loading = effectiveLoading;
+      if (isLcpCandidate) imageProps.fetchPriority = 'high';
 
       if (srcset) {
         imageProps.srcSet = srcset;
@@ -1674,6 +1712,7 @@ const LayerItem: React.FC<{
               ancestorComponentIds={effectiveAncestorIds}
               isSlideChild={layer.name === 'slides'}
               serverSettings={serverSettings}
+              lcpCandidateLayerId={lcpCandidateLayerId}
             />
           )}
         </Tag>

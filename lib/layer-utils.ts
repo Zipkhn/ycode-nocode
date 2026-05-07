@@ -4,9 +4,6 @@
 
 import { Layer, FieldVariable, CollectionVariable, CollectionItemWithValues, CollectionField, Component, ComponentVariable, Breakpoint, LayerVariables, DesignColorVariable, BoundColorStop } from '@/types';
 import { generateId } from '@/lib/utils';
-import { iconExists, IconProps } from '@/components/ui/icon';
-import { getBlockIcon, getBlockName } from '@/lib/templates/blocks';
-import { isSliderLayerName } from '@/lib/templates/utilities';
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
 import { DEFAULT_TEXT_STYLES } from '@/lib/text-format-utils';
 import { getCmsFieldBinding } from '@/lib/tiptap-utils';
@@ -15,7 +12,7 @@ import { resolveFieldFromSources } from '@/lib/cms-variables-utils';
 import { isDatePreset, resolveDateFilterValue } from '@/lib/collection-field-utils';
 import { parseMultiReferenceValue } from '@/lib/collection-utils';
 import { getInheritedValue } from '@/lib/tailwind-class-mapper';
-import { cloneDeep } from 'lodash';
+import cloneDeep from 'lodash/cloneDeep';
 import { layerHasLink, hasLinkInTree, hasRichTextLinks } from '@/lib/link-utils';
 
 // Alias for backwards compatibility within this file
@@ -1077,6 +1074,17 @@ export function getText(layer: Layer): string | undefined {
 }
 
 /**
+ * Best-effort label for a layer used in builder error messages emitted from
+ * this template-free module. The full pretty-name resolution lives in
+ * `lib/layer-display-utils.ts`; consumers that want it can call
+ * `getLayerName()` directly with the layer info.
+ */
+function layerLabelFallback(layer: Layer): string {
+  if (layer.id === 'body') return 'Body';
+  return layer.customName || layer.name;
+}
+
+/**
  * Check if a layer can have a link added
  * @param layer - The layer to check
  * @param allLayers - All layers in the current context (page or component)
@@ -1108,7 +1116,7 @@ export function canLayerHaveLink(
     if (hasAncestorWithLink) {
       return {
         canHaveLinks: false,
-        issue: { type: 'ancestor', layerName: getLayerName(hasAncestorWithLink) }
+        issue: { type: 'ancestor', layerName: layerLabelFallback(hasAncestorWithLink) }
       };
     }
 
@@ -1131,7 +1139,7 @@ export function canLayerHaveLink(
   if (hasLinkSettings(layer)) {
     return {
       canHaveLinks: false,
-      issue: { type: 'self', layerName: getLayerName(layer) }
+      issue: { type: 'self', layerName: layerLabelFallback(layer) }
     };
   }
 
@@ -1145,7 +1153,7 @@ export function canLayerHaveLink(
   if (hasAncestorWithLink) {
     return {
       canHaveLinks: false,
-      issue: { type: 'ancestor', layerName: getLayerName(hasAncestorWithLink) }
+      issue: { type: 'ancestor', layerName: layerLabelFallback(hasAncestorWithLink) }
     };
   }
 
@@ -1176,6 +1184,31 @@ export function canAddChild(parent: Layer, child: Layer): boolean {
   }
 
   if (layerHasLink(child) && layerHasLink(parent)) {
+    return false;
+  }
+
+  return true;
+}
+
+export const LINK_NESTING_ERROR = {
+  title: 'Links cannot be nested',
+  description: 'The pasted layer contains a link and cannot be placed inside a link.',
+} as const;
+
+/**
+ * Check if a layer can be pasted as a child of a target parent,
+ * considering both the direct parent and ancestor link nesting.
+ */
+export function canPasteIntoParent(layers: Layer[], parentId: string, childToPaste: Layer): boolean {
+  const parent = findLayerById(layers, parentId);
+  if (!parent) return true;
+
+  if (!canAddChild(parent, childToPaste)) {
+    return false;
+  }
+
+  const hasLinkAncestor = findAncestor(layers, parentId, (ancestor) => layerHasLink(ancestor));
+  if (hasLinkAncestor && hasLinkInTree(childToPaste)) {
     return false;
   }
 
@@ -1558,134 +1591,10 @@ export function getLayoutTypeName(layoutType: LayoutType): string | null {
   }
 }
 
-// Layout custom names that should use breakpoint-aware icons/names
-const LAYOUT_CUSTOM_NAMES = ['Columns', 'Rows', 'Grid'];
-
-/**
- * Get the icon name (for `components/ui/Icon.tsx`) for a layer
- *
- * @param layer - The layer to get the icon for
- * @param defaultIcon - Fallback icon (default: 'box')
- * @param breakpoint - Optional breakpoint for layout-aware icons
- */
-export function getLayerIcon(
-  layer: Layer,
-  defaultIcon: IconProps['name'] = 'box',
-  breakpoint?: Breakpoint
-): IconProps['name'] {
-  // Body layers
-  if (layer.id === 'body') return 'layout';
-
-  // Component layers
-  if (layer.componentId) return 'component';
-
-  // Collection layers (skip when optionsSource manages the binding, e.g. checkbox groups)
-  if (getCollectionVariable(layer) && !layer.settings?.optionsSource) {
-    return 'database';
-  }
-
-  // Heading layers
-  if (layer.name === 'heading') return 'heading';
-
-  // Rich text layers
-  if (layer.name === 'richText') return 'rich-text';
-
-  // Text layers (backward compat: text with h1-h6 tag still shows heading icon)
-  if (layer.name === 'text') {
-    return ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(layer.settings?.tag || '') ? 'heading' : 'text';
-  }
-
-  // Layout layers (Columns, Rows, Grid) - breakpoint-aware icons
-  if (layer.customName && LAYOUT_CUSTOM_NAMES.includes(layer.customName)) {
-    if (breakpoint) {
-      const layoutType = getLayoutTypeForBreakpoint(layer, breakpoint);
-      if (layoutType === 'columns') return 'columns';
-      if (layoutType === 'rows') return 'rows';
-      if (layoutType === 'grid') return 'grid';
-      if (layoutType === 'hidden') return 'eye-off';
-    }
-    // Fallback to custom name when no breakpoint
-    if (layer.customName === 'Columns') return 'columns';
-    if (layer.customName === 'Rows') return 'rows';
-    if (layer.customName === 'Grid') return 'grid';
-  }
-
-  // Other named layers
-  if (layer.customName === 'Container') return 'container';
-
-  // Checkbox wrapper div (contains a checkbox input child)
-  if (layer.name === 'div' && layer.children?.some(c => c.name === 'input' && c.attributes?.type === 'checkbox')) {
-    return 'checkbox';
-  }
-
-  // Radio wrapper div (contains a radio input child)
-  if (layer.name === 'div' && layer.children?.some(c => c.name === 'input' && c.attributes?.type === 'radio')) {
-    return 'radio';
-  }
-
-  // Fallback to block icon (based on name)
-  return getBlockIcon(layer.name, defaultIcon);
-}
-
-/**
- * Get the label for a layer (for display in the UI)
- *
- * @param layer - The layer to get the name for
- * @param context - Optional context (component_name, collection_name, source_field_name)
- * @param breakpoint - Optional breakpoint for layout-aware names
- */
-export function getLayerName(
-  layer: Layer,
-  context?: {
-    component_name?: string | undefined | null;
-    collection_name?: string | undefined | null;
-    /** When collection is bound to a field (reference/multi-reference/multi-asset), the field name */
-    source_field_name?: string | undefined | null;
-  },
-  breakpoint?: Breakpoint
-): string {
-  // Special case for Body layer
-  if (layer.id === 'body') {
-    return 'Body';
-  }
-
-  // Use component name if this is a component instance
-  if (layer.componentId) {
-    return context?.component_name || 'Component';
-  }
-
-  // Use field name or collection name in parentheses after "Collection" (skip when optionsSource manages the binding)
-  if (getCollectionVariable(layer) && !layer.settings?.optionsSource) {
-    const label = context?.source_field_name ?? context?.collection_name;
-    return label ? `Collection (${label})` : 'Collection';
-  }
-
-  // Layout layers (Columns, Rows, Grid) - breakpoint-aware names
-  if (breakpoint && layer.customName && LAYOUT_CUSTOM_NAMES.includes(layer.customName)) {
-    const layoutType = getLayoutTypeForBreakpoint(layer, breakpoint);
-    const layoutName = getLayoutTypeName(layoutType);
-    if (layoutName) {
-      return layoutName;
-    }
-  }
-
-  // Use custom name if available
-  if (layer.customName) {
-    return layer.customName;
-  }
-
-  // Checkbox wrapper div (contains a checkbox input child)
-  if (layer.name === 'div' && layer.children?.some(c => c.name === 'input' && c.attributes?.type === 'checkbox')) {
-    return 'Checkbox';
-  }
-
-  // Radio wrapper div (contains a radio input child)
-  if (layer.name === 'div' && layer.children?.some(c => c.name === 'input' && c.attributes?.type === 'radio')) {
-    return 'Radio';
-  }
-
-  return getBlockName(layer.name) || 'Layer';
-}
+// `getLayerIcon` / `getLayerName` were moved to `lib/layer-display-utils.ts`
+// to keep this module free of `lib/templates/*` imports — those drag the
+// entire ~1.5 MB template tree into any bundle that touches `layer-utils`,
+// including the public-site renderer.
 
 /**
  * Get the HTML tag name for a layer

@@ -12,7 +12,7 @@ import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables';
 import { renderRootLayoutHeadCode } from '@/lib/parse-head-html';
 import { generateInitialAnimationCSS, type HiddenLayerInfo } from '@/lib/animation-utils';
 import { buildCustomFontsCss, buildFontClassesCss, getGoogleFontLinks } from '@/lib/font-utils';
-import { collectLayerAssetIds, getAssetProxyUrl } from '@/lib/asset-utils';
+import { collectLayerAssetIds, getAssetProxyUrl, findLcpCandidateLayerId } from '@/lib/asset-utils';
 import { getAllPages } from '@/lib/repositories/pageRepository';
 import { getAllPageFolders } from '@/lib/repositories/pageFolderRepository';
 import { getMapboxAccessToken, getGoogleMapsEmbedApiKey } from '@/lib/map-server';
@@ -159,6 +159,19 @@ function hasLightboxLayers(layers: Layer[]): boolean {
   for (const layer of layers) {
     if (layer.name === 'lightbox') return true;
     if (layer.children && hasLightboxLayers(layer.children)) return true;
+  }
+  return false;
+}
+
+/**
+ * Recursively check if any layer in the tree has interactions configured.
+ * Used to skip rendering AnimationInitializer (and shipping ~50KB of GSAP +
+ * ScrollTrigger + SplitText to the client) for pages with no animations.
+ */
+function hasAnyInteractions(layers: Layer[]): boolean {
+  for (const layer of layers) {
+    if (layer.interactions?.length) return true;
+    if (layer.children && hasAnyInteractions(layer.children)) return true;
   }
   return false;
 }
@@ -446,6 +459,11 @@ export default async function PageRenderer({
     }
   }
 
+  // Identify the LCP candidate so the renderer can flip its loading=lazy
+  // template default to eager + fetchpriority=high. Skips images smaller than
+  // ~200px to avoid prioritizing logos/icons.
+  const lcpCandidateLayerId = findLcpCandidateLayerId(childLayers, resolvedAssets);
+
   return (
     <>
       {/* Global head code fallback when layout skips it (SKIP_SETUP mode) */}
@@ -556,6 +574,7 @@ export default async function PageRenderer({
           resolvedAssets={resolvedAssets}
           components={components}
           serverSettings={serverSettings}
+          lcpCandidateLayerId={lcpCandidateLayerId}
         />
 
         {/* Inject password form for 401 error pages */}
@@ -569,8 +588,10 @@ export default async function PageRenderer({
         )}
       </main>
 
-      {/* Initialize GSAP animations based on layer interactions */}
-      <AnimationInitializer layers={animationLayers} />
+      {/* Initialize GSAP animations based on layer interactions.
+          Skipped entirely when no layer has interactions so we don't ship
+          GSAP + ScrollTrigger + SplitText to the client for static pages. */}
+      {hasAnyInteractions(resolvedLayers) && <AnimationInitializer layers={animationLayers} />}
 
       {/* Initialize Swiper on slider elements */}
       {hasSliderLayers(resolvedLayers) && <SliderInitializer />}

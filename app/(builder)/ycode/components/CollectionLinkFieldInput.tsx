@@ -27,7 +27,8 @@ import { useEditorStore } from '@/stores/useEditorStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { collectionsApi } from '@/lib/api';
 import { getAssetIcon } from '@/lib/asset-utils';
-import { getLayerIcon, getLayerName, findLayersWithAnchorId } from '@/lib/layer-utils';
+import { findLayersWithAnchorId } from '@/lib/layer-utils';
+import { getLayerIcon, getLayerName } from '@/lib/layer-display-utils';
 import PageSelector from './PageSelector';
 
 interface CollectionLinkFieldInputProps {
