@@ -8,6 +8,7 @@ import { cloneDeep } from 'lodash';
 import {
   canHaveChildren,
   canAddChild,
+  canPasteIntoParent,
   regenerateIdsWithInteractionRemapping,
   canMoveLayer,
   findLayerById,
@@ -1505,6 +1506,11 @@ export const usePagesStore = create<PagesStore>((set, get) => ({
       return null;
     }
 
+    // Check link nesting: the pasted layer becomes a sibling, so validate against the parent
+    if (result.parent && !canPasteIntoParent(draft.layers, result.parent.id, newLayer)) {
+      return null;
+    }
+
     // Don't allow pasting at root level (outside body) — redirect into body
     if (result.parent === null) {
       const bodyLayer = draft.layers.find(l => l.id === 'body' || l.name === 'body');
@@ -2812,6 +2818,11 @@ export const usePagesStore = create<PagesStore>((set, get) => ({
     const { draftsByPageId } = get();
     const draft = draftsByPageId[pageId];
     if (!draft) return null;
+
+    // Check link nesting: the pasted layer becomes a child of the target
+    if (!canPasteIntoParent(draft.layers, targetLayerId, layerToPaste)) {
+      return null;
+    }
 
     // Regenerate IDs and remap self-targeted interactions
     const newLayer = regenerateIdsWithInteractionRemapping(cloneDeep(layerToPaste));

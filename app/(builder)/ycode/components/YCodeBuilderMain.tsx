@@ -79,7 +79,7 @@ import { useVersionsStore } from '@/stores/useVersionsStore';
 
 // 6. Utils/lib
 import { findHomepage } from '@/lib/page-utils';
-import { findLayerById, getClassesString, removeLayerById, canCopyLayer, canDeleteLayer, regenerateIdsWithInteractionRemapping, findParentAndIndex, insertLayerAfter, updateLayerProps, getLayerIndexes, removeRichTextSublayer } from '@/lib/layer-utils';
+import { findLayerById, getClassesString, removeLayerById, canCopyLayer, canDeleteLayer, regenerateIdsWithInteractionRemapping, findParentAndIndex, insertLayerAfter, updateLayerProps, getLayerIndexes, removeRichTextSublayer, canPasteIntoParent, LINK_NESTING_ERROR } from '@/lib/layer-utils';
 import { cloneDeep } from 'lodash';
 import { StudioModal } from '@/components/Studio/StudioModal';
 
@@ -503,6 +503,17 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
             setStyles(response.data.styles);
             setSettings(response.data.settings);
             setLocales(response.data.locales || []);
+
+            // Eager-load translations if the persisted selected locale is non-default
+            // so the canvas reflects the locale on first paint instead of source content.
+            const localisationState = useLocalisationStore.getState();
+            const persistedLocaleId = localisationState.selectedLocaleId;
+            if (persistedLocaleId) {
+              const persistedLocale = localisationState.locales.find(l => l.id === persistedLocaleId);
+              if (persistedLocale && !persistedLocale.is_default) {
+                localisationState.loadTranslations(persistedLocaleId);
+              }
+            }
             setAssets(response.data.assets || []);
             setAssetFolders(response.data.assetFolders || []);
             setFonts(response.data.fonts || []);
@@ -1470,17 +1481,25 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
                 }
 
                 const layers = getCurrentLayers();
-                const newLayer = regenerateIdsWithInteractionRemapping(cloneDeep(clipboardLayer));
                 const result = findParentAndIndex(layers, selectedLayerId);
                 if (result) {
+                  if (result.parent && !canPasteIntoParent(layers, result.parent.id, clipboardLayer)) {
+                    toast.error(LINK_NESTING_ERROR.title, { description: LINK_NESTING_ERROR.description });
+                    return;
+                  }
+                  const newLayer = regenerateIdsWithInteractionRemapping(cloneDeep(clipboardLayer));
                   updateCurrentLayers(insertLayerAfter(layers, result.parent, result.index, newLayer));
                 }
               } else if (currentPageId) {
                 // If body is selected, paste inside body (not after it)
+                let pastedLayer: Layer | null;
                 if (selectedLayerId === 'body') {
-                  pasteInside(currentPageId, selectedLayerId, clipboardLayer);
+                  pastedLayer = pasteInside(currentPageId, selectedLayerId, clipboardLayer);
                 } else {
-                  pasteAfter(currentPageId, selectedLayerId, clipboardLayer);
+                  pastedLayer = pasteAfter(currentPageId, selectedLayerId, clipboardLayer);
+                }
+                if (!pastedLayer && clipboardLayer) {
+                  toast.error(LINK_NESTING_ERROR.title, { description: LINK_NESTING_ERROR.description });
                 }
               }
             }

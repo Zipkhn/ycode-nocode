@@ -28,6 +28,7 @@ import { useEditorStore } from '@/stores/useEditorStore';
 import { useLayerStylesStore } from '@/stores/useLayerStylesStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
+import { useLocalisationStore } from '@/stores/useLocalisationStore';
 import { usePagesStore } from '@/stores/usePagesStore';
 import { useCollaborationPresenceStore, getResourceLockKey, RESOURCE_TYPES } from '@/stores/useCollaborationPresenceStore';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -35,7 +36,8 @@ import { useAuthStore } from '@/stores/useAuthStore';
 // 6. Utils/lib
 import { cn } from '@/lib/utils';
 import { flattenTree, type FlattenedItem } from '@/lib/tree-utilities';
-import { canHaveChildren, getLayerIcon, getLayerName, getCollectionVariable, isTextContentLayer, isRichTextLayer, hasRichTextContent, getRichTextSublayers, getTextStyleSublayers, canMoveLayer, updateLayerProps, filterDisabledSliderLayers, getLayerCmsFieldBinding, extractBlockText } from '@/lib/layer-utils';
+import { canHaveChildren, getCollectionVariable, isTextContentLayer, isRichTextLayer, hasRichTextContent, getRichTextSublayers, getTextStyleSublayers, canMoveLayer, updateLayerProps, filterDisabledSliderLayers, getLayerCmsFieldBinding, extractBlockText } from '@/lib/layer-utils';
+import { getLayerIcon, getLayerName } from '@/lib/layer-display-utils';
 import { getBlockName } from '@/lib/templates/blocks';
 import { MULTI_ASSET_COLLECTION_ID } from '@/lib/collection-field-utils';
 import { hasStyleOverrides } from '@/lib/layer-style-utils';
@@ -196,13 +198,23 @@ const LayerRow = React.memo(function LayerRow({
   const setHoveredLayerId = useEditorStore((state) => state.setHoveredLayerId);
   const activeUIState = useEditorStore((state) => state.activeUIState);
   const isStateActive = activeUIState !== 'neutral';
+
+  // Disable layer drag/drop and add buttons in non-default locales — the tree
+  // becomes a read-only map of the page while translating.
+  const isLocalizing = useLocalisationStore((state) => {
+    const id = state.selectedLocaleId;
+    if (!id) return false;
+    const locale = state.locales.find((l) => l.id === id);
+    return !!(locale && !locale.is_default);
+  });
+
   const { setNodeRef: setDropRef } = useDroppable({
     id: node.id,
   });
 
   const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({
     id: node.id,
-    disabled: isRenaming,
+    disabled: isRenaming || isLocalizing,
   });
 
   const renameInputRef = React.useRef<HTMLInputElement>(null);
