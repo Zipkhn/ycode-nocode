@@ -20,14 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { CollectionLinkValue, CollectionLinkType, CollectionItemWithValues, Layer } from '@/types';
+import type { CollectionLinkValue, CollectionLinkType, CollectionItemWithValues } from '@/types';
 import { usePagesStore } from '@/stores/usePagesStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { collectionsApi } from '@/lib/api';
 import { getAssetIcon } from '@/lib/asset-utils';
-import { getLayerIcon, getLayerName } from '@/lib/layer-utils';
+import { getLayerIcon, getLayerName, findLayersWithAnchorId } from '@/lib/layer-utils';
 import PageSelector from './PageSelector';
 
 interface CollectionLinkFieldInputProps {
@@ -79,6 +79,7 @@ export default function CollectionLinkFieldInput({
   // Stores
   const pages = usePagesStore((state) => state.pages);
   const draftsByPageId = usePagesStore((state) => state.draftsByPageId);
+  const loadDraft = usePagesStore((state) => state.loadDraft);
   const { fields: collectionsFields } = useCollectionsStore();
   const openFileManager = useEditorStore((state) => state.openFileManager);
   const getAsset = useAssetsStore((state) => state.getAsset);
@@ -97,26 +98,6 @@ export default function CollectionLinkFieldInput({
   // Get asset info for display
   const selectedAsset = assetId ? getAsset(assetId) : null;
 
-  // Find layers with ID attribute for anchor selection
-  const findLayersWithId = useCallback((layers: Layer[]): Array<{ layer: Layer; id: string }> => {
-    const result: Array<{ layer: Layer; id: string }> = [];
-    const stack: Layer[] = [...layers];
-
-    while (stack.length > 0) {
-      const layer = stack.pop()!;
-
-      if (layer.attributes?.id) {
-        result.push({ layer, id: layer.attributes.id });
-      }
-
-      if (layer.children) {
-        stack.push(...layer.children);
-      }
-    }
-
-    return result;
-  }, []);
-
   // Get layers for anchor selection from the selected page
   const anchorLayers = useMemo(() => {
     if (!pageId) return [];
@@ -124,8 +105,15 @@ export default function CollectionLinkFieldInput({
     const draft = draftsByPageId[pageId];
     if (!draft || !draft.layers) return [];
 
-    return findLayersWithId(draft.layers);
-  }, [pageId, draftsByPageId, findLayersWithId]);
+    return findLayersWithAnchorId(draft.layers);
+  }, [pageId, draftsByPageId]);
+
+  // Load draft for selected page so anchor layers are available
+  useEffect(() => {
+    if (pageId && !draftsByPageId[pageId]) {
+      loadDraft(pageId);
+    }
+  }, [pageId, draftsByPageId, loadDraft]);
 
   // Get the selected page
   const selectedPage = useMemo(() => {

@@ -560,46 +560,50 @@ export function generateLinkHref(
       }
       break;
     case 'field': {
-      // For field-based links, use source to select correct data (page vs collection)
-      const source = linkSettings.field?.data?.source;
-      const collectionLayerId = linkSettings.field?.data?.collection_layer_id;
-      const { layerDataMap } = context;
+      const fieldId = linkSettings.field?.data?.field_id;
+      if (!fieldId) break;
 
-      let fieldData: Record<string, string> | undefined;
+      // Use pre-resolved value from injectCollectionData when available
+      // (published pages strip _collectionItemValues, but _resolvedValue survives)
+      let rawValue: string | undefined = linkSettings.field?.data?._resolvedValue;
 
-      // If collection_layer_id is specified, use layer-specific data from layerDataMap
-      if (collectionLayerId && layerDataMap?.[collectionLayerId]) {
-        fieldData = layerDataMap[collectionLayerId];
-      } else if (source === 'page') {
-        fieldData = pageCollectionItemData;
-      } else if (source === 'collection') {
-        fieldData = collectionItemData;
-      } else {
-        // No source specified - prefer collection layer data, fall back to page data (backwards compatibility)
-        fieldData = collectionItemData || pageCollectionItemData;
+      if (!rawValue) {
+        // Fall back to runtime field data lookup
+        const source = linkSettings.field?.data?.source;
+        const collectionLayerId = linkSettings.field?.data?.collection_layer_id;
+        const { layerDataMap } = context;
+
+        let fieldData: Record<string, string> | undefined;
+
+        if (collectionLayerId && layerDataMap?.[collectionLayerId]) {
+          fieldData = layerDataMap[collectionLayerId];
+        } else if (source === 'page') {
+          fieldData = pageCollectionItemData;
+        } else if (source === 'collection') {
+          fieldData = collectionItemData;
+        } else {
+          fieldData = collectionItemData || pageCollectionItemData;
+        }
+
+        if (fieldData) {
+          const relationships = linkSettings.field?.data?.relationships || [];
+          if (relationships.length > 0) {
+            const fullPath = [fieldId, ...relationships].join('.');
+            rawValue = fieldData[fullPath];
+          } else {
+            rawValue = fieldData[fieldId];
+          }
+        }
       }
 
-      if (linkSettings.field?.data?.field_id && fieldData) {
-        const fieldId = linkSettings.field.data.field_id;
-        const relationships = linkSettings.field.data.relationships || [];
-
-        let rawValue: string | undefined;
-        if (relationships.length > 0) {
-          const fullPath = [fieldId, ...relationships].join('.');
-          rawValue = fieldData[fullPath];
-        } else {
-          rawValue = fieldData[fieldId];
-        }
-
-        if (rawValue) {
-          const fieldType = linkSettings.field?.data?.field_type;
-          href = resolveFieldLinkValue({
-            fieldId,
-            rawValue,
-            fieldType,
-            context,
-          });
-        }
+      if (rawValue) {
+        const fieldType = linkSettings.field?.data?.field_type;
+        href = resolveFieldLinkValue({
+          fieldId,
+          rawValue,
+          fieldType,
+          context,
+        });
       }
       break;
     }

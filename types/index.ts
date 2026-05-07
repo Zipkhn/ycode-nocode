@@ -1141,6 +1141,8 @@ export interface FieldVariable extends VariableType {
     source?: 'page' | 'collection';
     /** ID of the collection layer this field belongs to (for nested collections) */
     collection_layer_id?: string;
+    /** Pre-resolved raw value from injectCollectionData (survives stripSSROnlyData) */
+    _resolvedValue?: string;
   };
 }
 

@@ -1223,6 +1223,24 @@ async function injectCollectionData(
     }
   }
 
+  // Link field binding — pre-resolve raw value so it survives stripSSROnlyData
+  const linkVar = layer.variables?.link;
+  if (linkVar?.type === 'field' && linkVar.field?.data?.field_id) {
+    const resolvedValue = resolveFieldValueWithRelationships(linkVar.field, enhancedValues, layerDataMap);
+    if (resolvedValue) {
+      resolvedVars.link = {
+        ...linkVar,
+        field: {
+          ...linkVar.field,
+          data: {
+            ...linkVar.field.data,
+            _resolvedValue: resolvedValue,
+          },
+        },
+      };
+    }
+  }
+
   // Design color field bindings → inline styles (supports solid + gradient)
   const designBindings = layer.variables?.design as Record<string, DesignColorVariable> | undefined;
   if (designBindings) {

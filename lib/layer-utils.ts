@@ -4277,3 +4277,27 @@ export function updateLayerProps(
     return layer;
   });
 }
+
+/**
+ * Find all layers with a custom anchor ID (settings.id takes priority over attributes.id).
+ * Used by link settings to populate anchor selection dropdowns.
+ */
+export function findLayersWithAnchorId(layers: Layer[]): Array<{ layer: Layer; id: string }> {
+  const result: Array<{ layer: Layer; id: string }> = [];
+  const stack: Layer[] = [...layers];
+
+  while (stack.length > 0) {
+    const layer = stack.pop()!;
+
+    const layerId = layer.settings?.id || layer.attributes?.id;
+    if (layerId) {
+      result.push({ layer, id: layerId });
+    }
+
+    if (layer.children) {
+      stack.push(...layer.children);
+    }
+  }
+
+  return result;
+}
