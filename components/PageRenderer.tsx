@@ -11,7 +11,7 @@ import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables';
 import { renderRootLayoutHeadCode } from '@/lib/parse-head-html';
 import { generateInitialAnimationCSS, type HiddenLayerInfo } from '@/lib/animation-utils';
 import { buildCustomFontsCss, buildFontClassesCss, getGoogleFontLinks } from '@/lib/font-utils';
-import { collectLayerAssetIds, getAssetProxyUrl } from '@/lib/asset-utils';
+import { collectLayerAssetIds, getAssetProxyUrl, findLcpCandidateLayerId } from '@/lib/asset-utils';
 import { getAllPages } from '@/lib/repositories/pageRepository';
 import { getAllPageFolders } from '@/lib/repositories/pageFolderRepository';
 import { getMapboxAccessToken, getGoogleMapsEmbedApiKey } from '@/lib/map-server';
@@ -433,6 +433,11 @@ export default async function PageRenderer({
     }
   }
 
+  // Identify the LCP candidate so the renderer can flip its loading=lazy
+  // template default to eager + fetchpriority=high. Skips images smaller than
+  // ~200px to avoid prioritizing logos/icons.
+  const lcpCandidateLayerId = findLcpCandidateLayerId(childLayers, resolvedAssets);
+
   return (
     <>
       {/* Global head code fallback when layout skips it (SKIP_SETUP mode) */}
@@ -544,6 +549,7 @@ export default async function PageRenderer({
           resolvedAssets={resolvedAssets}
           components={components}
           serverSettings={serverSettings}
+          lcpCandidateLayerId={lcpCandidateLayerId}
         />
 
         {/* Inject password form for 401 error pages */}
