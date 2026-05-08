@@ -508,6 +508,22 @@ export default async function PageRenderer({
         />
       )}
 
+      {/* Warm up the Google Fonts origins before parsing the stylesheet, so
+          DNS + TCP + TLS to fonts.gstatic.com runs in parallel with the CSS
+          fetch. Saves ~100–300 ms on the font request's first byte (PSI's
+          "Network dependency tree" insight flagged the missing preconnect).
+          `crossOrigin` on gstatic is required because font files are fetched
+          in CORS mode — without it the browser opens a fresh connection. */}
+      {googleFontLinkUrls.length > 0 && (
+        <>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link
+            rel="preconnect" href="https://fonts.gstatic.com"
+            crossOrigin="anonymous"
+          />
+        </>
+      )}
+
       {/* Load Google Fonts via <link> elements */}
       {googleFontLinkUrls.map((url, i) => (
         <link
