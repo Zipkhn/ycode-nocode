@@ -27,7 +27,9 @@ import { useEditorStore } from '@/stores/useEditorStore';
 import { useFontsStore } from '@/stores/useFontsStore';
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
 
-import type { Layer, Component, CollectionItemWithValues, CollectionField, Breakpoint, Asset, ComponentVariable } from '@/types';
+import { injectTranslatedText } from '@/lib/localisation-utils';
+
+import type { Layer, Component, CollectionItemWithValues, CollectionField, Breakpoint, Asset, ComponentVariable, Locale, Translation } from '@/types';
 import type { UseLiveLayerUpdatesReturn } from '@/hooks/use-live-layer-updates';
 import type { UseLiveComponentUpdatesReturn } from '@/hooks/use-live-component-updates';
 
@@ -106,6 +108,12 @@ interface CanvasProps {
   zoom?: number;
   /** Fixed viewport height for stable measurement of content using vh/svh/dvh units */
   referenceViewportHeight?: number;
+  /** Currently selected locale (controls translation injection on the canvas) */
+  currentLocale?: Locale | null;
+  /** All available locales (forwarded to LocaleSelector layers) */
+  availableLocales?: Locale[];
+  /** Translation map for the current locale (keyed by translatable key) */
+  translations?: Record<string, Translation> | null;
 }
 
 /**
@@ -129,6 +137,9 @@ interface CanvasContentProps {
   editorBreakpoint?: Breakpoint;
   zoom?: number;
   onComponentEdit?: (componentId: string, instanceLayerId: string) => void;
+  currentLocale?: Locale | null;
+  availableLocales?: Locale[];
+  translations?: Record<string, Translation> | null;
 }
 
 function CanvasContent({
@@ -149,6 +160,9 @@ function CanvasContent({
   editorBreakpoint,
   zoom = 100,
   onComponentEdit,
+  currentLocale,
+  availableLocales,
+  translations,
 }: CanvasContentProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
@@ -249,6 +263,9 @@ function CanvasContent({
           editorBreakpoint={editorBreakpoint}
           ancestorComponentIds={initialAncestorIds}
           onComponentEdit={onComponentEdit}
+          currentLocale={currentLocale}
+          availableLocales={availableLocales}
+          translations={translations}
         />
       </div>
     </CanvasPortalProvider>
@@ -297,6 +314,9 @@ const Canvas = React.memo(function Canvas({
   disableEditorHiddenLayers = false,
   zoom = 100,
   referenceViewportHeight,
+  currentLocale,
+  availableLocales,
+  translations,
 }: CanvasProps) {
   // Refs
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -312,6 +332,34 @@ const Canvas = React.memo(function Canvas({
   const { layers: resolvedLayers, componentMap } = useMemo(() => {
     return serializeLayers(layers, components, editingComponentVariables);
   }, [layers, components, editingComponentVariables]);
+
+  // When a non-default locale is active, swap layer text and translatable
+  // asset references with their translations so the canvas mirrors what the
+  // server-rendered preview / published page would output. The injection runs
+  // AFTER serializeLayers so component instance child IDs are already resolved
+  // (injectTranslatedText reads _originalLayerId / _masterComponentId to look
+  // up component-scoped translations).
+  //
+  // When the user is editing a component definition (editingComponentId set),
+  // the rendered layers are the component's raw layers (not a resolved
+  // instance), so they carry no _masterComponentId. Pass editingComponentId
+  // as the default so translations stored under `component:{id}:...` apply.
+  const localizedLayers = useMemo(() => {
+    if (!currentLocale || currentLocale.is_default || !translations) {
+      return resolvedLayers;
+    }
+    // pageId may be empty when editing a component without a page selected.
+    // injectTranslatedText still needs a non-empty value to perform lookups.
+    const lookupPageId = pageId || (editingComponentId ?? '');
+    if (!lookupPageId) return resolvedLayers;
+    // Builder canvas mirrors what the editor has saved, including in-progress
+    // translations that are not yet marked complete. Production rendering
+    // (page-fetcher) keeps the default behaviour and only ships completed ones.
+    return injectTranslatedText(resolvedLayers, lookupPageId, translations, {
+      includeIncomplete: true,
+      defaultMasterComponentId: editingComponentId ?? undefined,
+    });
+  }, [resolvedLayers, currentLocale, translations, pageId, editingComponentId]);
 
   // Enrich page collection item data with reference field dotted keys
   // so variables like "refFieldId.targetFieldId" resolve on canvas.
@@ -509,7 +557,7 @@ const Canvas = React.memo(function Canvas({
 
     rootRef.current.render(
       <CanvasContent
-        layers={resolvedLayers}
+        layers={localizedLayers}
         selectedLayerId={selectedLayerId}
         hoveredLayerId={effectiveHoveredLayerId}
         pageId={pageId}
@@ -526,6 +574,9 @@ const Canvas = React.memo(function Canvas({
         editorBreakpoint={breakpoint}
         zoom={zoom}
         onComponentEdit={onComponentEdit}
+        currentLocale={currentLocale}
+        availableLocales={availableLocales}
+        translations={translations}
       />
     );
   // selectedLayerId and hoveredLayerId are intentionally excluded from deps:
@@ -534,7 +585,7 @@ const Canvas = React.memo(function Canvas({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     iframeReady,
-    resolvedLayers,
+    localizedLayers,
     editingComponentId,
     editingComponentVariables,
     pageId,
@@ -549,6 +600,9 @@ const Canvas = React.memo(function Canvas({
     breakpoint,
     zoom,
     onComponentEdit,
+    currentLocale,
+    availableLocales,
+    translations,
   ]);
 
   // Handle keyboard events from iframe
@@ -781,7 +835,7 @@ const Canvas = React.memo(function Canvas({
       clearTimeout(observerTimer);
       observer.disconnect();
     };
-  }, [iframeReady, onContentHeightChange, onContentWidthChange, resolvedLayers, referenceViewportHeight, breakpoint]);
+  }, [iframeReady, onContentHeightChange, onContentWidthChange, localizedLayers, referenceViewportHeight, breakpoint]);
 
   // Handle zoom gestures from iframe (Ctrl+wheel, trackpad pinch)
   useEffect(() => {

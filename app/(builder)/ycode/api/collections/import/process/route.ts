@@ -6,11 +6,10 @@ import {
   completeImport,
 } from '@/lib/repositories/collectionImportRepository';
 import { createItemsBulk, deleteItem, getMaxIdValue, getMaxManualOrder } from '@/lib/repositories/collectionItemRepository';
-import { insertValuesBulk } from '@/lib/repositories/collectionItemValueRepository';
+import { insertValuesBulk, insertValuesDirectPg } from '@/lib/repositories/collectionItemValueRepository';
 import { getFieldsByCollectionId } from '@/lib/repositories/collectionFieldRepository';
 import {
   convertValueForFieldType,
-  parseCSVText,
   SKIP_COLUMN,
   AUTO_FIELD_KEYS,
   truncateValue,
@@ -34,10 +33,19 @@ interface UploadedAsset {
   publicUrl: string;
 }
 
+/** Encode a URL that may contain unencoded characters like spaces. */
+function sanitizeUrl(url: string): string {
+  try {
+    return new URL(url).href;
+  } catch {
+    return encodeURI(url);
+  }
+}
+
 /** Extract a decoded filename from a URL, or empty string if none found. */
 function extractFilenameFromUrl(url: string): string {
   try {
-    const segment = new URL(url).pathname.split('/').pop();
+    const segment = new URL(sanitizeUrl(url)).pathname.split('/').pop();
     if (segment && segment.includes('.')) {
       return decodeURIComponent(segment);
     }
@@ -48,7 +56,7 @@ function extractFilenameFromUrl(url: string): string {
 /** Download a file from a URL and upload it to the asset manager. */
 async function downloadAndUploadAsset(url: string): Promise<UploadedAsset | null> {
   try {
-    const response = await fetch(url, {
+    const response = await fetch(sanitizeUrl(url), {
       headers: { 'User-Agent': 'Ycode-CSV-Import/1.0' },
     });
 
@@ -58,7 +66,6 @@ async function downloadAndUploadAsset(url: string): Promise<UploadedAsset | null
     }
 
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
-    const blob = await response.blob();
 
     let filename = extractFilenameFromUrl(url);
     if (!filename) {
@@ -66,7 +73,9 @@ async function downloadAndUploadAsset(url: string): Promise<UploadedAsset | null
       filename = `imported-${Date.now()}.${ext}`;
     }
 
-    const file = new File([blob], filename, { type: contentType });
+    // Use arrayBuffer directly — avoids the extra blob→File copy
+    const buffer = await response.arrayBuffer();
+    const file = new File([buffer], filename, { type: contentType });
     const asset = await uploadFile(file, 'csv-import');
 
     if (!asset) {
@@ -84,7 +93,6 @@ async function downloadAndUploadAsset(url: string): Promise<UploadedAsset | null
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
 interface PreparedValue {
   item_id: string;
   field_id: string;
@@ -189,20 +197,60 @@ function prepareRow(
   };
 }
 
-const BATCH_SIZE = 20;
+/**
+ * Load a batch of rows from a JSON file in Supabase Storage.
+ * Used when rows are too large for the request body — the client uploads
+ * each batch as a small JSON file instead of sending the full CSV.
+ */
+async function loadBatchFromStorage(
+  batchPath: string,
+): Promise<{ rows: Record<string, string>[]; supabase: Awaited<ReturnType<typeof getSupabaseAdmin>> }> {
+  const supabase = await getSupabaseAdmin();
+  if (!supabase) {
+    throw new Error('Storage not configured');
+  }
+
+  const { data: fileBlob, error: downloadError } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .download(batchPath);
+
+  if (downloadError || !fileBlob) {
+    console.error('Failed to download batch from storage:', downloadError);
+    throw new Error('Failed to read batch file from storage');
+  }
+
+  const text = await fileBlob.text();
+  console.warn(`[csv-import] Downloaded batch from storage: ${(text.length / 1024).toFixed(0)}KB`);
+  const rows = JSON.parse(text) as Record<string, string>[];
+
+  try {
+    await supabase.storage.from(STORAGE_BUCKET).remove([batchPath]);
+  } catch { /* best-effort cleanup */ }
+
+  return { rows, supabase };
+}
 
 /**
  * POST /ycode/api/collections/import/process
  * Process the next batch of rows for an import job.
- * Reads the CSV file directly from Supabase Storage — no row data in the request body.
+ *
+ * Row delivery methods (in order of preference):
+ *  1. rows[] in body — for batches that fit under Vercel's 4.5MB body limit
+ *  2. batchStoragePath in body — client uploaded the batch as a JSON file to storage
  *
  * Body:
  *  - importId: string - The import job to process
+ *  - rows?: Record<string, string>[] - Batch of CSV rows (small batches)
+ *  - batchStoragePath?: string - Path to a batch JSON file in storage (large rows)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { importId } = body;
+    const { importId, rows: clientRows, batchStoragePath } = body as {
+      importId?: string;
+      rows?: Record<string, string>[];
+      batchStoragePath?: string;
+    };
 
     if (!importId) {
       return noCache({ error: 'importId is required' }, 400);
@@ -242,35 +290,28 @@ export async function POST(request: NextRequest) {
     }
     importJob = freshImportJob;
 
-    // Read CSV from Supabase Storage
-    const csvMeta = importJob.csv_data as { storage_path?: string } | null;
-    if (!csvMeta?.storage_path) {
-      return noCache({ error: 'Import job has no CSV file reference' }, 400);
-    }
-
-    const supabase = await getSupabaseAdmin();
-    if (!supabase) {
-      return noCache({ error: 'Storage not configured' }, 500);
-    }
-
-    const { data: fileBlob, error: downloadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .download(csvMeta.storage_path);
-
-    if (downloadError || !fileBlob) {
-      console.error('Failed to download CSV from storage:', downloadError);
-      return noCache({ error: 'Failed to read CSV file from storage' }, 500);
-    }
-
-    const csvText = await fileBlob.text();
-    const parsed = parseCSVText(csvText);
-
-    // Determine which rows to process in this batch
     const startIndex = importJob.processed_rows + importJob.failed_rows;
-    const rowsToProcess = parsed.rows.slice(startIndex, startIndex + BATCH_SIZE);
+    const csvMeta = importJob.csv_data as { storage_path?: string } | null;
+
+    // Resolve rows: body → batch file in storage
+    let rowsToProcess: Record<string, string>[];
+    let supabaseForCleanup: Awaited<ReturnType<typeof getSupabaseAdmin>> = null;
+    let isStorageFallback = false;
+
+    if (clientRows && Array.isArray(clientRows) && clientRows.length > 0) {
+      rowsToProcess = clientRows;
+      console.warn(`[csv-import] Client body: ${clientRows.length} rows, startIndex=${startIndex}`);
+    } else if (batchStoragePath) {
+      console.warn(`[csv-import] Batch from storage: ${batchStoragePath}, startIndex=${startIndex}`);
+      const storageResult = await loadBatchFromStorage(batchStoragePath);
+      rowsToProcess = storageResult.rows;
+      supabaseForCleanup = storageResult.supabase;
+      isStorageFallback = true;
+    } else {
+      rowsToProcess = [];
+    }
 
     if (rowsToProcess.length === 0) {
-      // All rows have been processed
       const errors = importJob.errors || [];
       await completeImport(importJob.id, importJob.processed_rows, importJob.failed_rows, errors);
       return noCache({
@@ -354,14 +395,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Merge all unique URLs from both asset fields and rich-text images
     const allUniqueUrls = new Set([
       ...allPendingAssets.map(a => a.asset.url),
       ...richTextImageUrls,
     ]);
 
     if (allUniqueUrls.size > 0) {
-      // 1) Extract filenames from all URLs and batch-query existing assets (1 DB query)
+      console.warn(`[csv-import] Processing ${allUniqueUrls.size} unique asset URLs`);
+
       const urlToFilename = new Map<string, string>();
       const filenamesToCheck: string[] = [];
       for (const url of allUniqueUrls) {
@@ -374,7 +415,6 @@ export async function POST(request: NextRequest) {
 
       const existingAssets = await findAssetsByFilenames(filenamesToCheck);
 
-      // 2) Resolve URLs: reuse existing assets or mark for download
       const urlToUploadedAsset = new Map<string, UploadedAsset>();
       const urlsToDownload: string[] = [];
 
@@ -388,8 +428,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 3) Download + upload only the URLs not already in the DB (parallel, batched)
-      const ASSET_CONCURRENCY = 20;
+      const ASSET_CONCURRENCY = isStorageFallback ? 5 : 20;
       for (let i = 0; i < urlsToDownload.length; i += ASSET_CONCURRENCY) {
         const batch = urlsToDownload.slice(i, i + ASSET_CONCURRENCY);
         const results = await Promise.allSettled(
@@ -405,7 +444,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 4) Assign asset IDs back to asset field values
       for (const { row, asset } of allPendingAssets) {
         const uploaded = urlToUploadedAsset.get(asset.url);
         if (uploaded) {
@@ -417,7 +455,6 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 5) Replace image URLs in rich-text field values
       if (richTextImageUrls.size > 0) {
         const rtUrlToAsset = new Map<string, { assetId: string; publicUrl: string }>();
         for (const url of richTextImageUrls) {
@@ -448,18 +485,56 @@ export async function POST(request: NextRequest) {
     if (preparedRows.length > 0) {
       await createItemsBulk(preparedRows.map(r => r.item));
 
+      const LARGE_VALUE_THRESHOLD = 500_000;
+
+      // Separate rows with large values (need Knex direct PG) from normal ones
+      const normalRows: PreparedRow[] = [];
+      const largeRows: PreparedRow[] = [];
+
       for (const row of preparedRows) {
+        if (row.values.some(v => (v.value?.length ?? 0) > LARGE_VALUE_THRESHOLD)) {
+          largeRows.push(row);
+        } else {
+          normalRows.push(row);
+        }
+      }
+
+      // Bulk insert all normal values in one call
+      if (normalRows.length > 0) {
+        const allValues = normalRows.flatMap(r => r.values);
+        try {
+          if (allValues.length > 0) {
+            await insertValuesBulk(allValues);
+          }
+          processedCount += normalRows.length;
+        } catch (error) {
+          // Fallback: insert per row to identify which one failed
+          for (const row of normalRows) {
+            try {
+              if (row.values.length > 0) {
+                await insertValuesBulk(row.values);
+              }
+              processedCount++;
+            } catch (rowError) {
+              failedCount++;
+              errors.push(`Row ${row.rowNumber}: DB insert failed — ${getErrorMessage(rowError)}`);
+              try { await deleteItem(row.itemId); } catch { /* best-effort */ }
+            }
+          }
+        }
+      }
+
+      // Large rows use direct PG with extended timeout
+      for (const row of largeRows) {
         try {
           if (row.values.length > 0) {
-            await insertValuesBulk(row.values);
+            await insertValuesDirectPg(row.values);
           }
           processedCount++;
         } catch (error) {
           failedCount++;
           errors.push(`Row ${row.rowNumber}: DB insert failed — ${getErrorMessage(error)}`);
-          try {
-            await deleteItem(row.itemId);
-          } catch { /* best-effort cleanup */ }
+          try { await deleteItem(row.itemId); } catch { /* best-effort */ }
         }
       }
     }
@@ -482,9 +557,14 @@ export async function POST(request: NextRequest) {
       await completeImport(importJob.id, processedCount, failedCount, errors);
 
       // Clean up the CSV file from storage
-      try {
-        await supabase.storage.from(STORAGE_BUCKET).remove([csvMeta.storage_path]);
-      } catch { /* best-effort cleanup */ }
+      if (csvMeta?.storage_path) {
+        try {
+          const supabase = supabaseForCleanup || await getSupabaseAdmin();
+          if (supabase) {
+            await supabase.storage.from(STORAGE_BUCKET).remove([csvMeta.storage_path]);
+          }
+        } catch { /* best-effort cleanup */ }
+      }
     }
 
     return noCache({

@@ -44,6 +44,7 @@ import { usePagesStore } from '@/stores/usePagesStore';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { useEditorActions } from '@/hooks/use-editor-url';
+import { useLocalizationMode } from '@/hooks/use-localization-mode';
 import type { UseLiveLayerUpdatesReturn } from '@/hooks/use-live-layer-updates';
 
 /**
@@ -288,6 +289,8 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   const pushComponentNavigation = useEditorStore((s) => s.pushComponentNavigation);
   const startCanvasDrag = useEditorStore((s) => s.startCanvasDrag);
   const endCanvasDrag = useEditorStore((s) => s.endCanvasDrag);
+  const leftSidebarWidth = useEditorStore((s) => s.leftSidebarWidth);
+  const { isLocalizing } = useLocalizationMode();
 
   const components = useComponentsStore((s) => s.components);
   const updateComponentDraft = useComponentsStore((s) => s.updateComponentDraft);
@@ -1402,12 +1405,36 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
 
   const deleteConfirmDescription = `Are you sure you want to delete "${componentName}"? ${usageSuffix}`;
 
+  // Read-only translation mode: hide the library entirely so the user knows
+  // they can't add or modify structural elements while in a non-default locale.
+  if (isLocalizing) {
+    return (
+      <div
+        className={cn(
+          'fixed left-64 top-14 bottom-0 w-64 bg-background border-r z-50 flex flex-col items-center justify-center p-6 text-center',
+          !isOpen && 'hidden'
+        )}
+      >
+        <Empty>
+          <EmptyMedia variant="icon">
+            <Icon name="globe" />
+          </EmptyMedia>
+          <EmptyTitle>Translating</EmptyTitle>
+          <EmptyDescription>
+            Switch to the default locale to add elements.
+          </EmptyDescription>
+        </Empty>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        'fixed left-64 top-14 bottom-0 w-64 bg-background border-r z-50 flex flex-col',
+        'fixed top-14 bottom-0 w-64 bg-background border-r z-50 flex flex-col',
         !isOpen && 'hidden'
       )}
+      style={{ left: `${leftSidebarWidth}px` }}
     >
         {/* Tabs */}
         <Tabs
