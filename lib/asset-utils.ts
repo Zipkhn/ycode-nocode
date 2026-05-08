@@ -399,11 +399,31 @@ const NON_LCP_ANCESTOR_NAMES = new Set(['header', 'footer', 'nav']);
 function isSvgAsset(asset: { mimeType?: string | null; url?: string | null } | undefined): boolean {
   if (!asset) return false;
   if (asset.mimeType && asset.mimeType.toLowerCase().includes('svg')) return true;
-  if (asset.url) {
-    const path = asset.url.split('?')[0].split('#')[0].toLowerCase();
-    if (path.endsWith('.svg')) return true;
-  }
+  if (asset.url) return isSvgUrl(asset.url);
   return false;
+}
+
+/** Cheap extension sniff: does the URL path end in `.svg`? */
+function isSvgUrl(url: string): boolean {
+  const path = url.split('?')[0].split('#')[0].toLowerCase();
+  return path.endsWith('.svg');
+}
+
+/**
+ * Best-effort URL extraction from an image layer's `src` variable when the
+ * variable is a raw URL string (`dynamic_text` / `static_text`) rather than
+ * an `AssetVariable`. Lets the LCP heuristic skip SVG logos that the user
+ * pasted as a URL instead of selecting from the asset library.
+ *
+ * Returns undefined for variable shapes we can't resolve cheaply (e.g. CMS
+ * field bindings) — those fall through to the existing checks.
+ */
+function getInlineImageUrl(srcVar: unknown): string | undefined {
+  if (!srcVar || typeof srcVar !== 'object') return undefined;
+  const v = srcVar as { type?: string; data?: { content?: unknown } };
+  if (v.type !== 'dynamic_text' && v.type !== 'static_text') return undefined;
+  const content = v.data?.content;
+  return typeof content === 'string' ? content : undefined;
 }
 
 export interface LcpCandidate {
@@ -444,13 +464,20 @@ export function findLcpCandidate(
     const inNonLcp = inNonLcpAncestor || NON_LCP_ANCESTOR_NAMES.has(layer.name);
 
     if (layer.name === 'image' && !inNonLcp) {
-      const assetId = isAssetVariable(layer.variables?.image?.src)
-        ? getAssetId(layer.variables.image.src)
-        : undefined;
+      const srcVar = layer.variables?.image?.src;
+      const assetId = isAssetVariable(srcVar) ? getAssetId(srcVar) : undefined;
       const asset = assetId ? resolvedAssets?.[assetId] : undefined;
 
+      // Some pages store the image URL directly as a `dynamic_text` /
+      // `static_text` variable (e.g. pasted logo URL) rather than an
+      // `AssetVariable`. Sniff the inline URL so SVG logos in that shape
+      // are still skipped.
+      const inlineUrl = !assetId ? getInlineImageUrl(srcVar) : undefined;
+
       // SVGs are vector logos / icons in practice — never the hero image.
-      if (!isSvgAsset(asset)) {
+      const isSvg = isSvgAsset(asset) || (inlineUrl ? isSvgUrl(inlineUrl) : false);
+
+      if (!isSvg) {
         let width = parseWidth(layer.attributes?.width);
         if (width === null && asset?.width) {
           width = asset.width as number;
