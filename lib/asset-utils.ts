@@ -406,10 +406,15 @@ function isSvgAsset(asset: { mimeType?: string | null; url?: string | null } | u
   return false;
 }
 
+export interface LcpCandidate {
+  layerId: string;
+  /** Asset id of the candidate image, when backed by a static asset variable. */
+  assetId?: string;
+}
+
 /**
- * Find the layer id that should be treated as the LCP (Largest Contentful Paint)
- * candidate for a given page tree. Walks the tree in render order and returns
- * the first `image`-named layer that:
+ * Find the LCP (Largest Contentful Paint) candidate for a given page tree.
+ * Walks the tree in render order and returns the first `image`-named layer that:
  *   - is NOT a descendant of a `header`, `footer`, or `nav` layer (logos),
  *   - is NOT backed by an SVG asset (vector logos / icons), and
  *   - has an effective intrinsic width unknown or at least `minWidth` pixels.
@@ -421,11 +426,11 @@ function isSvgAsset(asset: { mimeType?: string | null; url?: string | null } | u
  *
  * Returns null if no qualifying image exists in the tree.
  */
-export function findLcpCandidateLayerId(
+export function findLcpCandidate(
   layers: Layer[],
   resolvedAssets?: Record<string, { width?: number | null; mimeType?: string | null; url?: string | null }>,
   minWidth: number = 200
-): string | null {
+): LcpCandidate | null {
   const parseWidth = (value: unknown): number | null => {
     if (typeof value === 'number' && !isNaN(value)) return value;
     if (typeof value !== 'string') return null;
@@ -435,7 +440,7 @@ export function findLcpCandidateLayerId(
     return isNaN(n) ? null : n;
   };
 
-  const visit = (layer: Layer, inNonLcpAncestor: boolean): string | null => {
+  const visit = (layer: Layer, inNonLcpAncestor: boolean): LcpCandidate | null => {
     const inNonLcp = inNonLcpAncestor || NON_LCP_ANCESTOR_NAMES.has(layer.name);
 
     if (layer.name === 'image' && !inNonLcp) {
@@ -452,7 +457,7 @@ export function findLcpCandidateLayerId(
         }
 
         if (width === null || width >= minWidth) {
-          return layer.id;
+          return { layerId: layer.id, assetId: assetId || undefined };
         }
       }
     }
@@ -473,6 +478,15 @@ export function findLcpCandidateLayerId(
   }
 
   return null;
+}
+
+/** @deprecated Use {@link findLcpCandidate}. Kept for callers that only need the id. */
+export function findLcpCandidateLayerId(
+  layers: Layer[],
+  resolvedAssets?: Record<string, { width?: number | null; mimeType?: string | null; url?: string | null }>,
+  minWidth: number = 200
+): string | null {
+  return findLcpCandidate(layers, resolvedAssets, minWidth)?.layerId ?? null;
 }
 
 // ==========================================
