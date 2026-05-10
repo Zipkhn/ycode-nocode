@@ -673,6 +673,7 @@ export function collectLayerAssetIds(
     addAssetVar(layer.variables?.video?.poster);
     addAssetVar(layer.variables?.audio?.src);
     addAssetVar(layer.variables?.icon?.src);
+    addAssetVar(layer.variables?.lottie?.src);
     addAssetVar(layer.variables?.backgroundImage?.src);
 
     // Direct asset link

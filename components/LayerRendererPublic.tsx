@@ -48,6 +48,7 @@ const FilterableCollection = dynamic(() => import('@/components/FilterableCollec
 const LocaleSelector = dynamic(() => import('@/components/layers/LocaleSelector'));
 const AnimationInitializer = dynamic(() => import('@/components/AnimationInitializer'));
 const FilterLayerBehavior = dynamic(() => import('@/components/FilterLayerBehavior'));
+const DynamicLottiePlayer = dynamic(() => import('@/components/LottiePlayer'), { ssr: false });
 
 /** True if any layer in the tree has at least one interaction configured. */
 function layerTreeHasInteractions(layers: Layer[]): boolean {
@@ -1243,6 +1244,38 @@ const LayerItem: React.FC<{
           data-icon="true"
           dangerouslySetInnerHTML={{ __html: iconHtml }}
         />
+      );
+    }
+
+    if (layer.name === 'lottie') {
+      const { lottieLoop: _ll, lottieAutoplay: _la, lottieSpeed: _ls, lottieReverse: _lr, lottieRenderer: _lrend, lottieUseCustomDuration: _lucd, lottieDuration: _ld, ...lottieSafeProps } = elementProps as any;
+
+      const lottieSrc = (() => {
+        const src = layer.variables?.lottie?.src;
+        if (!src) return null;
+        if (isAssetVariable(src)) {
+          const assetId = getAssetId(src);
+          return assetId ? (getAsset(assetId)?.public_url || null) : null;
+        }
+        if (isDynamicTextVariable(src)) return getDynamicTextContent(src) || null;
+        return null;
+      })();
+
+      return (
+        <div {...lottieSafeProps} suppressHydrationWarning>
+          {lottieSrc ? (
+            <DynamicLottiePlayer
+              src={lottieSrc}
+              loop={layer.attributes?.lottieLoop !== false}
+              autoplay={layer.attributes?.lottieAutoplay !== false}
+              speed={typeof layer.attributes?.lottieSpeed === 'number' ? layer.attributes.lottieSpeed : 1}
+              reverse={!!layer.attributes?.lottieReverse}
+              renderer={(layer.attributes?.lottieRenderer as 'svg' | 'canvas') || 'svg'}
+              useCustomDuration={!!layer.attributes?.lottieUseCustomDuration}
+              duration={typeof layer.attributes?.lottieDuration === 'number' ? layer.attributes.lottieDuration : 1000}
+            />
+          ) : null}
+        </div>
       );
     }
 

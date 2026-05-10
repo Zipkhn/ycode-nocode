@@ -15,6 +15,12 @@
 
 @import "tailwindcss";
 
+/* Studio bridges (u-col-span-N, u-row-span-N, spacing tokens, custom
+   variable selectors) — needed on published & preview pages because user
+   layers emit these classes via tailwind-class-mapper. Without this the
+   Studio grid spans collapse and elements lose their dimensions. */
+@import "./global-theme.css";
+
 /* Builder UI is not rendered on published pages — drop ~150 KiB of
    sidebar/modal/dropdown utilities by excluding the route group. */
 @source not "../app/(builder)";
