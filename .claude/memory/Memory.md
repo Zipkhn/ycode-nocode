@@ -1,5 +1,9 @@
 # Memory — Preferences & Decisions
 
+## Post-Merge Upstream
+- **Toujours suivre `.claude/memory/PostMergeChecklist.md`** après chaque `git pull upstream` ou merge upstream/main.
+- Le tsc + build ne détectent PAS les régressions de rendu (Lottie, dimensions Studio, etc.). Tester en navigateur.
+
 ## Terminology
 - **Studio** = the custom left-panel plugin (design system manager)
 - **Sidebar** = the native Ycode right panel (style/properties panel)
