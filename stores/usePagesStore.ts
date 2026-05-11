@@ -1222,6 +1222,14 @@ export const usePagesStore = create<PagesStore>((set, get) => ({
       pages: updatedPages,
       draftsByPageId: remainingDrafts
     });
+
+    // Drop the version-tracking cache entry so the deleted page's layer JSON
+    // doesn't linger in memory for the rest of the session.
+    import('@/lib/version-tracking').then(({ clearVersionTracking }) => {
+      clearVersionTracking('page_layers', pageId);
+    }).catch(() => {
+      // non-fatal: cache will be replaced on next session
+    });
   },
 
   setDraftLayers: (pageId, layers) => {
