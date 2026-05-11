@@ -1329,26 +1329,28 @@ const LayerItem: React.FC<{
   // attribute so the canvas re-fetches when the user changes the default in the
   // SelectOptionsSettings panel. On the canvas there is no live `<select>`
   // value, so the layer attribute drives the effective sort.
+  //
+  // The lookup is scoped to the current page's draft (via the `pageId` prop)
+  // because the input layer always lives on the same page as the collection
+  // layer that references it. Walking every draft on every store update would
+  // cause every collection layer on the canvas to do an O(tree) search per
+  // keystroke for unrelated pages.
   const sortByInputDefaultValue = usePagesStore((state) => {
     const inputLayerId = collectionVariable?.sort_by_inputLayerId;
-    if (!inputLayerId) return undefined;
-    for (const draft of Object.values(state.draftsByPageId)) {
-      if (!draft) continue;
-      const found = findLayerById(draft.layers, inputLayerId);
-      if (found) return found.attributes?.value;
-    }
-    return undefined;
+    if (!inputLayerId || !pageId) return undefined;
+    const draft = state.draftsByPageId[pageId];
+    if (!draft) return undefined;
+    const found = findLayerById(draft.layers, inputLayerId);
+    return found?.attributes?.value;
   });
 
   const sortOrderInputDefaultValue = usePagesStore((state) => {
     const inputLayerId = collectionVariable?.sort_order_inputLayerId;
-    if (!inputLayerId) return undefined;
-    for (const draft of Object.values(state.draftsByPageId)) {
-      if (!draft) continue;
-      const found = findLayerById(draft.layers, inputLayerId);
-      if (found) return found.attributes?.value;
-    }
-    return undefined;
+    if (!inputLayerId || !pageId) return undefined;
+    const draft = state.draftsByPageId[pageId];
+    if (!draft) return undefined;
+    const found = findLayerById(draft.layers, inputLayerId);
+    return found?.attributes?.value;
   });
 
   useEffect(() => {

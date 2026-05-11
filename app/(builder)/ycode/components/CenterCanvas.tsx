@@ -1137,77 +1137,78 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const invalidationKey = useCollectionLayerStore((state) => state.invalidationKey);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Create a stable string representation of collection layer settings for dependency
-  const collectionLayersKey = useMemo(() => {
-    const extractCollectionSettings = (layerList: Layer[]): string[] => {
-      const settings: string[] = [];
+  // Extract the fetch params for every collection layer in one tree walk. The
+  // params reference changes whenever `layers` changes, but the derived
+  // `collectionLayersKey` string only changes when collection-relevant settings
+  // change — so the actual fetch effect can ignore unrelated edits (typing,
+  // styling) and only fire on real collection changes.
+  const collectionFetchParams = useMemo(() => {
+    const params: Array<{
+      layerId: string;
+      collectionId: string;
+      sortBy: string | undefined;
+      sortOrder: 'asc' | 'desc' | undefined;
+      limit: number | undefined;
+      offset: number | undefined;
+    }> = [];
+    const traverse = (layerList: Layer[]) => {
       layerList.forEach((layer) => {
         const collectionVariable = getCollectionVariable(layer);
         if (collectionVariable?.id) {
           const opts = layer.settings?.optionsSource;
-          const sortBy = opts?.sortFieldId || collectionVariable.sort_by;
-          const sortOrder = opts?.sortOrder || collectionVariable.sort_order;
-          settings.push(`${layer.id}:${collectionVariable.id}:${sortBy ?? ''}:${sortOrder ?? ''}:${collectionVariable.limit ?? ''}:${collectionVariable.offset ?? ''}`);
+          params.push({
+            layerId: layer.id,
+            collectionId: collectionVariable.id,
+            sortBy: opts?.sortFieldId || collectionVariable.sort_by || undefined,
+            sortOrder: opts?.sortOrder || collectionVariable.sort_order || undefined,
+            limit: collectionVariable.limit ?? undefined,
+            offset: collectionVariable.offset ?? undefined,
+          });
         }
         if (layer.children && layer.children.length > 0) {
-          settings.push(...extractCollectionSettings(layer.children));
+          traverse(layer.children);
         }
       });
-      return settings;
     };
-
-    return extractCollectionSettings(layers).join('|');
+    traverse(layers);
+    return params;
   }, [layers]);
+
+  // Stable string key used as the effect dependency so unrelated layer edits
+  // (text content, design changes) don't re-arm the debounced fetch timer.
+  const collectionLayersKey = useMemo(
+    () => collectionFetchParams
+      .map((p) => `${p.layerId}:${p.collectionId}:${p.sortBy ?? ''}:${p.sortOrder ?? ''}:${p.limit ?? ''}:${p.offset ?? ''}`)
+      .join('|'),
+    [collectionFetchParams],
+  );
+
+  // Keep latest params reachable from inside the debounced timer without
+  // needing to add the (unstable) array reference to the effect deps.
+  const collectionFetchParamsRef = useRef(collectionFetchParams);
+  collectionFetchParamsRef.current = collectionFetchParams;
 
   // Debounce the fetch to prevent duplicate calls during rapid updates
   useEffect(() => {
-    // Clear any existing timeout
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
 
-    // Set new timeout
     fetchTimeoutRef.current = setTimeout(() => {
-      // Recursively find all collection layers and fetch their data
-      const findAndFetchCollectionLayers = (layerList: Layer[]) => {
-        layerList.forEach((layer) => {
-          const collectionVariable = getCollectionVariable(layer);
-          if (collectionVariable?.id) {
-            const opts = layer.settings?.optionsSource;
-            const sortBy = opts?.sortFieldId || collectionVariable.sort_by;
-            const sortOrder = opts?.sortOrder || collectionVariable.sort_order;
-            fetchLayerData(
-              layer.id,
-              collectionVariable.id,
-              sortBy,
-              sortOrder,
-              collectionVariable.limit,
-              collectionVariable.offset
-            );
-          }
-
-          // Recursively check children
-          if (layer.children && layer.children.length > 0) {
-            findAndFetchCollectionLayers(layer.children);
-          }
-        });
-      };
-
-      if (layers.length > 0) {
-        findAndFetchCollectionLayers(layers);
-      }
-
+      const params = collectionFetchParamsRef.current;
+      params.forEach((p) => {
+        fetchLayerData(p.layerId, p.collectionId, p.sortBy, p.sortOrder, p.limit, p.offset);
+      });
       fetchTimeoutRef.current = null;
-    }, 100); // 100ms debounce - waits for rapid updates to settle
+    }, 100);
 
-    // Cleanup function
     return () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
         fetchTimeoutRef.current = null;
       }
     };
-  }, [collectionLayersKey, fetchLayerData, layers, invalidationKey]);
+  }, [collectionLayersKey, fetchLayerData, invalidationKey]);
 
   // Get current page
   const currentPage = useMemo(() => pages.find(p => p.id === currentPageId), [pages, currentPageId]);

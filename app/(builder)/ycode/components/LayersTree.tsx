@@ -884,6 +884,28 @@ function collectCollapsedIds(layers: Layer[]): Set<string> {
   return collapsed;
 }
 
+/**
+ * Build a stable string key fingerprinting the explicit `open` flags in the
+ * layer tree. Used as an effect dep so we only resync local `collapsedIds`
+ * state when collapse-relevant data actually changes — not on every keystroke
+ * that creates a fresh `layers` array reference.
+ */
+function collectCollapseKey(layers: Layer[]): string {
+  const parts: string[] = [];
+  function traverse(layerList: Layer[]) {
+    for (const layer of layerList) {
+      if (layer.open === false) {
+        parts.push(layer.id);
+      }
+      if (layer.children && layer.children.length > 0) {
+        traverse(layer.children);
+      }
+    }
+  }
+  traverse(layers);
+  return parts.join('|');
+}
+
 // Helper function to update a layer's open state in the tree
 function updateLayerOpenState(layers: Layer[], layerId: string, isOpen: boolean): Layer[] {
   return layers.map(layer => {
@@ -1271,10 +1293,16 @@ export default function LayersTree({
     }
   }, [toggleSelection, selectRange, flattenedNodes, onLayerSelect]);
 
-  // Sync collapsedIds state when layers change (from external updates)
+  // Sync collapsedIds state when collapse flags change (from external updates).
+  // Depend on a derived key instead of the `layers` reference so the tree
+  // doesn't rebuild this Set on every keystroke when only text/style changed.
+  const collapseKey = useMemo(() => collectCollapseKey(layers), [layers]);
   useEffect(() => {
     setCollapsedIds(collectCollapsedIds(layers));
-  }, [layers]);
+    // `layers` is intentionally excluded — we re-sync only when the derived
+    // collapse fingerprint changes, not on every layer-tree mutation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapseKey]);
 
   // Listen for expand events from ElementLibrary
   useEffect(() => {
