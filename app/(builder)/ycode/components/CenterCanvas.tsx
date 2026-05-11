@@ -715,7 +715,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
 
   // Collection layer store for independent layer data
   const referencedItems = useCollectionLayerStore((state) => state.referencedItems);
-  const fetchReferencedCollectionItems = useCollectionLayerStore((state) => state.fetchReferencedCollectionItems);
+  const fetchReferencedCollectionsBatch = useCollectionLayerStore((state) => state.fetchReferencedCollectionsBatch);
 
   const mergedCollectionItems = useMemo(
     () => ({ ...collectionItemsFromStore, ...referencedItems }),
@@ -2027,11 +2027,12 @@ const CenterCanvas = React.memo(function CenterCanvas({
       });
     }
 
-    // Fetch items for each referenced collection
-    allReferencedIds.forEach((collectionId) => {
-      fetchReferencedCollectionItems(collectionId);
-    });
-  }, [collectionFieldsFromStore, pageCollectionFields, fetchReferencedCollectionItems, invalidationKey]);
+    // One batch call per re-render covers every referenced collection; the
+    // store dedupes against already-loaded IDs so repeat calls are cheap.
+    if (allReferencedIds.size > 0) {
+      fetchReferencedCollectionsBatch(Array.from(allReferencedIds));
+    }
+  }, [collectionFieldsFromStore, pageCollectionFields, fetchReferencedCollectionsBatch, invalidationKey]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
