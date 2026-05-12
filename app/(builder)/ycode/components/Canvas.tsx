@@ -325,8 +325,6 @@ const Canvas = React.memo(function Canvas({
 
   // State
   const [iframeReady, setIframeReady] = useState(false);
-  const [internalHoveredLayerId, setInternalHoveredLayerId] = useState<string | null>(null);
-  const effectiveHoveredLayerId = hoveredLayerId ?? internalHoveredLayerId;
 
   // Resolve component instances in layers
   const { layers: resolvedLayers, componentMap } = useMemo(() => {
@@ -414,7 +412,10 @@ const Canvas = React.memo(function Canvas({
     onLayerClick?.(targetLayerId, event);
   }, [componentMap, editingComponentId, onLayerClick]);
 
-  // Handle hover
+  // Handle hover. We only forward the resolved id to the parent, which writes
+  // it into the editor store. `SelectionOverlay` reads the store directly to
+  // paint the outline, so we don't need any React state here — avoiding a
+  // Canvas re-render on every hover.
   const handleLayerHover = useCallback((layerId: string | null) => {
     // Resolve component root for hover (same logic as click)
     let resolvedLayerId = layerId;
@@ -428,7 +429,6 @@ const Canvas = React.memo(function Canvas({
       }
     }
 
-    setInternalHoveredLayerId(resolvedLayerId);
     onLayerHover?.(resolvedLayerId);
   }, [componentMap, editingComponentId, onLayerHover]);
 
@@ -559,7 +559,7 @@ const Canvas = React.memo(function Canvas({
       <CanvasContent
         layers={localizedLayers}
         selectedLayerId={selectedLayerId}
-        hoveredLayerId={effectiveHoveredLayerId}
+        hoveredLayerId={hoveredLayerId}
         pageId={pageId}
         pageCollectionItemId={pageCollectionItem?.id}
         pageCollectionItemData={enrichedPageCollectionItemData}

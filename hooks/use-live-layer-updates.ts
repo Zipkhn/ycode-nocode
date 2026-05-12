@@ -4,7 +4,7 @@
  * Manages real-time synchronization of layer changes using Supabase Realtime
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useCollaborationPresenceStore, getResourceLockKey } from '../stores/useCollaborationPresenceStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { usePagesStore, markPageMcpSynced } from '../stores/usePagesStore';
@@ -421,12 +421,17 @@ export function useLiveLayerUpdates(
     };
   }, []);
 
-  return {
+  // Stable return reference: broadcast callbacks are already memoized via
+  // useCallback, and `isReceivingUpdates` / `lastUpdateTime` are refs that
+  // mutate silently — no consumer reads them. Returning a stable object
+  // prevents downstream `React.memo` cascades through Canvas → LayerRenderer
+  // → LayerContextMenu when the host component re-renders for unrelated reasons.
+  return useMemo(() => ({
     broadcastLayerUpdate,
     broadcastLayerAdd,
     broadcastLayerDelete,
     broadcastLayerMove,
     isReceivingUpdates: isReceivingUpdates.current,
-    lastUpdateTime: lastUpdateTime.current
-  };
+    lastUpdateTime: lastUpdateTime.current,
+  }), [broadcastLayerUpdate, broadcastLayerAdd, broadcastLayerDelete, broadcastLayerMove]);
 }

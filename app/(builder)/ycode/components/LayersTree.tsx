@@ -397,7 +397,10 @@ const LayerRow = React.memo(function LayerRow({
   // Check if this is the Body layer (locked)
   const isLocked = node.layer.id === 'body';
 
-  const [isHovered, setIsHovered] = React.useState(false);
+  // Hover is driven by CSS :hover (via `group-hover/row:` on the wrapper) so
+  // each mouseover/leave doesn't queue a React commit. Background colors for
+  // both states are computed once per render and applied through CSS variables.
+  const canHover = !isDragActive && !isDragging && !isLockedByOther;
 
   const rowBg = isSelected && !usePurpleStyle && !isStateActive
     ? 'var(--primary)'
@@ -406,29 +409,30 @@ const LayerRow = React.memo(function LayerRow({
       : isSelected && usePurpleStyle
         ? 'rgb(168 85 247)'
         : isChildOfSelected && !usePurpleStyle && !isStateActive
-          ? isHovered
-            ? 'color-mix(in oklch, var(--primary) 20%, var(--background))'
-            : 'color-mix(in oklch, var(--primary) 15%, var(--background))'
+          ? 'color-mix(in oklch, var(--primary) 15%, var(--background))'
           : isChildOfSelected && !usePurpleStyle && isStateActive
-            ? isHovered
-              ? 'color-mix(in oklch, #8dd92f 20%, var(--background))'
-              : 'color-mix(in oklch, #8dd92f 15%, var(--background))'
+            ? 'color-mix(in oklch, #8dd92f 15%, var(--background))'
             : isChildOfSelected && usePurpleStyle
               ? 'color-mix(in oklch, rgb(168 85 247) 10%, var(--background))'
-              : !isDragActive && !isDragging && !isLockedByOther && isHovered
-                ? 'color-mix(in oklch, var(--foreground) 8%, var(--background))'
-                : 'transparent';
+              : 'transparent';
 
-  const hasAlwaysVisibleIcons = !!node.layer.settings?.hidden
-    || isLockedByOther
-    || interactionTriggerLayerIds.includes(node.id)
-    || interactionTargetLayerIds.includes(node.id);
+  const rowHoverBg = !canHover || isSelected
+    ? rowBg
+    : isChildOfSelected && !usePurpleStyle && !isStateActive
+      ? 'color-mix(in oklch, var(--primary) 20%, var(--background))'
+      : isChildOfSelected && !usePurpleStyle && isStateActive
+        ? 'color-mix(in oklch, #8dd92f 20%, var(--background))'
+        : isChildOfSelected && usePurpleStyle
+          ? rowBg
+          : 'color-mix(in oklch, var(--foreground) 8%, var(--background))';
 
-  const iconBg = rowBg === 'transparent'
-    ? 'var(--background)'
-    : isSelected || isChildOfSelected || hasAlwaysVisibleIcons
-      ? rowBg
-      : 'transparent';
+  // The icon area sits on top of the row content, so its background must be
+  // opaque to hide long layer names that scroll behind it. When the row itself
+  // has no background, fall back to the panel background.
+  const deriveIconBg = (bg: string) => bg === 'transparent' ? 'var(--background)' : bg;
+
+  const iconBg = deriveIconBg(rowBg);
+  const iconHoverBg = deriveIconBg(rowHoverBg);
 
   // Sublayer rows (content blocks or text style targets)
   if (node.sublayer) {
@@ -553,23 +557,25 @@ const LayerRow = React.memo(function LayerRow({
       editingComponentId={editingComponentId}
     >
       <div
-        className="relative flex"
+        className="relative flex group/row"
         style={{ width: '100%', minWidth: '100%' }}
-        onMouseEnter={() => { if (!isDragging) setIsHovered(true); }}
-        onMouseLeave={() => setIsHovered(false)}
       >
         {/* Background layer - stays fixed when scrolling horizontally */}
         <div className="absolute inset-0 pointer-events-none">
           <div
             className={cn(
-              'sticky left-0 h-full',
+              'sticky left-0 h-full bg-(--row-bg) group-hover/row:bg-(--row-hover-bg)',
               isSelected && !hasVisibleChildren && 'rounded-lg',
               isSelected && hasVisibleChildren && 'rounded-t-lg',
               !isSelected && isChildOfSelected && !isLastVisibleDescendant && 'rounded-none',
               !isSelected && isChildOfSelected && isLastVisibleDescendant && 'rounded-b-lg',
               !isSelected && !isChildOfSelected && 'rounded-lg',
             )}
-            style={{ width: 'var(--tree-available-width)', background: rowBg }}
+            style={{
+              width: 'var(--tree-available-width)',
+              '--row-bg': rowBg,
+              '--row-hover-bg': rowHoverBg,
+            } as React.CSSProperties}
           />
         </div>
 
@@ -756,8 +762,11 @@ const LayerRow = React.memo(function LayerRow({
             style={{ left: `${node.depth * 14 + 8 + 36}px` }}
           >
             <div
-              className="sticky right-0 h-full flex items-center pointer-events-auto gap-0.5 px-1 rounded-r-lg"
-              style={{ background: iconBg }}
+              className="sticky right-0 h-full flex items-center pointer-events-auto gap-0.5 px-1 rounded-r-lg bg-(--icon-bg) group-hover/row:bg-(--icon-hover-bg)"
+              style={{
+                '--icon-bg': iconBg,
+                '--icon-hover-bg': iconHoverBg,
+              } as React.CSSProperties}
             >
               {isLockedByOther && (
                 <div className="mr-1 shrink-0">

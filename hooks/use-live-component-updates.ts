@@ -6,7 +6,7 @@
  * Manages real-time synchronization of component changes using Supabase Realtime
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useComponentsStore } from '../stores/useComponentsStore';
 import { useCollaborationPresenceStore } from '../stores/useCollaborationPresenceStore';
@@ -249,11 +249,14 @@ export function useLiveComponentUpdates(): UseLiveComponentUpdatesReturn {
     updateUser(currentUserId, { last_active: Date.now() });
   }, [currentUserId, updateUser]);
   
-  return {
+  // Stable return reference: broadcast callbacks are already memoized via
+  // useCallback. `isConnected` is a ref that mutates silently — no consumer
+  // reads it. Stabilizing avoids cascading re-renders downstream.
+  return useMemo(() => ({
     broadcastComponentCreate,
     broadcastComponentUpdate,
     broadcastComponentDelete,
     broadcastComponentLayersUpdate,
     isConnected: isConnectedRef.current,
-  };
+  }), [broadcastComponentCreate, broadcastComponentUpdate, broadcastComponentDelete, broadcastComponentLayersUpdate]);
 }

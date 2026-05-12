@@ -3278,7 +3278,6 @@ const LayerItem: React.FC<{
         pageId={pageId}
         isLocked={isLocked}
         onLayerSelect={onLayerClick}
-        selectedLayerId={selectedLayerId}
         liveLayerUpdates={liveLayerUpdates}
         liveComponentUpdates={liveComponentUpdates}
       >
