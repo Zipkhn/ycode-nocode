@@ -240,23 +240,26 @@ export const useCollaborationPresenceStore = create<CollaborationPresenceState>(
   }))
 );
 
-// Subscribe to lock expiration
+// Background cleanup intervals.
+// Both functions are idempotent and reference-counted by the caller — they
+// must be paired with their `stop*` counterpart when the consumer unmounts.
 let lockCheckInterval: NodeJS.Timeout | null = null;
+let notificationCleanupInterval: NodeJS.Timeout | null = null;
 
+/** Periodically release `resourceLocks` whose `expires_at` has passed. */
 export const startLockExpirationCheck = () => {
   if (lockCheckInterval) return;
-  
+
   lockCheckInterval = setInterval(() => {
     const { resourceLocks, releaseResourceLock } = useCollaborationPresenceStore.getState();
     const now = Date.now();
-    
-    // Check all resource locks for expiration
-    Object.entries(resourceLocks).forEach(([key, lock]) => {
+
+    Object.entries(resourceLocks).forEach(([, lock]) => {
       if (now > lock.expires_at) {
         releaseResourceLock(lock.resource_type, lock.resource_id);
       }
     });
-  }, 1000); // Check every second
+  }, 1000);
 };
 
 export const stopLockExpirationCheck = () => {
@@ -266,17 +269,26 @@ export const stopLockExpirationCheck = () => {
   }
 };
 
-// Auto-cleanup notifications after 30 seconds
+/** Periodically drop notifications older than 30 s. */
 export const startNotificationCleanup = () => {
-  setInterval(() => {
+  if (notificationCleanupInterval) return;
+
+  notificationCleanupInterval = setInterval(() => {
     const { notifications, removeNotification } = useCollaborationPresenceStore.getState();
     const now = Date.now();
-    const maxAge = 30000; // 30 seconds
-    
+    const maxAge = 30000;
+
     notifications.forEach(notification => {
       if (now - notification.timestamp > maxAge) {
         removeNotification(notification.id);
       }
     });
-  }, 5000); // Check every 5 seconds
+  }, 5000);
+};
+
+export const stopNotificationCleanup = () => {
+  if (notificationCleanupInterval) {
+    clearInterval(notificationCleanupInterval);
+    notificationCleanupInterval = null;
+  }
 };

@@ -12,6 +12,7 @@ import { useComponentsStore } from '../stores/useComponentsStore';
 import { useCollaborationPresenceStore } from '../stores/useCollaborationPresenceStore';
 import { usePagesStore } from '../stores/usePagesStore';
 import { createClient } from '@/lib/supabase-browser';
+import { createChannelLifecycle } from '@/lib/realtime-channel';
 import type { Component, Layer } from '../types';
 
 // Types for component updates
@@ -44,28 +45,30 @@ export function useLiveComponentUpdates(): UseLiveComponentUpdatesReturn {
       return;
     }
     
+    const lifecycle = createChannelLifecycle();
+
     const initializeChannel = async () => {
       try {
         const supabase = await createClient();
         const channel = supabase.channel('components:updates');
-        
-        // Listen for component events
+        if (!lifecycle.track(channel, supabase)) return;
+
         channel.on('broadcast', { event: 'component_created' }, (payload) => {
           handleIncomingComponentCreate(payload.payload);
         });
-        
+
         channel.on('broadcast', { event: 'component_updated' }, (payload) => {
           handleIncomingComponentUpdate(payload.payload);
         });
-        
+
         channel.on('broadcast', { event: 'component_deleted' }, (payload) => {
           handleIncomingComponentDelete(payload.payload);
         });
-        
+
         channel.on('broadcast', { event: 'component_layers_updated' }, (payload) => {
           handleIncomingComponentLayersUpdate(payload.payload);
         });
-        
+
         await channel.subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             isConnectedRef.current = true;
@@ -73,20 +76,19 @@ export function useLiveComponentUpdates(): UseLiveComponentUpdatesReturn {
             isConnectedRef.current = false;
           }
         });
-        
+
+        if (lifecycle.cancelled) return;
         channelRef.current = channel;
       } catch (error) {
         console.error('[LIVE-COMPONENT] Failed to initialize:', error);
       }
     };
-    
+
     initializeChannel();
-    
+
     return () => {
-      if (channelRef.current) {
-        channelRef.current.unsubscribe();
-        channelRef.current = null;
-      }
+      lifecycle.teardown();
+      channelRef.current = null;
       isConnectedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

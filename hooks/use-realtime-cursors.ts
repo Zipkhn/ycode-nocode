@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCollaborationPresenceStore } from '../stores/useCollaborationPresenceStore'
 import { useAuthStore } from '../stores/useAuthStore'
 import { useEditorStore } from '../stores/useEditorStore'
+import { createChannelLifecycle } from '@/lib/realtime-channel'
 
 /**
  * Throttle a callback to a certain delay, It will only call the callback if the delay has passed, with the arguments
@@ -199,9 +200,12 @@ export const useRealtimeCursors = ({
   }, []);
 
   useEffect(() => {
+    const lifecycle = createChannelLifecycle();
+
     const initializeChannel = async () => {
       const supabaseClient = await getSupabaseClient();
       const channel = supabaseClient.channel(roomName)
+      if (!lifecycle.track(channel, supabaseClient)) return;
 
       channel
         .on('presence', { event: 'sync' }, () => {
@@ -292,6 +296,7 @@ export const useRealtimeCursors = ({
         })
         .subscribe(async (status: any) => {
           if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
+            if (lifecycle.cancelled) return;
             const currentUser = userRef.current;
             const avatarUrl = currentUser?.user_metadata?.avatar_url || null;
             await channel.track({ 
@@ -303,6 +308,7 @@ export const useRealtimeCursors = ({
               avatarUrl: avatarUrl,
               lockedLayerId: selectedLayerId || null
             })
+            if (lifecycle.cancelled) return;
             channelRef.current = channel
             setConnectionStatus(true)
                     
@@ -331,12 +337,10 @@ export const useRealtimeCursors = ({
     };
         
     initializeChannel();
-        
+
     return () => {
-      if (channelRef.current) {
-        channelRef.current.unsubscribe();
-        channelRef.current = null;
-      }
+      lifecycle.teardown();
+      channelRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName, userId, hasUser, setConnectionStatus, setCurrentUser])

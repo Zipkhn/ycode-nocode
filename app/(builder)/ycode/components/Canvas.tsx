@@ -860,7 +860,7 @@ const Canvas = React.memo(function Canvas({
     doc.addEventListener('wheel', handleWheel, { passive: false, capture: true });
 
     return () => {
-      doc.removeEventListener('wheel', handleWheel);
+      doc.removeEventListener('wheel', handleWheel, { capture: true });
     };
   }, [iframeReady, onZoomGesture]);
 
