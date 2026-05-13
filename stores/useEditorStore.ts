@@ -5,6 +5,23 @@ import { EditorState, UIState } from '../types';
 import type { Layer, Breakpoint, Asset, AssetCategoryFilter } from '../types';
 import { useCanvasTextEditorStore } from './useCanvasTextEditorStore';
 import { updateUrlQueryParam } from '@/hooks/use-editor-url';
+
+// Debounce window for the `?layer=…` URL mirror. Long enough to coalesce
+// rapid clicks (which would otherwise each trigger a Router-wide re-render
+// through Next.js's patched `history.replaceState`), short enough that the
+// URL is up-to-date by the time anyone copies it.
+const LAYER_URL_DEBOUNCE_MS = 250;
+let pendingLayerUrlTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingLayerUrlValue: string | null = null;
+
+function scheduleLayerUrlUpdate(id: string | null): void {
+  pendingLayerUrlValue = id;
+  if (pendingLayerUrlTimer !== null) return;
+  pendingLayerUrlTimer = setTimeout(() => {
+    pendingLayerUrlTimer = null;
+    updateUrlQueryParam('layer', pendingLayerUrlValue);
+  }, LAYER_URL_DEBOUNCE_MS);
+}
 interface HistoryEntry {
   pageId: string;
   layers: Layer[];
@@ -302,7 +319,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       const isLayerRoute = /^\/ycode\/(layers|pages|components)\//.test(pathname);
 
       if (isLayerRoute) {
-        updateUrlQueryParam('layer', id || null);
+        // Debounce the URL update: Next.js's App Router patches
+        // history.replaceState, so every direct call triggers a Router-wide
+        // re-render (`useSearchParams` consumers, etc.). Coalescing rapid
+        // selections keeps the `?layer=…` deep link accurate without paying
+        // the cascade cost on every click.
+        scheduleLayerUrlUpdate(id || null);
       }
     }
   },

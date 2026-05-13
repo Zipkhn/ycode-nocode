@@ -282,7 +282,10 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   const pages = usePagesStore((s) => s.pages);
 
   const currentPageId = useEditorStore((s) => s.currentPageId);
-  const selectedLayerId = useEditorStore((s) => s.selectedLayerId);
+  // Intentionally NOT subscribing to selectedLayerId — every usage below is
+  // inside an event handler / async callback. Subscribing would re-render the
+  // entire library (1700+ lines, dozens of ElementButtons, tooltips, context
+  // menus) on every layer click. Read lazily via getState() instead.
   const setSelectedLayerId = useEditorStore((s) => s.setSelectedLayerId);
   const editingComponentId = useEditorStore((s) => s.editingComponentId);
   const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
@@ -414,6 +417,7 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   }, [startCanvasDrag, onClose]);
 
   const handleAddElement = (elementType: string) => {
+    const selectedLayerId = useEditorStore.getState().selectedLayerId;
     // If editing component, use component draft instead
     if (editingComponentId) {
       const layers = useComponentsStore.getState().componentDrafts[editingComponentId] || [];
@@ -676,6 +680,7 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   };
 
   const handleAddLayout = async (layoutKey: string) => {
+    const selectedLayerId = useEditorStore.getState().selectedLayerId;
     if (editingComponentId) {
       const layers = useComponentsStore.getState().componentDrafts[editingComponentId] || [];
 
@@ -1153,6 +1158,7 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   };
 
   const handleAddComponent = (componentId: string) => {
+    const selectedLayerId = useEditorStore.getState().selectedLayerId;
     // Find the component
     const component = components.find(c => c.id === componentId);
     if (!component) return;
@@ -1316,7 +1322,7 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   const handleEditComponent = async (component: Component, e: React.MouseEvent) => {
     e.stopPropagation();
 
-    const { setSelectedLayerId: setLayerId } = useEditorStore.getState();
+    const { setSelectedLayerId: setLayerId, selectedLayerId } = useEditorStore.getState();
 
     setLayerId(null);
 

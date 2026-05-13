@@ -49,8 +49,10 @@ const LeftSidebar = React.memo(function LeftSidebar({
   liveLayerUpdates,
   liveComponentUpdates,
 }: LeftSidebarProps) {
-  const selectedLayerId = useEditorStore((state) => state.selectedLayerId);
-
+  // Intentionally NOT subscribing to selectedLayerId here — it's only read
+  // inside the asset-select handler. A subscription would re-render the
+  // whole left sidebar (pages list, layers tree, context menus, …) on
+  // every selection change, which is what made selecting a layer feel slow.
   const { sidebarTab } = useEditorUrl();
   const [showElementLibrary, setShowElementLibrary] = useState(false);
   const { width: sidebarWidth, isDragging: isResizing, handleMouseDown: handleResizeMouseDown } = useResizableSidebar({ side: 'left' });
@@ -244,6 +246,7 @@ const LeftSidebar = React.memo(function LeftSidebar({
       return;
     }
 
+    const selectedLayerId = useEditorStore.getState().selectedLayerId;
     if (!selectedLayerId) {
       setAssetMessage('❌ Please select an image layer first');
       setTimeout(() => setAssetMessage(null), 3000);

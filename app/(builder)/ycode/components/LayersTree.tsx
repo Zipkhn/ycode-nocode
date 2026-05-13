@@ -2182,6 +2182,14 @@ export default function LayersTree({
           const node = flattenedNodes[virtualRow.index];
           const selectionData = nodeSelectionData.get(node.id)!;
 
+          // `highlightedDepths` is only consumed when drawing the connector
+          // lines on selected / child-of-selected rows. Other rows would
+          // otherwise re-render on every selection change just because the
+          // string flipped — pin them to the empty token so React.memo bails.
+          const rowHighlightedDepths = (selectionData.isSelected || selectionData.isChildOfSelected)
+            ? highlightedDepths
+            : ',,';
+
           return (
             <VirtualLayerRow
               key={node.id}
@@ -2201,7 +2209,7 @@ export default function LayersTree({
                 isDragging={activeId === node.id}
                 isDragActive={!!activeId}
                 dropPosition={overId === node.id ? dropPosition : null}
-                highlightedDepths={highlightedDepths}
+                highlightedDepths={rowHighlightedDepths}
                 onSelect={handleSelect}
                 onMultiSelect={handleMultiSelect}
                 onToggle={handleToggle}
