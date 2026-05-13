@@ -254,9 +254,14 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   isCanvasContextMenuOpen: false,
   setCanvasContextMenuOpen: (value) => set({ isCanvasContextMenuOpen: value }),
   sliderSnapCounts: {},
-  setSliderSnapCount: (sliderId, count) => set((state) => ({
-    sliderSnapCounts: { ...state.sliderSnapCounts, [sliderId]: count },
-  })),
+  setSliderSnapCount: (sliderId, count) => set((state) => {
+    // Swiper fires `update` on every DOM mutation inside its wrapper, which
+    // happens constantly in the iframe (Tailwind class injections, child
+    // re-renders). Bail out when the count hasn't changed so subscribers
+    // — notably slideBullets `LayerItem`s — don't re-render.
+    if (state.sliderSnapCounts[sliderId] === count) return state;
+    return { sliderSnapCounts: { ...state.sliderSnapCounts, [sliderId]: count } };
+  }),
   // Canvas sibling reorder initial state
   isDraggingLayerOnCanvas: false,
   draggedLayerId: null,

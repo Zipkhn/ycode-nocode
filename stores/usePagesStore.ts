@@ -139,17 +139,28 @@ export function consumePageMcpSync(pageId: string): boolean {
 }
 
 function updateLayerInTree(tree: Layer[], layerId: string, updater: (l: Layer) => Layer): Layer[] {
-  return tree.map((node) => {
+  // Preserve identity for branches that don't contain `layerId` so downstream
+  // React.memo on LayerItem can bail out on unchanged subtrees instead of
+  // re-rendering the entire layer tree on every property edit.
+  let changed = false;
+  const next = tree.map((node) => {
     if (node.id === layerId) {
+      changed = true;
       return updater(node);
     }
 
     if (node.children && node.children.length > 0) {
-      return { ...node, children: updateLayerInTree(node.children, layerId, updater) };
+      const newChildren = updateLayerInTree(node.children, layerId, updater);
+      if (newChildren !== node.children) {
+        changed = true;
+        return { ...node, children: newChildren };
+      }
     }
 
     return node;
   });
+
+  return changed ? next : tree;
 }
 
 /**
