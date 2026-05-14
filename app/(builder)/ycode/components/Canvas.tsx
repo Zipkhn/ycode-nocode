@@ -23,9 +23,12 @@ import { CanvasPortalProvider } from '@/lib/canvas-portal-context';
 import { cn } from '@/lib/utils';
 import { loadSwiperCss } from '@/lib/slider-utils';
 import { resolveReferenceFieldsSync } from '@/lib/collection-utils';
+import { extractStyleBlockContents } from '@/lib/parse-head-html';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useFontsStore } from '@/stores/useFontsStore';
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
+import { usePagesStore } from '@/stores/usePagesStore';
+import { useSettingsStore } from '@/stores/useSettingsStore';
 
 import { injectTranslatedText } from '@/lib/localisation-utils';
 
@@ -539,6 +542,47 @@ export default function Canvas({
     }
     styleEl.textContent = colorVarCss;
   }, [iframeReady, colorVarCss]);
+
+  // Inject user-defined custom CSS from `<style>` blocks in head custom code
+  // so `:root { --x: ... }` variables (and any other CSS) live-preview in the
+  // canvas — matching the legacy `#custom-css-style` injection in IFrame.vue.
+  // Page-editing context: global head + current page head custom code.
+  // Component-editing context: global head only (no page bound to the canvas).
+  // Scripts and other head HTML are intentionally ignored to keep the canvas
+  // sandbox safe; full execution still happens on the published/preview site
+  // via PageRenderer + CustomCodeInjector.
+  const globalCustomCodeHead = useSettingsStore(
+    (state) => state.settingsByKey['custom_code_head'] as string | null
+  );
+  const pageCustomCodeHead = usePagesStore((state) => {
+    if (!pageId || editingComponentId) return null;
+    const page = state.pages.find((p) => p.id === pageId);
+    return page?.settings?.custom_code?.head || null;
+  });
+
+  const customHeadCss = useMemo(() => {
+    const segments: string[] = [];
+    const globalCss = extractStyleBlockContents(globalCustomCodeHead);
+    if (globalCss) segments.push(globalCss);
+    const pageCss = extractStyleBlockContents(pageCustomCodeHead);
+    if (pageCss) segments.push(pageCss);
+    return segments.join('\n');
+  }, [globalCustomCodeHead, pageCustomCodeHead]);
+
+  useEffect(() => {
+    if (!iframeReady || !iframeRef.current) return;
+    const iframeDoc = iframeRef.current.contentDocument;
+    if (!iframeDoc) return;
+
+    const STYLE_ID = 'ycode-custom-head-css';
+    let styleEl = iframeDoc.getElementById(STYLE_ID) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = iframeDoc.createElement('style');
+      styleEl.id = STYLE_ID;
+      iframeDoc.head.appendChild(styleEl);
+    }
+    styleEl.textContent = customHeadCss;
+  }, [iframeReady, customHeadCss]);
 
   // Render content into iframe
   useEffect(() => {
