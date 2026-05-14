@@ -147,7 +147,7 @@ export const useCollectionLayerStore = create<CollectionLayerStore>((set, get) =
     offset?: number,
     filters?: Array<{ fieldId: string; operator: string; value: string }>
   ) => {
-    const { layerData, loading, layerConfig } = get();
+    const { loading, layerConfig } = get();
 
     // Skip for virtual collections (multi-asset)
     if (collectionId === MULTI_ASSET_COLLECTION_ID) {
@@ -159,7 +159,9 @@ export const useCollectionLayerStore = create<CollectionLayerStore>((set, get) =
       return;
     }
 
-    // Check if we already have data with the same config
+    // Check if we already fetched with the same config.
+    // `layerConfig[layerId]` is only set after a successful fetch, so its presence
+    // signals "already fetched" regardless of whether the result was empty.
     const existingConfig = layerConfig[layerId];
     const filtersMatch = JSON.stringify(existingConfig?.filters) === JSON.stringify(filters);
     const configMatches = existingConfig &&
@@ -170,8 +172,9 @@ export const useCollectionLayerStore = create<CollectionLayerStore>((set, get) =
       existingConfig.offset === offset &&
       filtersMatch;
 
-    // Skip if we have data and config matches
-    if (layerData[layerId]?.length > 0 && configMatches) {
+    // Skip if config matches — prevents refetching when a collection legitimately
+    // returns an empty array (otherwise the layer would loop fetching forever).
+    if (configMatches) {
       return;
     }
 
