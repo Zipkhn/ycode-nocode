@@ -36,6 +36,7 @@ interface CollectionLayerActions {
     filters?: Array<{ fieldId: string; operator: string; value: string }>
   ) => Promise<void>;
   fetchReferencedCollectionItems: (collectionId: string) => Promise<void>;
+  fetchReferencedCollectionsBatch: (collectionIds: string[]) => Promise<void>;
   clearLayerData: (layerId: string) => void;
   clearAllLayerData: () => void;
   updateItemInLayerData: (itemId: string, values: Record<string, string>) => void;
@@ -87,6 +88,52 @@ export const useCollectionLayerStore = create<CollectionLayerStore>((set, get) =
       set((state) => ({
         referencedLoading: { ...state.referencedLoading, [collectionId]: false },
       }));
+    }
+  },
+
+  /**
+   * Fetch reference-display items for many collections in a single round-trip.
+   * Dedupes against already-loaded/in-flight collections so it's safe to call
+   * with the full set of referenced IDs on every canvas re-render.
+   */
+  fetchReferencedCollectionsBatch: async (collectionIds: string[]) => {
+    const { referencedItems, referencedLoading } = get();
+
+    const toFetch = collectionIds.filter(
+      (id) => !referencedItems[id] && !referencedLoading[id],
+    );
+    if (toFetch.length === 0) return;
+
+    set((state) => {
+      const nextLoading = { ...state.referencedLoading };
+      for (const id of toFetch) nextLoading[id] = true;
+      return { referencedLoading: nextLoading };
+    });
+
+    try {
+      const response = await collectionsApi.getReferencedItemsBatch(toFetch, 100);
+
+      if (response.error || !response.data?.items) {
+        throw new Error(response.error || 'Empty batch reference response');
+      }
+
+      const batchItems = response.data.items;
+      set((state) => {
+        const nextReferenced = { ...state.referencedItems };
+        const nextLoading = { ...state.referencedLoading };
+        for (const id of toFetch) {
+          nextReferenced[id] = batchItems[id]?.items || [];
+          nextLoading[id] = false;
+        }
+        return { referencedItems: nextReferenced, referencedLoading: nextLoading };
+      });
+    } catch (error) {
+      console.error('[CollectionLayerStore] Error fetching referenced items batch:', error);
+      set((state) => {
+        const nextLoading = { ...state.referencedLoading };
+        for (const id of toFetch) nextLoading[id] = false;
+        return { referencedLoading: nextLoading };
+      });
     }
   },
 
