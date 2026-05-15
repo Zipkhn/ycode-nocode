@@ -589,6 +589,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [previewContentHeight, setPreviewContentHeight] = useState(0);
+  const [previewContainerHeight, setPreviewContainerHeight] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // State for iframe element (for SelectionOverlay)
@@ -837,16 +838,28 @@ const CenterCanvas = React.memo(function CenterCanvas({
     iframeRef,
   });
 
-  // Calculate final iframe height — always stretch so the scaled canvas fills the
-  // visible viewport at any zoom level. When the actual content is taller than the
-  // viewport, use the content height instead so scrolling works naturally.
+  // Size the iframe element to exactly fill the visible canvas area at the
+  // current zoom. The iframe's native scrolling then handles document content
+  // taller than this — giving a single, properly-bounded scrollbar inside the
+  // canvas instead of an (invisible) outer container scroll. Content height
+  // (iframeContentHeight) still drives Fit Height zoom calc separately.
   const finalIframeHeight = useMemo(() => {
     if (editingComponentId) return iframeContentHeight;
     if (!containerHeight || zoom <= 0) return iframeContentHeight;
 
-    const minHeightForZoom = (containerHeight - CANVAS_PADDING) / (zoom / 100);
-    return Math.max(iframeContentHeight, minHeightForZoom);
+    return (containerHeight - CANVAS_PADDING) / (zoom / 100);
   }, [iframeContentHeight, containerHeight, zoom, editingComponentId]);
+
+  // Same logic as finalIframeHeight, applied to the preview iframe. Sizing the
+  // wrapper to the measured scrollHeight is unstable on pages that pin absolute
+  // elements to the viewport (e.g. `bottom: -6rem` with no positioned ancestor)
+  // — once `h-full` is restored after measurement, those elements extend past
+  // the wrapper. Sizing to the visible container area instead lets the iframe
+  // scroll internally and keeps the scrollbar bounded and accurate.
+  const finalPreviewIframeHeight = useMemo(() => {
+    if (!previewContainerHeight || previewZoom <= 0) return 0;
+    return (previewContainerHeight - CANVAS_PADDING) / (previewZoom / 100);
+  }, [previewContainerHeight, previewZoom]);
 
   const previewObserverRef = useRef<ResizeObserver | null>(null);
 
@@ -970,32 +983,38 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const isInitialScrollRef = useRef(true);
 
   const scrollCanvasToLayer = useCallback((layerId: string, smooth: boolean, force = false) => {
-    const scrollEl = scrollContainerRef.current;
-    if (!canvasIframeElement || !scrollEl) return;
+    if (!canvasIframeElement) return;
 
     const iframeDoc = canvasIframeElement.contentDocument;
-    if (!iframeDoc) return;
+    const iframeWin = canvasIframeElement.contentWindow;
+    if (!iframeDoc || !iframeWin) return;
 
     const el = iframeDoc.querySelector(`[data-layer-id="${layerId}"]`) as HTMLElement;
     if (!el) return;
 
+    // Scrolling happens inside the iframe (the iframe element is sized to the
+    // visible canvas area; its own document handles overflow). All coordinates
+    // here are in the iframe's coordinate system, so zoom doesn't apply.
+    const scrollEl = iframeDoc.scrollingElement || iframeDoc.documentElement;
     const elRect = el.getBoundingClientRect();
-    const iframeRect = canvasIframeElement.getBoundingClientRect();
-    const zoomScale = zoom / 100;
-    const elTopInScroll = iframeRect.top - scrollEl.getBoundingClientRect().top + scrollEl.scrollTop + elRect.top * zoomScale;
-    const elBottomInScroll = elTopInScroll + elRect.height * zoomScale;
-    const viewTop = scrollEl.scrollTop;
-    const viewBottom = scrollEl.scrollTop + scrollEl.clientHeight;
+    const currentScroll = scrollEl.scrollTop;
+    const viewHeight = scrollEl.clientHeight;
 
-    if (!force && elTopInScroll >= viewTop && elBottomInScroll <= viewBottom) return;
+    const elTopInDoc = currentScroll + elRect.top;
+    const elBottomInDoc = elTopInDoc + elRect.height;
+    const viewTop = currentScroll;
+    const viewBottom = viewTop + viewHeight;
 
-    const elScaledHeight = elRect.height * zoomScale;
-    const fitsInView = elScaledHeight <= scrollEl.clientHeight;
+    if (!force && elTopInDoc >= viewTop && elBottomInDoc <= viewBottom) return;
+
+    const fitsInView = elRect.height <= viewHeight;
     const targetScroll = fitsInView
-      ? elTopInScroll - (scrollEl.clientHeight / 2) + (elScaledHeight / 2)
-      : elTopInScroll;
+      ? elTopInDoc - viewHeight / 2 + elRect.height / 2
+      : elTopInDoc;
+    // scrollEl.scrollTo starts the animation more reliably than iframeWin.scrollTo
+    // across browsers, which avoids a noticeable lag before smooth scrolling begins.
     scrollEl.scrollTo({ top: Math.max(0, targetScroll), behavior: smooth ? 'smooth' : 'auto' });
-  }, [canvasIframeElement, zoom]);
+  }, [canvasIframeElement]);
 
   const scrollCanvasToLayerRef = useRef(scrollCanvasToLayer);
   scrollCanvasToLayerRef.current = scrollCanvasToLayer;
@@ -1016,7 +1035,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
 
     let attempts = 0;
     const maxAttempts = 20;
-    const delay = isInitial ? 200 : 50;
+    let timeoutId: number | undefined;
 
     const tryScroll = () => {
       const iframeDoc = canvasIframeElement.contentDocument;
@@ -1031,9 +1050,18 @@ const CenterCanvas = React.memo(function CenterCanvas({
       scrollCanvasToLayer(selectedLayerId, !isInitial);
     };
 
-    let timeoutId = window.setTimeout(tryScroll, delay);
+    // Try synchronously first — the layer is almost always already in the DOM
+    // when selection changes, so we can start scrolling immediately. Only the
+    // initial selection on page load needs a deferred attempt while layers mount.
+    if (isInitial) {
+      timeoutId = window.setTimeout(tryScroll, 200);
+    } else {
+      tryScroll();
+    }
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
   }, [selectedLayerId, canvasIframeElement, isCanvasReady, scrollCanvasToLayer]);
 
   // Re-scroll when content height changes during initial load (images loading shifts layout)
@@ -1093,6 +1121,20 @@ const CenterCanvas = React.memo(function CenterCanvas({
 
     return () => resizeObserver.disconnect();
   }, [isCanvasReady]);
+
+  // Track preview container height so the preview iframe wrapper can be sized
+  // to fit the visible area (mirrors the canvas container tracking).
+  useEffect(() => {
+    const container = previewContainerRef.current;
+    if (!container) return;
+
+    const update = () => setPreviewContainerHeight(container.clientHeight);
+    update();
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, [isPreviewMode]);
 
   const layers = useMemo(() => {
     // If editing a component, show component layers
@@ -2892,7 +2934,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
               minWidth: viewportMode === 'desktop' && previewZoomMode === 'autofit'
                 ? viewportSizes[viewportMode].width
                 : undefined,
-              height: previewContentHeight > 0 ? `${previewContentHeight}px` : '100%',
+              height: finalPreviewIframeHeight > 0 ? `${finalPreviewIframeHeight}px` : '100%',
               flexShrink: 0,
               transition: 'none',
             }}
