@@ -831,15 +831,16 @@ const CenterCanvas = React.memo(function CenterCanvas({
     iframeRef,
   });
 
-  // Calculate final iframe height — always stretch so the scaled canvas fills the
-  // visible viewport at any zoom level. When the actual content is taller than the
-  // viewport, use the content height instead so scrolling works naturally.
+  // Size the iframe element to exactly fill the visible canvas area at the
+  // current zoom. The iframe's native scrolling then handles document content
+  // taller than this — giving a single, properly-bounded scrollbar inside the
+  // canvas instead of an (invisible) outer container scroll. Content height
+  // (iframeContentHeight) still drives Fit Height zoom calc separately.
   const finalIframeHeight = useMemo(() => {
     if (editingComponentId) return iframeContentHeight;
     if (!containerHeight || zoom <= 0) return iframeContentHeight;
 
-    const minHeightForZoom = (containerHeight - CANVAS_PADDING) / (zoom / 100);
-    return Math.max(iframeContentHeight, minHeightForZoom);
+    return (containerHeight - CANVAS_PADDING) / (zoom / 100);
   }, [iframeContentHeight, containerHeight, zoom, editingComponentId]);
 
   const previewObserverRef = useRef<ResizeObserver | null>(null);
