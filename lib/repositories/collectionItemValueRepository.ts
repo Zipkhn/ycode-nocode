@@ -115,6 +115,8 @@ export interface UpdateCollectionItemValueData {
  * Get all values for multiple items in one query (batch operation)
  * @param item_ids - Array of item UUIDs
  * @param is_published - Filter for draft (false) or published (true) values. Defaults to false (draft).
+ * @param knownFieldTypes - Optional pre-loaded field-id → type map to skip the extra lookup
+ * @param fieldIds - Optional whitelist of field IDs to fetch
  */
 export async function getValuesByItemIds(
   item_ids: string[],
