@@ -96,7 +96,6 @@ import { useCanvasDropDetection } from '@/hooks/use-canvas-drop-detection';
 import { useCanvasSiblingReorder } from '@/hooks/use-canvas-sibling-reorder';
 
 interface CenterCanvasProps {
-  selectedLayerId: string | null;
   currentPageId: string | null;
   viewportMode: ViewportMode;
   setViewportMode: (mode: ViewportMode) => void;
@@ -574,7 +573,6 @@ function CanvasSiblingReorderOverlay({
 }
 
 const CenterCanvas = React.memo(function CenterCanvas({
-  selectedLayerId,
   currentPageId,
   viewportMode,
   setViewportMode,
@@ -584,6 +582,8 @@ const CenterCanvas = React.memo(function CenterCanvas({
   liveLayerUpdates,
   liveComponentUpdates,
 }: CenterCanvasProps) {
+  const selectedLayerId = useEditorStore((state) => state.selectedLayerId);
+
   const [showAddBlockPanel, setShowAddBlockPanel] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -638,7 +638,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const returnToPageId = useEditorStore((state) => state.returnToPageId);
   const currentPageCollectionItemId = useEditorStore((state) => state.currentPageCollectionItemId);
   const setCurrentPageCollectionItemId = useEditorStore((state) => state.setCurrentPageCollectionItemId);
-  const hoveredLayerId = useEditorStore((state) => state.hoveredLayerId);
   const setHoveredLayerId = useEditorStore((state) => state.setHoveredLayerId);
   const isPreviewMode = useEditorStore((state) => state.isPreviewMode);
   const activeSidebarTab = useEditorStore((state) => state.activeSidebarTab);
@@ -715,13 +714,20 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const collectionFieldsFromStore = useCollectionsStore((state) => state.fields);
 
   // Collection layer store for independent layer data
-  const collectionLayerData = useCollectionLayerStore((state) => state.layerData);
   const referencedItems = useCollectionLayerStore((state) => state.referencedItems);
-  const fetchReferencedCollectionItems = useCollectionLayerStore((state) => state.fetchReferencedCollectionItems);
+  const fetchReferencedCollectionsBatch = useCollectionLayerStore((state) => state.fetchReferencedCollectionsBatch);
+
+  const mergedCollectionItems = useMemo(
+    () => ({ ...collectionItemsFromStore, ...referencedItems }),
+    [collectionItemsFromStore, referencedItems],
+  );
 
   const { urlState, navigateToLayers, navigateToPage, navigateToPageEdit, updateQueryParams } = useEditorUrl();
   const components = useComponentsStore((state) => state.components);
   const componentDrafts = useComponentsStore((state) => state.componentDrafts);
+  const editingComponentDraft = useComponentsStore((state) =>
+    editingComponentId ? state.componentDrafts[editingComponentId] ?? null : null
+  );
   const [collectionItems, setCollectionItems] = useState<Array<{ id: string; label: string }>>([]);
   const [collectionItemSearch, setCollectionItemSearch] = useState('');
 
@@ -1091,7 +1097,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const layers = useMemo(() => {
     // If editing a component, show component layers
     if (editingComponentId) {
-      return componentDrafts[editingComponentId] || [];
+      return editingComponentDraft || [];
     }
 
     // Otherwise show page layers
@@ -1100,7 +1106,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
     }
 
     return currentDraft ? currentDraft.layers : [];
-  }, [editingComponentId, componentDrafts, currentPageId, currentDraft]);
+  }, [editingComponentId, editingComponentDraft, currentPageId, currentDraft]);
 
   // Check if we're waiting for a draft to load (page selected but no draft yet)
   const isDraftLoading = useMemo(() => {
@@ -1131,77 +1137,78 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const invalidationKey = useCollectionLayerStore((state) => state.invalidationKey);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Create a stable string representation of collection layer settings for dependency
-  const collectionLayersKey = useMemo(() => {
-    const extractCollectionSettings = (layerList: Layer[]): string[] => {
-      const settings: string[] = [];
+  // Extract the fetch params for every collection layer in one tree walk. The
+  // params reference changes whenever `layers` changes, but the derived
+  // `collectionLayersKey` string only changes when collection-relevant settings
+  // change — so the actual fetch effect can ignore unrelated edits (typing,
+  // styling) and only fire on real collection changes.
+  const collectionFetchParams = useMemo(() => {
+    const params: Array<{
+      layerId: string;
+      collectionId: string;
+      sortBy: string | undefined;
+      sortOrder: 'asc' | 'desc' | undefined;
+      limit: number | undefined;
+      offset: number | undefined;
+    }> = [];
+    const traverse = (layerList: Layer[]) => {
       layerList.forEach((layer) => {
         const collectionVariable = getCollectionVariable(layer);
         if (collectionVariable?.id) {
           const opts = layer.settings?.optionsSource;
-          const sortBy = opts?.sortFieldId || collectionVariable.sort_by;
-          const sortOrder = opts?.sortOrder || collectionVariable.sort_order;
-          settings.push(`${layer.id}:${collectionVariable.id}:${sortBy ?? ''}:${sortOrder ?? ''}:${collectionVariable.limit ?? ''}:${collectionVariable.offset ?? ''}`);
+          params.push({
+            layerId: layer.id,
+            collectionId: collectionVariable.id,
+            sortBy: opts?.sortFieldId || collectionVariable.sort_by || undefined,
+            sortOrder: opts?.sortOrder || collectionVariable.sort_order || undefined,
+            limit: collectionVariable.limit ?? undefined,
+            offset: collectionVariable.offset ?? undefined,
+          });
         }
         if (layer.children && layer.children.length > 0) {
-          settings.push(...extractCollectionSettings(layer.children));
+          traverse(layer.children);
         }
       });
-      return settings;
     };
-
-    return extractCollectionSettings(layers).join('|');
+    traverse(layers);
+    return params;
   }, [layers]);
+
+  // Stable string key used as the effect dependency so unrelated layer edits
+  // (text content, design changes) don't re-arm the debounced fetch timer.
+  const collectionLayersKey = useMemo(
+    () => collectionFetchParams
+      .map((p) => `${p.layerId}:${p.collectionId}:${p.sortBy ?? ''}:${p.sortOrder ?? ''}:${p.limit ?? ''}:${p.offset ?? ''}`)
+      .join('|'),
+    [collectionFetchParams],
+  );
+
+  // Keep latest params reachable from inside the debounced timer without
+  // needing to add the (unstable) array reference to the effect deps.
+  const collectionFetchParamsRef = useRef(collectionFetchParams);
+  collectionFetchParamsRef.current = collectionFetchParams;
 
   // Debounce the fetch to prevent duplicate calls during rapid updates
   useEffect(() => {
-    // Clear any existing timeout
     if (fetchTimeoutRef.current) {
       clearTimeout(fetchTimeoutRef.current);
     }
 
-    // Set new timeout
     fetchTimeoutRef.current = setTimeout(() => {
-      // Recursively find all collection layers and fetch their data
-      const findAndFetchCollectionLayers = (layerList: Layer[]) => {
-        layerList.forEach((layer) => {
-          const collectionVariable = getCollectionVariable(layer);
-          if (collectionVariable?.id) {
-            const opts = layer.settings?.optionsSource;
-            const sortBy = opts?.sortFieldId || collectionVariable.sort_by;
-            const sortOrder = opts?.sortOrder || collectionVariable.sort_order;
-            fetchLayerData(
-              layer.id,
-              collectionVariable.id,
-              sortBy,
-              sortOrder,
-              collectionVariable.limit,
-              collectionVariable.offset
-            );
-          }
-
-          // Recursively check children
-          if (layer.children && layer.children.length > 0) {
-            findAndFetchCollectionLayers(layer.children);
-          }
-        });
-      };
-
-      if (layers.length > 0) {
-        findAndFetchCollectionLayers(layers);
-      }
-
+      const params = collectionFetchParamsRef.current;
+      params.forEach((p) => {
+        fetchLayerData(p.layerId, p.collectionId, p.sortBy, p.sortOrder, p.limit, p.offset);
+      });
       fetchTimeoutRef.current = null;
-    }, 100); // 100ms debounce - waits for rapid updates to settle
+    }, 100);
 
-    // Cleanup function
     return () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
         fetchTimeoutRef.current = null;
       }
     };
-  }, [collectionLayersKey, fetchLayerData, layers, invalidationKey]);
+  }, [collectionLayersKey, fetchLayerData, invalidationKey]);
 
   // Get current page
   const currentPage = useMemo(() => pages.find(p => p.id === currentPageId), [pages, currentPageId]);
@@ -1252,16 +1259,15 @@ const CenterCanvas = React.memo(function CenterCanvas({
     // Get layers from either component draft or page draft
     let layersToSearch: Layer[] = [];
     if (editingComponentId) {
-      layersToSearch = componentDrafts[editingComponentId] || [];
+      layersToSearch = editingComponentDraft || [];
     } else {
       layersToSearch = currentDraft ? currentDraft.layers : [];
     }
 
     if (!layersToSearch.length) return null;
 
-    // Find parent collection layer
     return findParentCollectionLayer(layersToSearch, editingLayerId);
-  }, [editingLayerId, editingComponentId, componentDrafts, currentPageId, currentDraft]);
+  }, [editingLayerId, editingComponentId, editingComponentDraft, currentPageId, currentDraft]);
 
   // Build field groups for the canvas text editor's inline variable selection
   // Components are page-agnostic, so exclude dynamic page-collection fields when editing a component
@@ -1269,14 +1275,14 @@ const CenterCanvas = React.memo(function CenterCanvas({
     if (!editingLayerId) return undefined;
     let layers: Layer[] = [];
     if (editingComponentId) {
-      layers = componentDrafts[editingComponentId] || [];
+      layers = editingComponentDraft || [];
     } else if (currentPageId) {
       layers = currentDraft ? currentDraft.layers : [];
     }
     if (!layers.length) return undefined;
     const page = editingComponentId ? null : currentPage;
     return buildFieldGroupsForLayer(editingLayerId, layers, page, collectionFieldsFromStore, collectionsFromStore);
-  }, [editingLayerId, editingComponentId, componentDrafts, currentPageId, currentDraft, currentPage, collectionFieldsFromStore, collectionsFromStore]);
+  }, [editingLayerId, editingComponentId, editingComponentDraft, currentPageId, currentDraft, currentPage, collectionFieldsFromStore, collectionsFromStore]);
 
   const textFieldGroups = useMemo(
     () => filterFieldGroupsByType(fieldGroups, SIMPLE_TEXT_FIELD_TYPES),
@@ -1394,13 +1400,13 @@ const CenterCanvas = React.memo(function CenterCanvas({
     if (selectedLocale && !selectedLocale.is_default) return;
 
     if (editingComponentId) {
-      const { updateComponentDraft } = useComponentsStore.getState();
-      const currentDraft = componentDrafts[editingComponentId] || [];
-      updateComponentDraft(editingComponentId, updateLayerProps(currentDraft, layerId, updates));
+      const { componentDrafts, updateComponentDraft } = useComponentsStore.getState();
+      const draft = componentDrafts[editingComponentId] || [];
+      updateComponentDraft(editingComponentId, updateLayerProps(draft, layerId, updates));
     } else if (currentPageId) {
       updateLayer(currentPageId, layerId, updates);
     }
-  }, [editingComponentId, componentDrafts, currentPageId, updateLayer, selectedLocale]);
+  }, [editingComponentId, currentPageId, updateLayer, selectedLocale]);
 
   const handleCanvasDeleteLayer = useCallback(() => {
     if (!selectedLayerId || !currentPageId) return;
@@ -1474,14 +1480,14 @@ const CenterCanvas = React.memo(function CenterCanvas({
     if (!richTextSheetLayerId || !currentPageId) return undefined;
     let layers: Layer[] = [];
     if (editingComponentId) {
-      layers = componentDrafts[editingComponentId] || [];
+      layers = editingComponentDraft || [];
     } else {
       layers = currentDraft ? currentDraft.layers : [];
     }
     if (!layers.length) return undefined;
     const page = editingComponentId ? null : currentPage;
     return buildFieldGroupsForLayer(richTextSheetLayerId, layers, page, collectionFieldsFromStore, collectionsFromStore);
-  }, [richTextSheetLayerId, editingComponentId, componentDrafts, currentPageId, currentDraft, currentPage, collectionFieldsFromStore, collectionsFromStore]);
+  }, [richTextSheetLayerId, editingComponentId, editingComponentDraft, currentPageId, currentDraft, currentPage, collectionFieldsFromStore, collectionsFromStore]);
 
   // Track the current value locally so the value prop always matches the editor's
   // internal state. This prevents the editor's sync effect from resetting content
@@ -1534,9 +1540,10 @@ const CenterCanvas = React.memo(function CenterCanvas({
       return;
     }
 
-    const source = editingComponentId
-      ? componentDrafts[editingComponentId]
-      : currentDraft?.layers ?? null;
+    const compId = useEditorStore.getState().editingComponentId;
+    const source = compId
+      ? useComponentsStore.getState().componentDrafts[compId]
+      : usePagesStore.getState().draftsByPageId[currentPageId ?? '']?.layers ?? null;
     const layer = source ? findLayerById(source as Layer[], richTextSheetLayerId) : null;
     setRichTextSheetValue(getRichTextValue(layer?.variables));
   // Only re-derive when the sheet target layer (or translation context) changes,
@@ -1770,14 +1777,13 @@ const CenterCanvas = React.memo(function CenterCanvas({
     // Get layers from either component draft or page draft
     let layersToSearch: Layer[] = [];
     if (editingComponentId) {
-      layersToSearch = componentDrafts[editingComponentId] || [];
+      layersToSearch = editingComponentDraft || [];
     } else {
       layersToSearch = currentDraft ? currentDraft.layers : [];
     }
 
     if (!layersToSearch.length) return null;
 
-    // Recursive function to find parent of a layer
     const findParentId = (layers: Layer[], targetId: string, parentId: string | null = null): string | null | undefined => {
       for (const layer of layers) {
         if (layer.id === targetId) {
@@ -1790,18 +1796,17 @@ const CenterCanvas = React.memo(function CenterCanvas({
           }
         }
       }
-      return undefined; // Not found in this branch
+      return undefined;
     };
 
     const result = findParentId(layersToSearch, selectedLayerId);
     if (result === undefined) return null;
 
-    // Hide parent outline for slide layers (parent is just the slides wrapper)
     const selectedLayer = findLayerById(layersToSearch, selectedLayerId);
     if (selectedLayer?.name === 'slide') return null;
 
     return result;
-  }, [selectedLayerId, currentPageId, editingComponentId, componentDrafts, currentDraft]);
+  }, [selectedLayerId, currentPageId, editingComponentId, editingComponentDraft, currentDraft]);
 
   // Get selected layer name for drag preview
   const selectedLayerName = useMemo(() => {
@@ -2023,11 +2028,12 @@ const CenterCanvas = React.memo(function CenterCanvas({
       });
     }
 
-    // Fetch items for each referenced collection
-    allReferencedIds.forEach((collectionId) => {
-      fetchReferencedCollectionItems(collectionId);
-    });
-  }, [collectionFieldsFromStore, pageCollectionFields, fetchReferencedCollectionItems, invalidationKey]);
+    // One batch call per re-render covers every referenced collection; the
+    // store dedupes against already-loaded IDs so repeat calls are cheap.
+    if (allReferencedIds.size > 0) {
+      fetchReferencedCollectionsBatch(Array.from(allReferencedIds));
+    }
+  }, [collectionFieldsFromStore, pageCollectionFields, fetchReferencedCollectionsBatch, invalidationKey]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -2253,7 +2259,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
             let layersToSearch: Layer[] = [];
             if (editingLayerId) {
               if (editingComponentId) {
-                layersToSearch = componentDrafts[editingComponentId] || [];
+                layersToSearch = editingComponentDraft || [];
               } else if (currentPageId) {
                 layersToSearch = currentDraft ? currentDraft.layers : [];
               }
@@ -2478,7 +2484,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
             iframeElement={canvasIframeElement}
             containerElement={scrollContainerRef.current}
             selectedLayerId={selectedLayerId}
-            hoveredLayerId={hoveredLayerId}
             parentLayerId={parentLayerId}
             zoom={zoom}
             activeSublayerIndex={activeSublayerIndex}
@@ -2577,11 +2582,11 @@ const CenterCanvas = React.memo(function CenterCanvas({
                         layers={layers}
                         components={components}
                         selectedLayerId={selectedLayerId}
-                        hoveredLayerId={hoveredLayerId}
+                        hoveredLayerId={null}
                         breakpoint={viewportMode}
                         activeUIState={activeUIState}
                         editingComponentId={editingComponentId || null}
-                        collectionItems={{ ...collectionItemsFromStore, ...referencedItems }}
+                        collectionItems={mergedCollectionItems}
                         collectionFields={collectionFieldsFromStore}
                         pageCollectionItem={translatedPageCollectionItem}
                         pageCollectionFields={pageCollectionFields}
@@ -2589,7 +2594,6 @@ const CenterCanvas = React.memo(function CenterCanvas({
                         availableLocales={locales}
                         translations={localeTranslations}
                         assets={assetsMap}
-                        collectionLayerData={collectionLayerData}
                         pageId={currentPageId || ''}
                         onLayerClick={handleCanvasLayerClick}
                         onLayerUpdate={handleCanvasLayerUpdate}
