@@ -142,7 +142,7 @@ const PageSettingsPanel = React.forwardRef<PageSettingsPanelHandle, PageSettings
   const [jsonLdArticleDateModified, setJsonLdArticleDateModified] = useState('');
   const [jsonLdFaqEnabled, setJsonLdFaqEnabled] = useState(false);
   const [jsonLdFaqItems, setJsonLdFaqItems] = useState<Array<{ question: string; answer: string }>>([]);
-  const { openFileManager } = useEditorStore();
+  const openFileManager = useEditorStore((state) => state.openFileManager);
   const leftSidebarWidth = useEditorStore((state) => state.leftSidebarWidth);
 
   const nameInputRef = useRef<HTMLInputElement>(null);

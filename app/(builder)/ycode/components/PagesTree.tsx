@@ -72,7 +72,7 @@ function checkIsDescendant(
 }
 
 // PageRow Component - Individual draggable/droppable tree node
-function PageRow({
+const PageRow = React.memo(function PageRow({
   node,
   isSelected,
   isChildOfSelected,
@@ -303,7 +303,7 @@ function PageRow({
     </div>
     </PageContextMenu>
   );
-}
+});
 
 // EndDropZone Component - Drop target for adding items at the end of the list
 function EndDropZone({

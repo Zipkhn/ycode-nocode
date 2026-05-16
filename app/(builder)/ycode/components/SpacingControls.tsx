@@ -35,7 +35,8 @@ const SpacingControls = memo(function SpacingControls({ layer, onLayerUpdate, ac
   const [isOpen, setIsOpen] = useState(true);
   const [focusedField, setFocusedField] = useState<SpacingProperty>('paddingTop');
   const focusedFieldRef = useRef<SpacingProperty>('paddingTop');
-  const { activeBreakpoint, activeUIState } = useEditorStore();
+  const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
+  const activeUIState = useEditorStore((s) => s.activeUIState);
   const { debouncedUpdateDesignProperty, getDesignProperty } = useDesignSync({
     layer,
     onLayerUpdate,
