@@ -1,5 +1,6 @@
 import { redirect, permanentRedirect } from 'next/navigation';
 import { unstable_cache } from 'next/cache';
+import { addCacheTag } from '@vercel/functions';
 import Link from 'next/link';
 import { fetchHomepage, fetchErrorPage, splitPageData, reassemblePageData, slimPageData } from '@/lib/page-fetcher';
 import type { PageData } from '@/lib/page-fetcher';
@@ -25,7 +26,15 @@ export const revalidate = false; // Cache indefinitely until publish invalidates
  * Cached with tag-based revalidation (no time-based stale cache)
  */
 async function fetchPublishedHomepage() {
-  const tags = ['all-pages', 'route-/'];
+  // Tags are both 'route-/' AND 'all-pages':
+  // - route-/ lets selective invalidation purge just this page's data cache
+  // - all-pages lets full invalidation (color variables, redirects, etc.)
+  //   sweep every page's data cache in one invalidateByTag call.
+  // Vercel's invalidateByTag is tag-precise, so no cascade — selective
+  // invalidation of one route doesn't disturb others. (Next.js bug #63509
+  // would apply if we used revalidateTag for selective on Vercel, but we
+  // route exclusively through invalidateByTag here.)
+  const tags = ['route-/', 'all-pages'];
   const opts = { tags, revalidate: false as const };
 
   const [core, layers] = await Promise.all([
@@ -140,6 +149,11 @@ async function fetchCachedErrorPage(errorCode: 401) {
 }
 
 export default async function Home() {
+  // Tag this response for Vercel CDN cache invalidation. The publish endpoint
+  // purges this exact tag (route-/) so only the homepage cache entry is
+  // invalidated. No-ops outside Vercel.
+  await addCacheTag(['route-/', 'all-pages']);
+
   // Check for redirects targeting the homepage
   const redirects = await fetchCachedRedirects();
   if (redirects && Array.isArray(redirects)) {
@@ -177,6 +191,9 @@ export default async function Home() {
 
   // Load all global settings early so error pages also get global custom code
   const globalSettings = await fetchCachedGlobalSettings();
+
+  // Per-page CSS with fallback to global published_css
+  const cssForPage = data.generatedCss || globalSettings.publishedCss || undefined;
 
   // Check password protection for homepage.
   // First evaluate without cookies() so non-protected pages can stay cacheable.
@@ -249,7 +266,7 @@ export default async function Home() {
       page={data.page}
       layers={data.pageLayers.layers || []}
       components={data.components}
-      generatedCss={globalSettings.publishedCss || undefined}
+      generatedCss={cssForPage}
       colorVariablesCss={globalSettings.colorVariablesCss || undefined}
       locale={data.locale}
       availableLocales={data.availableLocales}

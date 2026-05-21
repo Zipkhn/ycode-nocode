@@ -288,6 +288,7 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   // menus) on every layer click. Read lazily via getState() instead.
   const setSelectedLayerId = useEditorStore((s) => s.setSelectedLayerId);
   const editingComponentId = useEditorStore((s) => s.editingComponentId);
+  const editingComponentVariantId = useEditorStore((s) => s.editingComponentVariantId);
   const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
   const pushComponentNavigation = useEditorStore((s) => s.pushComponentNavigation);
   const startCanvasDrag = useEditorStore((s) => s.startCanvasDrag);
@@ -298,6 +299,7 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
   const { isLocalizing } = useLocalizationMode();
 
   const components = useComponentsStore((s) => s.components);
+  const componentDrafts = useComponentsStore((s) => s.componentDrafts);
   const updateComponentDraft = useComponentsStore((s) => s.updateComponentDraft);
   const deleteComponent = useComponentsStore((s) => s.deleteComponent);
   const getDeletePreview = useComponentsStore((s) => s.getDeletePreview);
@@ -331,6 +333,16 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
         .map(c => c.id)
     );
   }, [components, editingComponentId]);
+
+  // Resolve the active variant id for the component currently being edited.
+  // Newly-added elements always go into the variant the user is looking at.
+  const activeComponentVariantId = useMemo(() => {
+    if (!editingComponentId) return null;
+    const drafts = componentDrafts[editingComponentId];
+    if (!drafts) return editingComponentVariantId || null;
+    if (editingComponentVariantId && drafts[editingComponentVariantId]) return editingComponentVariantId;
+    return Object.keys(drafts)[0] || null;
+  }, [editingComponentId, editingComponentVariantId, componentDrafts]);
 
   const matchingComponentIds = useMemo(() => {
     if (!componentSearch.trim()) return null;
@@ -420,9 +432,9 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
 
   const handleAddElement = (elementType: string) => {
     const selectedLayerId = useEditorStore.getState().selectedLayerId;
-    // If editing component, use component draft instead
-    if (editingComponentId) {
-      const layers = useComponentsStore.getState().componentDrafts[editingComponentId] || [];
+    // If editing component, use the active variant's draft instead
+    if (editingComponentId && activeComponentVariantId) {
+      const layers = useComponentsStore.getState().componentDrafts[editingComponentId]?.[activeComponentVariantId] || [];
       const parentId = selectedLayerId || layers[0]?.id || 'body';
 
       const template = getLayerFromTemplate(elementType);
@@ -594,7 +606,9 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
           );
         }
 
-        updateComponentDraft(editingComponentId, finalLayers);
+        if (activeComponentVariantId) {
+          updateComponentDraft(editingComponentId, activeComponentVariantId, finalLayers);
+        }
         setSelectedLayerId(result.newLayerId);
         if (result.parentToExpand) {
           window.dispatchEvent(new CustomEvent('expandLayer', {
@@ -683,8 +697,9 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
 
   const handleAddLayout = async (layoutKey: string) => {
     const selectedLayerId = useEditorStore.getState().selectedLayerId;
-    if (editingComponentId) {
-      const layers = useComponentsStore.getState().componentDrafts[editingComponentId] || [];
+    // If editing component, use the active variant's draft instead
+    if (editingComponentId && activeComponentVariantId) {
+      const layers = useComponentsStore.getState().componentDrafts[editingComponentId]?.[activeComponentVariantId] || [];
 
       // Get layout template first (we need it to check if it's a section)
       const layoutTemplate = getLayoutTemplate(layoutKey);
@@ -850,7 +865,9 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
           );
         }
 
-        updateComponentDraft(editingComponentId, finalLayers);
+        if (activeComponentVariantId) {
+          updateComponentDraft(editingComponentId, activeComponentVariantId, finalLayers);
+        }
         setSelectedLayerId(result.newLayerId);
         if (result.parentToExpand) {
           window.dispatchEvent(new CustomEvent('expandLayer', {
@@ -1200,8 +1217,8 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
       });
     };
 
-    // If editing a component, add to component draft
-    if (editingComponentId) {
+    // If editing a component, add to the active variant's draft
+    if (editingComponentId && activeComponentVariantId) {
       // Check for circular reference before adding
       const circularError = checkCircularReference(editingComponentId, componentInstanceLayer, components);
       if (circularError) {
@@ -1209,7 +1226,7 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
         return;
       }
 
-      const layers = useComponentsStore.getState().componentDrafts[editingComponentId] || [];
+      const layers = useComponentsStore.getState().componentDrafts[editingComponentId]?.[activeComponentVariantId] || [];
       const parentId = selectedLayerId || layers[0]?.id;
       if (!parentId) return;
 
@@ -1240,7 +1257,7 @@ export default function ElementLibrary({ isOpen, onClose, liveLayerUpdates }: El
         newLayers.splice(selectedIndex + 1, 0, componentInstanceLayer);
       }
 
-      updateComponentDraft(editingComponentId, newLayers);
+      updateComponentDraft(editingComponentId, activeComponentVariantId, newLayers);
       setSelectedLayerId(componentInstanceLayer.id);
 
       if (parentToExpand) {

@@ -175,9 +175,32 @@
    7. STYLES ÉDITEUR (hors @layer — styles globaux du builder)
    ============================================================ */
 
-/* Icon SVG */
-[data-icon] { display: inline-block; }
-[data-icon] svg { width: 100%; height: 100%; display: block; fill: currentColor; }
+/* Icon SVG styling — exclude `.hidden` so Tailwind's `display: none` always
+   wins for hidden icons (this author rule is unlayered and would otherwise
+   beat any layered `.hidden` utility). */
+[data-icon]:not(.hidden) {
+  display: inline-block;
+}
+
+[data-icon] svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Force inline SVG fill/stroke attributes (even on nested nodes) to inherit
+   the icon layer's text color — matches the legacy `<i>` wrapper behavior so
+   migrated icons with hard-coded colors still tint with `text-*` utilities.
+   Note: must not blanket-apply `fill: currentColor` to the root <svg>, since
+   that would override `fill="none"` and solid-fill stroke-only icons. */
+[data-icon] [fill]:not([fill="none"]) {
+  fill: currentColor;
+}
+
+[data-icon] [stroke]:not([stroke="none"]),
+[data-icon] [stroke-width] {
+  stroke: currentColor;
+}
 
 /* RichTextEditor — Base */
 .rich-text-editor.ProseMirror { @apply outline-none w-full min-h-full; }

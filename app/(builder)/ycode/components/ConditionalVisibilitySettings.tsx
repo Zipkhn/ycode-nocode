@@ -253,6 +253,7 @@ export default function ConditionalVisibilitySettings({
   const currentPageId = useEditorStore((state) => state.currentPageId);
   const editingComponentId = useEditorStore((state) => state.editingComponentId);
   const activeBreakpoint = useEditorStore((state) => state.activeBreakpoint);
+  const editingComponentVariantId = useEditorStore((state) => state.editingComponentVariantId);
 
   const componentDrafts = useComponentsStore((state) => state.componentDrafts);
   const availableLocales = useLocalisationStore((state) => state.locales);
@@ -263,14 +264,18 @@ export default function ConditionalVisibilitySettings({
 
     let layers: Layer[] = [];
     if (editingComponentId) {
-      layers = componentDrafts[editingComponentId] || [];
+      const variantDrafts = componentDrafts[editingComponentId];
+      const variantId = (editingComponentVariantId && variantDrafts?.[editingComponentVariantId])
+        ? editingComponentVariantId
+        : (variantDrafts ? Object.keys(variantDrafts)[0] : null);
+      layers = (variantId && variantDrafts) ? variantDrafts[variantId] || [] : [];
     } else {
       const draft = draftsByPageId[currentPageId];
       layers = draft ? draft.layers : [];
     }
 
     return findAllCollectionLayers(layers);
-  }, [currentPageId, editingComponentId, componentDrafts, draftsByPageId]);
+  }, [currentPageId, editingComponentId, editingComponentVariantId, componentDrafts, draftsByPageId]);
 
   // Initialize groups and default visibility from layer data
   const groups: VisibilityConditionGroup[] = useMemo(() => {

@@ -117,8 +117,9 @@ function splitClassesPreservingBrackets(cls: string): string[] {
  * Used to distinguish between text-[color] and text-[size] arbitrary values
  */
 function isColorValue(value: string): boolean {
-  // Check for CSS custom property color references: color:var(--...)
+  // Check for CSS custom property color references: color:var(--...) or var(--...)
   if (/^color:var\(--/.test(value)) return true;
+  if (/^var\(--/.test(value)) return true;
 
   // Check for hex colors (with or without #)
   // Supports: #RGB, RGB, #RRGGBB, RRGGBB, #RRGGBBAA, RRGGBBAA
@@ -325,13 +326,13 @@ const CLASS_PROPERTY_MAP: Record<string, RegExp> = {
   backgroundClip: /^bg-clip-(text|border|padding|content)$/,
 
   // Borders
-  borderWidth: /^border(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
-  borderTopWidth: /^border-t(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
-  borderRightWidth: /^border-r(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
-  borderBottomWidth: /^border-b(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
-  borderLeftWidth: /^border-l(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
+  borderWidth: /^border(-\d+|-\[(?!#|rgb|color:var|var\().+\])?$/,
+  borderTopWidth: /^border-t(-\d+|-\[(?!#|rgb|color:var|var\().+\])?$/,
+  borderRightWidth: /^border-r(-\d+|-\[(?!#|rgb|color:var|var\().+\])?$/,
+  borderBottomWidth: /^border-b(-\d+|-\[(?!#|rgb|color:var|var\().+\])?$/,
+  borderLeftWidth: /^border-l(-\d+|-\[(?!#|rgb|color:var|var\().+\])?$/,
   borderStyle: /^border-(solid|dashed|dotted|double|hidden|none)$/,
-  borderColor: /^border-(?!(?:solid|dashed|dotted|double|hidden|none|collapse|separate)$)(?!t-|r-|b-|l-|x-|y-|spacing)((\w+)(-\d+)?|\[(?:#|rgb|oklch|oklab|color:var).+\])(\/\d+)?$/,
+  borderColor: /^border-(?!(?:solid|dashed|dotted|double|hidden|none|collapse|separate)$)(?!t-|r-|b-|l-|x-|y-|spacing)((\w+)(-\d+)?|\[(?:#|rgb|oklch|oklab|color:var|var\().+\])(\/\d+)?$/,
   borderRadius: /^rounded(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full|-\[.+\]|(?!-(?:tl|tr|br|bl)(?:-|$))-[a-z][a-z0-9-]*)?$/,
   borderTopLeftRadius: /^rounded-tl(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full|-\[.+\])?$/,
   borderTopRightRadius: /^rounded-tr(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full|-\[.+\])?$/,
@@ -339,14 +340,14 @@ const CLASS_PROPERTY_MAP: Record<string, RegExp> = {
   borderBottomLeftRadius: /^rounded-bl(-none|-sm|-md|-lg|-xl|-2xl|-3xl|-full|-\[.+\])?$/,
 
   // Dividers
-  divideX: /^divide-x(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
-  divideY: /^divide-y(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
+  divideX: /^divide-x(-\d+|-\[(?!#|rgb|color:var|var\().+\])?$/,
+  divideY: /^divide-y(-\d+|-\[(?!#|rgb|color:var|var\().+\])?$/,
   divideStyle: /^divide-(solid|dashed|dotted|double|none)$/,
-  divideColor: /^divide-((\w+)(-\d+)?|\[(?:#|rgb|oklch|oklab|color:var).+\])(\/\d+)?$/,
+  divideColor: /^divide-((\w+)(-\d+)?|\[(?:#|rgb|oklch|oklab|color:var|var\().+\])(\/\d+)?$/,
 
   // Outline
-  outlineWidth: /^outline(-\d+|-\[(?!#|rgb|color:var).+\])?$/,
-  outlineColor: /^outline-((\w+)(-\d+)?|\[(?:#|rgb|oklch|oklab|color:var).+\])(\/\d+)?$/,
+  outlineWidth: /^outline(-\d+|-\[(?!#|rgb|oklch|oklab|color:var|var\().+\])?$/,
+  outlineColor: /^outline-((\w+)(-\d+)?|\[(?:#|rgb|oklch|oklab|color:var|var\().+\])(\/\d+)?$/,
   outlineOffset: /^outline-offset-(\d+|-?\[.+\])$/,
 
   // Effects
@@ -1622,8 +1623,8 @@ export function classesToDesign(classes: string | string[]): Layer['design'] {
       if (value) design.borders!.borderBottomLeftRadius = value;
     }
 
-    // Border Width (all)
-    if (cls.startsWith('border-[') && !cls.includes('#') && !cls.includes('rgb')) {
+    // Border Width (all) — exclude color values (hex, rgb, var references)
+    if (cls.startsWith('border-[') && !cls.includes('#') && !cls.includes('rgb') && !cls.includes('var(')) {
       const value = extractArbitraryValue(cls);
       if (value) design.borders!.borderWidth = value;
     }
@@ -1635,8 +1636,8 @@ export function classesToDesign(classes: string | string[]): Layer['design'] {
     if (cls === 'border-double') design.borders!.borderStyle = 'double';
     if (cls === 'border-none') design.borders!.borderStyle = 'none';
 
-    // Border Color
-    if (cls.startsWith('border-[#') || cls.startsWith('border-[rgb') || cls.startsWith('border-[color:var(') || cls.startsWith('border-[oklch(') || cls.startsWith('border-[oklab(')) {
+    // Border Color — also handle raw var() references without color: prefix
+    if (cls.startsWith('border-[#') || cls.startsWith('border-[rgb') || cls.startsWith('border-[color:var(') || cls.startsWith('border-[oklch(') || cls.startsWith('border-[oklab(') || cls.startsWith('border-[var(')) {
       const value = extractArbitraryValueWithOpacity(cls);
       if (value) design.borders!.borderColor = value;
     }
@@ -1664,22 +1665,22 @@ export function classesToDesign(classes: string | string[]): Layer['design'] {
     if (cls === 'divide-double') design.borders!.divideStyle = 'double';
     if (cls === 'divide-none') design.borders!.divideStyle = 'none';
 
-    // Divide Color
-    if (cls.startsWith('divide-[#') || cls.startsWith('divide-[rgb') || cls.startsWith('divide-[color:var(') || cls.startsWith('divide-[oklch(') || cls.startsWith('divide-[oklab(')) {
+    // Divide Color — also handle raw var() references without color: prefix
+    if (cls.startsWith('divide-[#') || cls.startsWith('divide-[rgb') || cls.startsWith('divide-[color:var(') || cls.startsWith('divide-[oklch(') || cls.startsWith('divide-[oklab(') || cls.startsWith('divide-[var(')) {
       const value = extractArbitraryValueWithOpacity(cls);
       if (value) design.borders!.divideColor = value;
     }
 
-    // Outline Width
-    if (cls.startsWith('outline-[') && !cls.includes('#') && !cls.includes('rgb') && !cls.includes('color:var')) {
+    // Outline Width — exclude color values (hex, rgb, var references)
+    if (cls.startsWith('outline-[') && !cls.includes('#') && !cls.includes('rgb') && !cls.includes('var(')) {
       const value = extractArbitraryValue(cls);
       if (value) design.borders!.outlineWidth = value;
     } else if (cls.match(/^outline-\d+$/)) {
       design.borders!.outlineWidth = cls.replace('outline-', '') + 'px';
     }
 
-    // Outline Color
-    if (cls.startsWith('outline-[#') || cls.startsWith('outline-[rgb') || cls.startsWith('outline-[color:var(') || cls.startsWith('outline-[oklch(') || cls.startsWith('outline-[oklab(')) {
+    // Outline Color — also handle raw var() references without color: prefix
+    if (cls.startsWith('outline-[#') || cls.startsWith('outline-[rgb') || cls.startsWith('outline-[color:var(') || cls.startsWith('outline-[oklch(') || cls.startsWith('outline-[oklab(') || cls.startsWith('outline-[var(')) {
       const value = extractArbitraryValueWithOpacity(cls);
       if (value) design.borders!.outlineColor = value;
     }
@@ -1692,7 +1693,7 @@ export function classesToDesign(classes: string | string[]): Layer['design'] {
 
     // ===== BACKGROUNDS =====
     // Background Color
-    if (cls.startsWith('bg-[#') || cls.startsWith('bg-[rgb') || cls.startsWith('bg-[color:var(') || cls.startsWith('bg-[oklch(') || cls.startsWith('bg-[oklab(')) {
+    if (cls.startsWith('bg-[#') || cls.startsWith('bg-[rgb') || cls.startsWith('bg-[color:var(') || cls.startsWith('bg-[oklch(') || cls.startsWith('bg-[oklab(') || cls.startsWith('bg-[var(')) {
       const value = extractArbitraryValueWithOpacity(cls);
       if (value) design.backgrounds!.backgroundColor = value;
     }

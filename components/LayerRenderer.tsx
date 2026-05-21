@@ -31,6 +31,7 @@ import { hasComponentOrVariable } from '@/lib/tiptap-utils';
 import LayerContextMenu from '@/app/(builder)/ycode/components/LayerContextMenu';
 import CanvasTextEditor from '@/app/(builder)/ycode/components/CanvasTextEditor';
 import { useComponentsStore } from '@/stores/useComponentsStore';
+import { getComponentVariantLayers } from '@/lib/component-variant-utils';
 import { useCollectionLayerStore } from '@/stores/useCollectionLayerStore';
 import { useFilterStore } from '@/stores/useFilterStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
@@ -1180,9 +1181,27 @@ const LayerItemImpl: React.FC<{
   // injectTranslatedText pass on the serialized page layers. Without injecting
   // here, component content would always render in the default language even
   // when the user previews a non-default locale on a page.
+  // If this nested-component instance has its variant choice driven by a
+  // parent component variable, resolve the effective variant id from the
+  // parent's override (or the variable's default). Mirrors the SSR branch in
+  // `applyComponentOverrides`; without this the canvas keeps using the
+  // baked-in `componentVariantId` and ignores instance-level overrides.
+  const effectiveVariantId = useMemo(() => {
+    const linkedId = layer.componentVariantVariableId;
+    if (!linkedId) return layer.componentVariantId;
+    const variableDef = parentComponentVariables?.find(v => v.id === linkedId);
+    const overrideValue = parentComponentOverrides?.variant?.[linkedId];
+    const value = (overrideValue ?? variableDef?.default_value) as { variant_id?: string } | undefined;
+    return value?.variant_id ?? layer.componentVariantId;
+  }, [layer.componentVariantVariableId, layer.componentVariantId, parentComponentVariables, parentComponentOverrides]);
+
   const transformedComponentLayers = useMemo(() => {
-    if (!isEditMode || !component?.layers?.length) return null;
-    const transformed = transformLayerIdsForInstance(component.layers, layer.id);
+    if (!isEditMode || !component) return null;
+    // Pick the variant the instance is bound to (silently falls back to the
+    // first variant when the requested one was deleted).
+    const variantLayers = getComponentVariantLayers(component, effectiveVariantId);
+    if (!variantLayers.length) return null;
+    const transformed = transformLayerIdsForInstance(variantLayers, layer.id);
     if (!currentLocale || currentLocale.is_default || !translations) {
       return transformed;
     }
@@ -1190,7 +1209,7 @@ const LayerItemImpl: React.FC<{
       includeIncomplete: true,
       defaultMasterComponentId: component.id,
     });
-  }, [isEditMode, component, layer.id, currentLocale, translations, pageId]);
+  }, [isEditMode, component, layer.id, effectiveVariantId, currentLocale, translations, pageId]);
 
   // Collect hidden layer IDs from the component's transformed layers
   // Needed because Canvas computes editorHiddenLayerIds from serializeLayers (different ID transform)
@@ -1603,11 +1622,27 @@ const LayerItemImpl: React.FC<{
   // setBreakpointClass already handles property-aware conflict resolution.
 
   // Buttons inside grid cells stretch by default. Add w-fit unless an explicit
-  // w-* class is already set (covers both <button> and <a> rendered buttons).
+  // w-* class or a block-level display class is already set (covers both
+  // <button> and <a> rendered buttons). `<a>` also defaults to display: inline
+  // and inherits text-align, so for a button-with-link rendered as <a> we
+  // re-apply text-center unless an explicit text-align class is set.
+  const BLOCK_DISPLAY_CLASSES = new Set([
+    'flex', 'block', 'grid', 'table', 'flow-root',
+  ]);
+  const TEXT_ALIGN_CLASSES = new Set([
+    'text-left', 'text-center', 'text-right', 'text-justify', 'text-start', 'text-end',
+  ]);
+  const layerClassList = layer.name === 'button'
+    ? (Array.isArray(layer.classes) ? layer.classes : (layer.classes || '').split(' '))
+    : [];
   const buttonNeedsFit = layer.name === 'button' && (() => {
-    const cls = Array.isArray(layer.classes) ? layer.classes : (layer.classes || '').split(' ');
-    return !cls.some((c: string) => /^w-/.test(c.split(':').pop() || ''));
+    const hasWidth = layerClassList.some((c: string) => /^w-/.test(c.split(':').pop() || ''));
+    if (hasWidth) return false;
+    const hasBlockDisplay = layerClassList.some((c: string) => BLOCK_DISPLAY_CLASSES.has(c.split(':').pop() || ''));
+    return !hasBlockDisplay;
   })();
+  const buttonNeedsTextCenter = isButtonWithLink
+    && !layerClassList.some((c: string) => TEXT_ALIGN_CLASSES.has(c.split(':').pop() || ''));
 
   // Strip hidden classes in edit mode so the element renders as ghost instead of disappearing.
   // Must happen before fullClassName is built.
@@ -1631,12 +1666,13 @@ const LayerItemImpl: React.FC<{
     SWIPER_CLASS_MAP[layer.name],
     isSlideChild && 'swiper-slide',
     buttonNeedsFit && 'w-fit',
+    buttonNeedsTextCenter && 'text-center',
     enableDragDrop && !isEditing && !isLockedByOther && 'cursor-default',
     isDragging && 'opacity-30',
     showProjection && 'outline outline-1 outline-dashed outline-blue-400 bg-blue-50/10',
     isLockedByOther && 'opacity-90 pointer-events-none select-none',
     'ycode-layer'
-  ) : clsx(classesString, paragraphClasses, SWIPER_CLASS_MAP[layer.name], isSlideChild && 'swiper-slide', buttonNeedsFit && 'w-fit');
+  ) : clsx(classesString, paragraphClasses, SWIPER_CLASS_MAP[layer.name], isSlideChild && 'swiper-slide', buttonNeedsFit && 'w-fit', buttonNeedsTextCenter && 'text-center');
 
   // Check if layer should be hidden (hide completely in both edit mode and public pages)
   if (layer.settings?.hidden) {
@@ -2205,7 +2241,6 @@ const LayerItemImpl: React.FC<{
       const effectiveLoading = isLcpCandidate ? 'eager' : imgLoadingAttr;
 
       const optimizedSrc = getOptimizedImageUrl(finalImageUrl, 1920, 85);
-      const srcset = generateImageSrcset(finalImageUrl);
 
       // Prefer an explicit `sizes` attribute. Otherwise, if we have an
       // intrinsic pixel width, emit a media-aware sizes string so browsers
@@ -2217,6 +2252,12 @@ const LayerItemImpl: React.FC<{
         : null;
       const sizes = explicitSizes
         || (widthForSizes ? `(max-width: 768px) 100vw, ${widthForSizes}px` : getImageSizes());
+
+      // Pass intrinsic width so srcset descriptors don't exceed the source's
+      // natural size (the proxy won't upscale; mismatched descriptors break
+      // browser intrinsic-dimension math and shrink the rendered image).
+      const intrinsicWidthForSrcset = widthForSizes ? parseInt(widthForSizes, 10) : null;
+      const srcset = generateImageSrcset(finalImageUrl, undefined, undefined, intrinsicWidthForSrcset);
 
       const imageProps: Record<string, any> = {
         ...elementProps,
