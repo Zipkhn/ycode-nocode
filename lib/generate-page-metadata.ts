@@ -8,12 +8,12 @@ import 'server-only';
 
 import { cache } from 'react';
 import type { Metadata } from 'next';
-import type { Page } from '@/types';
+import type { Asset, Page } from '@/types';
 import type { CollectionItemWithValues } from '@/types';
 import { resolveInlineVariables, resolveImageUrl } from '@/lib/resolve-cms-variables';
 import { getSettingsByKeys } from '@/lib/repositories/settingsRepository';
 import { getAssetById } from '@/lib/repositories/assetRepository';
-import { getAssetProxyUrl } from '@/lib/asset-utils';
+import { buildSvgDataUrl, getAssetProxyUrl } from '@/lib/asset-utils';
 import { generateColorVariablesCss } from '@/lib/repositories/colorVariableRepository';
 import { getSiteBaseUrl } from '@/lib/url-utils';
 import {
@@ -38,7 +38,9 @@ export interface GlobalPageSettings {
   globalCustomCodeBody?: string | null;
   ycodeBadge?: boolean;
   faviconUrl?: string | null;
+  faviconMimeType?: string | null;
   webClipUrl?: string | null;
+  webClipMimeType?: string | null;
   /** Global og:site_name — used when the page does not set its own og_site_name. */
   ogSiteName?: string | null;
   /** Organization name for JSON-LD Organization schema (Phase 2). */
@@ -82,10 +84,21 @@ export interface GenerateMetadataOptions {
 // ── Fetch global settings ─────────────────────────────────────────────────────
 
 /**
- * Fetch all global page settings in a single database query.
- * Wrapped with React cache to deduplicate within the same request.
+ * Resolve a usable URL for favicon/web-clip assets, falling back to an
+ * inline data URL for SVGs stored without a public_url/storage_path.
  */
-export const fetchGlobalPageSettings = cache(async (): Promise<GlobalPageSettings> => {
+function resolveIconAssetUrl(asset: Asset): string | null {
+  const proxyOrPublic = getAssetProxyUrl(asset) || asset.public_url || null;
+  if (proxyOrPublic) return proxyOrPublic;
+
+  if (asset.mime_type === 'image/svg+xml' && asset.content) {
+    return buildSvgDataUrl(asset.content, asset.width, asset.height);
+  }
+
+  return null;
+}
+
+async function fetchGlobalPageSettingsImpl(isPreview = false): Promise<GlobalPageSettings> {
   const settings = await getSettingsByKeys([
     'google_site_verification',
     'global_canonical_url',
@@ -101,21 +114,36 @@ export const fetchGlobalPageSettings = cache(async (): Promise<GlobalPageSetting
     'schema_org_logo_url',
   ]);
 
+  // Fetch favicon and web clip asset URLs if IDs are set
+  // In preview mode, read draft assets so the favicon shows before publishing.
   let faviconUrl: string | null = null;
+  let faviconMimeType: string | null = null;
   let webClipUrl: string | null = null;
+  let webClipMimeType: string | null = null;
+  const isAssetPublished = !isPreview;
 
   if (settings.favicon_asset_id) {
     try {
-      const asset = await getAssetById(settings.favicon_asset_id, true);
-      if (asset) faviconUrl = getAssetProxyUrl(asset) || asset.public_url || null;
-    } catch { /* ignore */ }
+      const asset = await getAssetById(settings.favicon_asset_id, isAssetPublished);
+      if (asset) {
+        faviconUrl = resolveIconAssetUrl(asset);
+        faviconMimeType = asset.mime_type || null;
+      }
+    } catch {
+      // Ignore errors fetching favicon
+    }
   }
 
   if (settings.web_clip_asset_id) {
     try {
-      const asset = await getAssetById(settings.web_clip_asset_id, true);
-      if (asset) webClipUrl = getAssetProxyUrl(asset) || asset.public_url || null;
-    } catch { /* ignore */ }
+      const asset = await getAssetById(settings.web_clip_asset_id, isAssetPublished);
+      if (asset) {
+        webClipUrl = resolveIconAssetUrl(asset);
+        webClipMimeType = asset.mime_type || null;
+      }
+    } catch {
+      // Ignore errors fetching web clip
+    }
   }
 
   const colorVariablesCss = await generateColorVariablesCss();
@@ -130,15 +158,34 @@ export const fetchGlobalPageSettings = cache(async (): Promise<GlobalPageSetting
     globalCustomCodeBody: settings.custom_code_body || null,
     ycodeBadge: settings.ycode_badge ?? true,
     faviconUrl,
+    faviconMimeType,
     webClipUrl,
+    webClipMimeType,
     ogSiteName: settings.og_site_name || null,
     schemaOrgName: settings.schema_org_name || null,
     schemaOrgLogoUrl: settings.schema_org_logo_url || null,
   };
+}
+
+/**
+ * Fetch all global page settings in a single database query
+ * Includes SEO settings, published CSS, and global custom code
+ * Wrapped with React cache to deduplicate within the same request (non-preview only)
+ */
+const fetchGlobalPageSettingsCached = cache(async (): Promise<GlobalPageSettings> => {
+  return fetchGlobalPageSettingsImpl();
 });
 
+export async function fetchGlobalPageSettings(isPreview = false): Promise<GlobalPageSettings> {
+  if (isPreview) {
+    // Preview mode: bypass cache and read draft assets
+    return fetchGlobalPageSettingsImpl(true);
+  }
+  return fetchGlobalPageSettingsCached();
+}
+
 /** @deprecated Use fetchGlobalPageSettings instead */
-export const fetchGlobalSeoSettings = fetchGlobalPageSettings;
+export const fetchGlobalSeoSettings = fetchGlobalPageSettingsCached;
 
 // ── Main function ─────────────────────────────────────────────────────────────
 
@@ -195,9 +242,11 @@ export async function generatePageMetadata(
   let canonicalUrl: string | null = null;
   let globalSettings: GlobalPageSettings = {};
 
-  if (!isPreview) {
-    globalSettings = options.globalSeoSettings || (await fetchGlobalSeoSettings());
+  // Always fetch global settings — preview mode reads draft assets so the
+  // favicon and web clip render before the user publishes.
+  globalSettings = options.globalSeoSettings || (await fetchGlobalPageSettings(isPreview));
 
+  if (!isPreview) {
     siteBaseUrl = getSiteBaseUrl({
       globalCanonicalUrl: globalSettings.globalCanonicalUrl,
       primaryDomainUrl,
@@ -221,12 +270,21 @@ export async function generatePageMetadata(
     if (canonicalUrl) {
       metadata.alternates = { canonical: canonicalUrl };
     }
+  }
 
-    // Favicon & web clip
-    if (globalSettings.faviconUrl || globalSettings.webClipUrl) {
-      metadata.icons = {};
-      if (globalSettings.faviconUrl) metadata.icons.icon = globalSettings.faviconUrl;
-      if (globalSettings.webClipUrl) metadata.icons.apple = globalSettings.webClipUrl;
+  // Add custom favicon and web clip (apple-touch-icon) — applies to preview too.
+  // Default favicon is handled by app/icon.svg
+  if (globalSettings.faviconUrl || globalSettings.webClipUrl) {
+    metadata.icons = {};
+    if (globalSettings.faviconUrl) {
+      metadata.icons.icon = globalSettings.faviconMimeType
+        ? { url: globalSettings.faviconUrl, type: globalSettings.faviconMimeType }
+        : globalSettings.faviconUrl;
+    }
+    if (globalSettings.webClipUrl) {
+      metadata.icons.apple = globalSettings.webClipMimeType
+        ? { url: globalSettings.webClipUrl, type: globalSettings.webClipMimeType }
+        : globalSettings.webClipUrl;
     }
   }
 
