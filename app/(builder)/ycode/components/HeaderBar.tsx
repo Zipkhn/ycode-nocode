@@ -39,6 +39,7 @@ import Icon from '@/components/ui/icon';
 import { Separator } from '@/components/ui/separator';
 import { BackupRestoreDialog } from '@/components/project/BackupRestoreDialog';
 import { isCloudVersion } from '@/lib/utils';
+import { useRole } from '@/hooks/use-role';
 
 interface HeaderBarProps {
   user: User | null;
@@ -84,6 +85,8 @@ export default function HeaderBar({
   const router = useRouter();
   const pathname = usePathname();
   const pageDropdownRef = useRef<HTMLDivElement>(null);
+  const { isEditor, canManageSettings, canManageMembers } = useRole();
+  const editorSidebarTab = useEditorStore((s) => s.activeSidebarTab);
   const currentPageCollectionItemId = useEditorStore((s) => s.currentPageCollectionItemId);
   const storeCurrentPageId = useEditorStore((s) => s.currentPageId);
   const isPreviewMode = useEditorStore((s) => s.isPreviewMode);
@@ -384,11 +387,13 @@ export default function HeaderBar({
                 <DropdownMenuSeparator />
               </>
             )}
-            <DropdownMenuItem
-              onClick={() => router.push('/ycode/settings/general')}
-            >
-              Settings
-            </DropdownMenuItem>
+            {canManageSettings && (
+              <DropdownMenuItem
+                onClick={() => router.push('/ycode/settings/general')}
+              >
+                Settings
+              </DropdownMenuItem>
+            )}
 
             <DropdownMenuItem
               onClick={() => openFileManager()}
@@ -396,17 +401,21 @@ export default function HeaderBar({
               File manager
             </DropdownMenuItem>
 
-            <DropdownMenuItem
-              onClick={() => router.push('/ycode/integrations/apps')}
-            >
-              Integrations
-            </DropdownMenuItem>
+            {canManageSettings && (
+              <>
+                <DropdownMenuItem
+                  onClick={() => router.push('/ycode/integrations/apps')}
+                >
+                  Integrations
+                </DropdownMenuItem>
 
-            <DropdownMenuItem
-              onClick={() => setShowTransferDialog(true)}
-            >
-              Backup &amp; Restore
-            </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setShowTransferDialog(true)}
+                >
+                  Backup &amp; Restore
+                </DropdownMenuItem>
+              </>
+            )}
 
             <DropdownMenuSeparator />
 
@@ -454,38 +463,73 @@ export default function HeaderBar({
         </DropdownMenu>
 
         <div className="flex gap-1">
-          <Button
-            variant={activeNavButton === 'design' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => {
-              setOptimisticNav('design');
-              setActiveSidebarTab('layers');
-              // Restore last design URL if available
-              if (lastDesignUrl) {
-                router.push(lastDesignUrl);
-              } else {
-                const targetPageId = storeCurrentPageId || findHomepage(storePages)?.id || storePages[0]?.id;
-                if (targetPageId) {
-                  navigateToLayers(targetPageId);
+          {isEditor ? (
+            <>
+              <Button
+                variant={(activeNavButton === 'design' && editorSidebarTab !== 'pages') ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => {
+                  setOptimisticNav('design');
+                  setActiveSidebarTab('layers');
+                  if (lastDesignUrl) {
+                    router.push(lastDesignUrl);
+                  } else {
+                    const targetPageId = storeCurrentPageId || findHomepage(storePages)?.id || storePages[0]?.id;
+                    if (targetPageId) {
+                      navigateToLayers(targetPageId);
+                    }
+                  }
+                }}
+              >
+                <Icon name="pencil" />
+                Content editor
+              </Button>
+              <Button
+                variant={editorSidebarTab === 'pages' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => {
+                  setActiveSidebarTab('pages');
+                  const targetPageId = storeCurrentPageId || findHomepage(storePages)?.id || storePages[0]?.id;
+                  if (targetPageId) {
+                    navigateToLayers(targetPageId);
+                  }
+                }}
+              >
+                <Icon name="page" />
+                Pages
+              </Button>
+            </>
+          ) : (
+            <Button
+              variant={activeNavButton === 'design' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => {
+                setOptimisticNav('design');
+                setActiveSidebarTab('layers');
+                if (lastDesignUrl) {
+                  router.push(lastDesignUrl);
+                } else {
+                  const targetPageId = storeCurrentPageId || findHomepage(storePages)?.id || storePages[0]?.id;
+                  if (targetPageId) {
+                    navigateToLayers(targetPageId);
+                  }
                 }
-              }
-            }}
-          >
-            <Icon name="cursor-default" />
-            Design
-          </Button>
+              }}
+            >
+              <Icon name="cursor-default" />
+              Design
+            </Button>
+          )}
           <Button
             variant={activeNavButton === 'cms' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => {
-              // Save current design URL before navigating away
               const isDesignRoute = routeType === 'layers' || routeType === 'page' || routeType === 'component';
               if (isDesignRoute) {
                 setLastDesignUrl(window.location.pathname + window.location.search);
               }
               setOptimisticNav('cms');
               setActiveSidebarTab('cms');
-              // Navigate to last selected or first available collection
               const targetCollectionId = storeSelectedCollectionId || collections[0]?.id;
               if (targetCollectionId) {
                 setSelectedCollectionId(targetCollectionId);
@@ -498,22 +542,23 @@ export default function HeaderBar({
             <Icon name="database" />
             CMS
           </Button>
-          <Button
-            variant={activeNavButton === 'forms' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => {
-              // Save current design URL before navigating away
-              const isDesignRoute = routeType === 'layers' || routeType === 'page' || routeType === 'component';
-              if (isDesignRoute) {
-                setLastDesignUrl(window.location.pathname + window.location.search);
-              }
-              setOptimisticNav('forms');
-              router.push('/ycode/forms');
-            }}
-          >
-            <Icon name="form" />
-            Forms
-          </Button>
+          {!isEditor && (
+            <Button
+              variant={activeNavButton === 'forms' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => {
+                const isDesignRoute = routeType === 'layers' || routeType === 'page' || routeType === 'component';
+                if (isDesignRoute) {
+                  setLastDesignUrl(window.location.pathname + window.location.search);
+                }
+                setOptimisticNav('forms');
+                router.push('/ycode/forms');
+              }}
+            >
+              <Icon name="form" />
+              Forms
+            </Button>
+          )}
           <Button
             variant="ghost" size="sm"
             onClick={openStudio} title="Studio (Shift+Option+S)"
@@ -556,7 +601,7 @@ export default function HeaderBar({
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
-            {!pathname?.startsWith('/ycode/localization') && (
+            {canManageSettings && !pathname?.startsWith('/ycode/localization') && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -586,7 +631,7 @@ export default function HeaderBar({
           </a>
         </Button>
 
-        {hasUpdate && (
+        {hasUpdate && canManageSettings && (
           <>
             <div className="h-5">
               <Separator orientation="vertical" />
@@ -610,7 +655,7 @@ export default function HeaderBar({
         <ActiveUsersInHeader />
 
         {/* Invite User */}
-        <InviteUserButton />
+        {canManageMembers && <InviteUserButton />}
 
         {/* Save Status Indicator */}
         <div className="flex items-center justify-end w-16 text-xs text-zinc-500 dark:text-white/50">
