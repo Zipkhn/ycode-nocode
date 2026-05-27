@@ -309,14 +309,33 @@ function injectRuntimeBridges(content) {
     h4: '1.4', h5: '1.4', h6: '1.5', large: '1.5', body: '1.5', small: '1.5',
   };
 
-  const typoLines = ['/* Studio Runtime Typography Bridge v9.0 */'];
+  const TEXT_WRAP_DEFAULTS = {
+    display: 'pretty', h1: 'pretty', h2: 'pretty', h3: 'pretty', h4: 'pretty',
+    h5: 'pretty', h6: 'balance', large: 'balance', body: 'balance', small: 'balance',
+  };
+
+  const typoLines = [
+    '/* Studio Runtime Typography Bridge v9.0 */',
+    ':where(body) { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }',
+  ];
   for (const lvl of TYPO_LEVELS) {
     const fw = readVar(`${lvl.key}-font-weight`,   '600');
     const lh = readVar(`${lvl.key}-line-height`,   LINE_HEIGHT_DEFAULTS[lvl.key] || '1.4');
     const ls = readVar(`${lvl.key}-letter-spacing`, '0em');
     const mb = readVar(`${lvl.key}-margin-bottom`,  '0rem');
-    typoLines.push(`${lvl.selector}{font-weight:${fw}!important;line-height:${lh}!important;letter-spacing:${ls}!important;margin-bottom:${mb}!important}`);
+    const tw = readVar(`${lvl.key}-text-wrap`,      TEXT_WRAP_DEFAULTS[lvl.key] || 'balance');
+    typoLines.push(`${lvl.selector}{font-weight:${fw}!important;line-height:${lh}!important;letter-spacing:${ls}!important;margin-bottom:${mb}!important;text-wrap:${tw}!important}`);
   }
+
+  // ── Radius bridge ───────────────────────────────────────────────────────────
+  // Hand-tuned section the old template silently dropped on every run.
+  const radiusLines = [
+    '',
+    '/* Studio Radius Bridge */',
+    ':where(body) [class*="rounded-radius-small"]{border-radius:var(--radius--small)!important}',
+    ':where(body) [class*="rounded-radius-main"]{border-radius:var(--radius--main)!important}',
+    ':where(body) [class*="rounded-radius-round"]{border-radius:var(--radius--round)!important}',
+  ];
 
   // ── Preserve runtime-only sections (theme dark bridge with UUIDs) ─────────
   // These are written by the Studio sync and contain Ycode UUIDs — the patch
@@ -338,15 +357,16 @@ function injectRuntimeBridges(content) {
     }
   }
 
-  const bridgeBlock = `\n${BRIDGE_START}\n${spacingLines.join('\n')}\n\n${typoLines.join('\n')}${preservedThemeDark}\n${BRIDGE_END}\n`;
+  const bridgeBlock = `\n${BRIDGE_START}\n${spacingLines.join('\n')}\n\n${typoLines.join('\n')}\n${radiusLines.join('\n')}${preservedThemeDark}\n${BRIDGE_END}`;
 
   if (content.includes(BRIDGE_START) && content.includes(BRIDGE_END)) {
+    // Replace only up to (not including) the trailing newline so reruns are idempotent.
     content = content.replace(
       new RegExp(`${escapeRegex(BRIDGE_START)}[\\s\\S]*?${escapeRegex(BRIDGE_END)}`),
       bridgeBlock.trimStart()
     );
   } else {
-    content = content.trimEnd() + '\n' + bridgeBlock;
+    content = content.trimEnd() + '\n' + bridgeBlock + '\n';
   }
 
   const themeDarkMsg = preservedThemeDark ? ' + theme dark bridge preserved' : '';
