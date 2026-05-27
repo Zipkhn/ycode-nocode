@@ -70,3 +70,5 @@ next-env.d.ts
 
 # scripts
 release.sh
+#claude
+.claude
