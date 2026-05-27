@@ -37,8 +37,7 @@
     "migrate:status": "NODE_NO_WARNINGS=1 knex migrate:status --knexfile knexfile.ts",
     "migrate:credentials": "npx ts-node scripts/migrate-credentials.ts",
     "fonts:update": "npx ts-node scripts/fetch-google-fonts.ts",
-    "prepare": "husky",
-    "postinstall": "node scripts/patch-studio.mjs"
+    "prepare": "husky"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
