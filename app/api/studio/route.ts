@@ -99,6 +99,9 @@ export async function GET() {
     const regex = /--([a-zA-Z0-9_-]+):\s*([^;]+);/g;
     let match;
     while ((match = regex.exec(coreSection)) !== null) {
+      // Skip scoped/responsive overrides (always `!important`) so the canonical
+      // :root token wins — e.g. --site--column-count reads 12, not the @media 4.
+      if (match[2].includes('!important')) continue;
       variables[match[1]] = match[2];
     }
 
