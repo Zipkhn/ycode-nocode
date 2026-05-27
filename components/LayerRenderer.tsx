@@ -236,6 +236,7 @@ const LayerRenderer: React.FC<LayerRendererProps> = ({
                 collectionLayerId={originalLayerId}
                 itemIds={layer._paginationMeta!.itemIds}
                 layerTemplate={layer._paginationMeta!.layerTemplate}
+                collectionLayer={layer._filterConfig?.collectionLayer || layer._paginationMeta!.collectionLayer}
               >
                 {content}
               </LoadMoreCollection>
@@ -269,6 +270,7 @@ const LayerRenderer: React.FC<LayerRendererProps> = ({
               collectionLayerClasses={layer._filterConfig!.collectionLayerClasses}
               collectionLayerTag={layer._filterConfig!.collectionLayerTag}
               isPublished={layer._filterConfig!.isPublished}
+              collectionLayer={layer._filterConfig!.collectionLayer}
             >
               {content}
             </FilterableCollection>
@@ -2341,6 +2343,12 @@ const LayerItemImpl: React.FC<{
     if (htmlTag === 'select') {
       if (isInsideForm && !elementProps.name) {
         elementProps.name = layer.settings?.id || layer.id;
+      }
+
+      // Drop null/undefined value so the select can fall back to defaultValue
+      // (React warns about a null value prop on <select>).
+      if ('value' in elementProps && elementProps.value == null) {
+        delete elementProps.value;
       }
 
       // In edit mode, keep value controlled (canvas selects aren't interactive)

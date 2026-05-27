@@ -20,6 +20,7 @@ import makeLogo from './make/logo.svg';
 import mapboxLogo from './mapbox/logo.png';
 import googleMapsEmbedLogo from './google-maps-embed/logo.png';
 import n8nLogo from './n8n/logo.svg';
+import staticExportLogo from './static-export/logo.svg';
 
 // =============================================================================
 // Types
@@ -38,6 +39,13 @@ export const APP_CATEGORIES: { value: AppCategory; label: string }[] = [
   { value: 'other', label: 'Other' },
 ];
 
+export interface AppAuthor {
+  /** Display name of the author or organization */
+  name: string;
+  /** Optional URL (e.g. GitHub profile) */
+  url?: string;
+}
+
 export interface AppDefinition {
   /** Unique identifier (kebab-case), used as app_id in database */
   id: string;
@@ -51,6 +59,8 @@ export interface AppDefinition {
   categories: AppCategory[];
   /** Whether this app is fully implemented or just a placeholder */
   implemented: boolean;
+  /** Author or contributor credit */
+  author?: AppAuthor;
 }
 
 // =============================================================================
@@ -65,6 +75,7 @@ export const apps: AppDefinition[] = [
     logo: airtableLogo,
     categories: ['popular', 'cms-data'],
     implemented: true,
+    author: { name: 'Ycode', url: 'https://github.com/ycode/ycode' },
   },
   {
     id: 'webflow',
@@ -73,6 +84,7 @@ export const apps: AppDefinition[] = [
     logo: webflowLogo,
     categories: ['popular', 'cms-data'],
     implemented: true,
+    author: { name: 'Ycode', url: 'https://github.com/ycode/ycode' },
   },
   {
     id: 'mailerlite',
@@ -81,6 +93,7 @@ export const apps: AppDefinition[] = [
     logo: mailerliteLogo,
     categories: ['popular', 'email'],
     implemented: true,
+    author: { name: 'Ycode', url: 'https://github.com/ycode/ycode' },
   },
   {
     id: 'mailchimp',
@@ -121,6 +134,7 @@ export const apps: AppDefinition[] = [
     logo: mapboxLogo,
     categories: ['popular', 'maps'],
     implemented: true,
+    author: { name: 'Ycode', url: 'https://github.com/ycode/ycode' },
   },
   {
     id: 'google-maps-embed',
@@ -129,6 +143,16 @@ export const apps: AppDefinition[] = [
     logo: googleMapsEmbedLogo,
     categories: ['popular', 'maps'],
     implemented: true,
+    author: { name: 'Ycode', url: 'https://github.com/ycode/ycode' },
+  },
+  {
+    id: 'static-export',
+    name: 'Static HTML Export',
+    description: 'Export your site as static HTML/CSS/JS — host anywhere: S3, Netlify, Cloudflare Pages, or local files.',
+    logo: staticExportLogo,
+    categories: ['popular', 'other'],
+    implemented: true,
+    author: { name: 'Serge/Grish', url: 'https://github.com/sj-unit72' },
   },
 ];
 

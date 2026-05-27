@@ -2982,6 +2982,7 @@ const RightSidebar = React.memo(function RightSidebar({
 
             <InputSettings
               layer={selectedLayer}
+              allLayers={allLayers}
               onLayerUpdate={handleLayerUpdate}
             />
 
