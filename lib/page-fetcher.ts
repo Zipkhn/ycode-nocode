@@ -3,7 +3,7 @@ import { escapeHtml } from '@/lib/escape-html';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { getKnexClient } from '@/lib/knex-client';
 import { buildSlugPath, buildDynamicPageUrl, buildLocalizedSlugPath, buildLocalizedDynamicPageUrl, detectLocaleFromPath, matchPageWithTranslatedSlugs, matchDynamicPageWithTranslatedSlugs } from '@/lib/page-utils';
-import { getItemWithValues, getItemsWithValues, getItemsWithValuesByIds, getItemIdsByFieldValue, getItemsByCollectionId } from '@/lib/repositories/collectionItemRepository';
+import { getItemWithValues, getItemsWithValues, getItemsWithValuesByIds, getItemIdsByFieldValue, getItemsByCollectionId, getSlugsByItemIds } from '@/lib/repositories/collectionItemRepository';
 import { getValuesByItemIds } from '@/lib/repositories/collectionItemValueRepository';
 import { getFieldsByCollectionId } from '@/lib/repositories/collectionFieldRepository';
 import { enrichItemsWithCountValues } from '@/lib/repositories/collectionCountRepository';
@@ -603,7 +603,7 @@ async function fetchPageByPathInternal(
               meta_description: matchingPage.settings?.seo?.description,
             };
             let resolvedLayers = layersWithInjectedData.length > 0
-              ? await resolveCollectionLayers(layersWithInjectedData, isPublished, enhancedItemValues, paginationContext, translations, collectionItem.id, timezone, pageDataForVisibility)
+              ? await resolveCollectionLayers(layersWithInjectedData, isPublished, enhancedItemValues, paginationContext, translations, collectionItem.id, timezone, pageDataForVisibility, collectionItem.id)
               : [];
 
             // Resolve collections inside rich text embedded components
@@ -1973,28 +1973,38 @@ async function buildCollectionCache(
   // Items are fetched per-collection because a single `.in('collection_id', [...])`
   // query is bounded by Supabase/PostgREST's `db-max-rows` setting (often 1000),
   // so a large collection can starve smaller ones in the same page.
+  // We chunk via `.range()` past the 1000-row cap, stopping once we hit
+  // PER_COLLECTION_LIMIT or run out of rows.
   const allCollIds = [...ids, ...refCollectionIds];
   const PER_COLLECTION_LIMIT = 5000;
+  const ITEMS_PAGE_SIZE = 1000;
 
-  const buildItemsQuery = (collectionId: string) => {
-    let q = client
-      .from('collection_items')
-      .select('*')
-      .eq('collection_id', collectionId)
-      .eq('is_published', isPublished)
-      .is('deleted_at', null)
-      .order('manual_order', { ascending: true })
-      .order('created_at', { ascending: false })
-      .limit(PER_COLLECTION_LIMIT);
-    if (isPublished) q = q.eq('is_publishable', true);
-    return q;
+  const fetchItemsForCollection = async (collectionId: string) => {
+    const all: any[] = [];
+    for (let from = 0; from < PER_COLLECTION_LIMIT; from += ITEMS_PAGE_SIZE) {
+      const to = Math.min(from + ITEMS_PAGE_SIZE - 1, PER_COLLECTION_LIMIT - 1);
+      let q = client
+        .from('collection_items')
+        .select('*')
+        .eq('collection_id', collectionId)
+        .eq('is_published', isPublished)
+        .is('deleted_at', null)
+        .order('manual_order', { ascending: true })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      if (isPublished) q = q.eq('is_publishable', true);
+      const { data, error } = await q;
+      if (error) throw new Error(`Failed to fetch items: ${error.message}`);
+      if (!data || data.length === 0) break;
+      all.push(...data);
+      if (data.length < (to - from + 1)) break;
+    }
+    return all;
   };
 
-  const itemsPromise = Promise.all(allCollIds.map(buildItemsQuery))
-    .then(results => ({
-      data: results.flatMap(r => r.data || []),
-      error: results.find(r => r.error)?.error,
-    }));
+  const itemsPromise = Promise.all(allCollIds.map(fetchItemsForCollection))
+    .then(results => ({ data: results.flat(), error: null as unknown }))
+    .catch(error => ({ data: [] as any[], error }));
 
   const refFieldsPromise = refCollectionIds.length > 0
     ? client.from('collection_fields').select('*')
@@ -2126,7 +2136,12 @@ export async function resolveCollectionLayers(
   translations?: Record<string, Translation>,
   parentCollectionItemId?: string,
   timezone?: string,
-  currentPageData?: { locale?: string; name?: string; folder_name?: string; title_tag?: string; meta_description?: string }
+  currentPageData?: { locale?: string; name?: string; folder_name?: string; title_tag?: string; meta_description?: string },
+  // The dynamic page's collection item ID. Distinct from `parentCollectionItemId`
+  // (which advances as nested collections recurse) because `self` filters always
+  // resolve "current page item" against the outermost page item, never the
+  // nearest enclosing collection.
+  pageCollectionItemId?: string,
 ): Promise<Layer[]> {
   // Reuse caller-provided timezone, or fetch once for the entire tree
   if (!timezone) {
@@ -2311,7 +2326,15 @@ export async function resolveCollectionLayers(
               .filter(item => {
                 const val = item.values[sourceFieldId!];
                 if (!val) return false;
-                return val === parentItemId || (typeof val === 'string' && val.includes(`"${parentItemId}"`));
+                // Single reference: bare UUID string. Multi-reference: castValue already
+                // JSON-parses the stored array into a JS array, so check membership
+                // directly. The legacy `val.includes('"id"')` substring check is kept as
+                // a fallback for any value that arrives un-parsed.
+                if (Array.isArray(val)) return val.includes(parentItemId);
+                if (typeof val === 'string') {
+                  return val === parentItemId || val.includes(`"${parentItemId}"`);
+                }
+                return false;
               })
               .map(item => item.id);
           } else if (sourceFieldId && itemValues) {
@@ -2336,6 +2359,51 @@ export async function resolveCollectionLayers(
             filteredItems = filteredItems.filter(i => allowedSet.has(i.id));
           }
 
+          // Apply static collection filters early so totalItems, pagination
+          // slicing, and the `itemIds` we hand off to load_more all reflect
+          // the same constrained set. Input-linked conditions are skipped
+          // here — they run client-side via FilterableCollection.
+          const collectionFilters = collectionVariable.filters;
+          const staticFilters = collectionFilters?.groups?.length ? {
+            ...collectionFilters,
+            groups: collectionFilters.groups.map(group => ({
+              ...group,
+              conditions: group.conditions.filter(c => !c.inputLayerId),
+            })).filter(group => group.conditions.length > 0),
+          } : null;
+          const hasStaticFilters = !!staticFilters && staticFilters.groups.length > 0;
+
+          if (hasStaticFilters) {
+            filteredItems = filteredItems.filter(item =>
+              evaluateVisibility(staticFilters!, {
+                collectionLayerData: item.values,
+                pageCollectionData: parentItemValues ?? null,
+                pageCollectionCounts: {},
+                currentItemId: item.id,
+                pageCollectionItemId: pageCollectionItemId ?? parentCollectionItemId,
+              })
+            );
+          }
+
+          // When pagination is enabled, `collectionVariable.limit` acts as a
+          // hard cap on the total — both for the displayed count and for how
+          // far `load_more` can page. Without pagination, the legacy slice
+          // below applies it as a per-page limit instead.
+          const maxTotal = isPaginated && typeof collectionVariable.limit === 'number' && collectionVariable.limit > 0
+            ? collectionVariable.limit
+            : undefined;
+          if (maxTotal != null && filteredItems.length > maxTotal) {
+            filteredItems = filteredItems.slice(0, maxTotal);
+          }
+
+          // Static filters shrink the candidate pool — propagate the final
+          // ID list so the load_more API uses it as its candidate pool
+          // (otherwise it falls back to all collection items and bypasses
+          // the layer's static filters).
+          if (hasStaticFilters) {
+            allowedItemIds = filteredItems.map(item => item.id);
+          }
+
           const totalItems = filteredItems.length;
 
           // For non-field-sort, apply limit/offset in-memory (mirrors DB pagination)
@@ -2345,28 +2413,6 @@ export async function resolveCollectionLayers(
             items = filteredItems.slice(start, limit ? start + limit : undefined);
           } else {
             items = filteredItems;
-          }
-
-          // Apply static collection filters (evaluate against each item's own values)
-          const collectionFilters = collectionVariable.filters;
-          if (collectionFilters?.groups?.length) {
-            const staticFilters = {
-              ...collectionFilters,
-              groups: collectionFilters.groups.map(group => ({
-                ...group,
-                conditions: group.conditions.filter(c => !c.inputLayerId),
-              })).filter(group => group.conditions.length > 0),
-            };
-
-            if (staticFilters.groups.length > 0) {
-              items = items.filter(item =>
-                evaluateVisibility(staticFilters, {
-                  collectionLayerData: item.values,
-                  pageCollectionData: null,
-                  pageCollectionCounts: {},
-                })
-              );
-            }
           }
 
           // Apply sorting if specified (since API doesn't handle sortBy yet)
@@ -2503,6 +2549,7 @@ export async function resolveCollectionLayers(
               isPublished,
               sortBy: collectionVariable.sort_by,
               sortOrder: collectionVariable.sort_order,
+              maxTotal,
             };
           }
 
@@ -2803,7 +2850,7 @@ export async function resolveCollectionLayers(
   // Third pass: Filter layers by conditional visibility
   // We need to compute collection counts first, then filter
   // parentItemValues is the page collection data for dynamic pages
-  const filteredResult = filterByVisibility(resultWithPagination, undefined, parentItemValues, currentPageData);
+  const filteredResult = filterByVisibility(resultWithPagination, undefined, parentItemValues, currentPageData, pageCollectionItemId ?? parentCollectionItemId);
 
   return filteredResult;
 }
@@ -2892,22 +2939,26 @@ function getFilterableCollectionTarget(
  * @param layers - Layer tree to filter
  * @param collectionLayerData - Current collection layer item values for field conditions
  * @param pageCollectionData - Page collection data for dynamic pages
+ * @param pageCollectionItemId - ID of the dynamic page's collection item, when on a dynamic page
  * @returns Filtered layer tree with hidden layers removed
  */
 function filterByVisibility(
   layers: Layer[],
   collectionLayerData?: Record<string, string>,
   pageCollectionData?: Record<string, string> | null,
-  currentPageData?: { locale?: string; name?: string; folder_name?: string; title_tag?: string; meta_description?: string }
+  currentPageData?: { locale?: string; name?: string; folder_name?: string; title_tag?: string; meta_description?: string },
+  pageCollectionItemId?: string | null,
 ): Layer[] {
   const pageCollectionCounts = computeCollectionCounts(layers);
   const filterableCollectionIds = findFilterableCollectionIds(layers);
 
   function filterLayer(
     layer: Layer,
-    currentCollectionLayerData?: Record<string, string>
+    currentCollectionLayerData?: Record<string, string>,
+    currentItemId?: string,
   ): Layer | null {
     const effectiveCollectionLayerData = layer._collectionItemValues || currentCollectionLayerData;
+    const effectiveCurrentItemId = layer._collectionItemId || currentItemId;
 
     const conditionalVisibility = layer.variables?.conditionalVisibility;
     if (conditionalVisibility && conditionalVisibility.groups?.length > 0) {
@@ -2916,6 +2967,8 @@ function filterByVisibility(
         pageCollectionData,
         pageCollectionCounts,
         currentPageData,
+        currentItemId: effectiveCurrentItemId,
+        pageCollectionItemId,
       });
       const filterTarget = getFilterableCollectionTarget(conditionalVisibility, filterableCollectionIds);
       if (filterTarget) {
@@ -2940,7 +2993,7 @@ function filterByVisibility(
           attributes,
           children: layer.children
             ? layer.children
-              .map(child => filterLayer(child, effectiveCollectionLayerData))
+              .map(child => filterLayer(child, effectiveCollectionLayerData, effectiveCurrentItemId))
               .filter((child): child is Layer => child !== null)
             : undefined,
         };
@@ -2952,7 +3005,7 @@ function filterByVisibility(
 
     if (layer.children) {
       const filteredChildren = layer.children
-        .map(child => filterLayer(child, effectiveCollectionLayerData))
+        .map(child => filterLayer(child, effectiveCollectionLayerData, effectiveCurrentItemId))
         .filter((child): child is Layer => child !== null);
 
       return {
@@ -2965,7 +3018,7 @@ function filterByVisibility(
   }
 
   return layers
-    .map(layer => filterLayer(layer, collectionLayerData))
+    .map(layer => filterLayer(layer, collectionLayerData, pageCollectionItemId ?? undefined))
     .filter((layer): layer is Layer => layer !== null);
 }
 
@@ -2981,9 +3034,16 @@ function updatePaginationLayerWithMeta(layer: Layer, meta: CollectionPaginationM
   // Deep clone to avoid mutation
   const updatedLayer: Layer = JSON.parse(JSON.stringify(layer));
 
+  // No results: hide the entire pagination wrapper rather than rendering
+  // controls with empty/zero text.
+  if (totalItems <= 0) {
+    updatedLayer.classes = Array.isArray(updatedLayer.classes)
+      ? [...updatedLayer.classes, 'hidden']
+      : `${updatedLayer.classes || ''} hidden`.trim();
+  }
+
   // Helper to recursively update layers
   function updateLayerRecursive(l: Layer): void {
-    // Update page info text (for 'pages' mode)
     if (l.id?.endsWith('-pagination-info')) {
       l.variables = {
         ...l.variables,
@@ -2994,7 +3054,6 @@ function updatePaginationLayerWithMeta(layer: Layer, meta: CollectionPaginationM
       };
     }
 
-    // Update items count text (for 'load_more' mode)
     if (l.id?.endsWith('-pagination-count')) {
       const shownItems = Math.min(itemsPerPage, totalItems);
       l.variables = {
@@ -3164,24 +3223,8 @@ async function enrichSlugsFromLinkFields(
   const missingItemIds = extractCrossCollectionItemIds(items, linkFieldIds, existingSlugs);
   if (missingItemIds.length === 0) return;
 
-  const refItems = await getItemsWithValuesByIds(missingItemIds, isPublished);
-  const refCollectionIds = new Set(Object.values(refItems).map(i => i.collection_id));
-
-  const fieldsByCollection = new Map<string, CollectionField[]>();
-  await Promise.all(
-    Array.from(refCollectionIds).map(async (collId) => {
-      const fields = await getFieldsByCollectionId(collId, isPublished);
-      fieldsByCollection.set(collId, fields);
-    })
-  );
-
-  for (const refItem of Object.values(refItems)) {
-    const fields = fieldsByCollection.get(refItem.collection_id);
-    const slugField = fields?.find(f => f.key === 'slug');
-    if (slugField && refItem.values[slugField.id]) {
-      existingSlugs[refItem.id] = refItem.values[slugField.id];
-    }
-  }
+  const refSlugs = await getSlugsByItemIds(missingItemIds, isPublished);
+  Object.assign(existingSlugs, refSlugs);
 }
 
 /**
@@ -3277,6 +3320,8 @@ export async function renderCollectionItemsToHtml(
         undefined,
         item.id,
         htmlTimezone,
+        undefined,
+        pageLinkContext?.pageCollectionItemId,
       );
 
       // Resolve all AssetVariables to URLs server-side
@@ -3332,7 +3377,7 @@ export async function renderCollectionItemsToHtml(
       }
 
       // Apply conditional visibility based on this item's field values
-      resolvedLayers = filterByVisibility(resolvedLayers, item.values);
+      resolvedLayers = filterByVisibility(resolvedLayers, item.values, undefined, undefined, pageLinkContext?.pageCollectionItemId);
 
       // Preferred path: rebuild a full clone of the collection layer just
       // like SSR does (link/action/attributes preserved). Renders one HTML
@@ -4016,6 +4061,13 @@ export interface PageLinkContext {
   pageCollectionItemId?: string;
   pageCollectionSortedItemIds?: string[];
   isPreview?: boolean;
+  /**
+   * Set by the static export to opt out of the iframe-wrapped htmlEmbed
+   * SSR fallback. The live site relies on React hydration to replace the
+   * SSR iframe with an inline `HtmlEmbedRenderer`; the static export has
+   * no hydration, so an iframe with no `height` clips the user's content.
+   */
+  isStaticExport?: boolean;
 }
 
 /** Build an `assetMap`-backed `getAsset` callback compatible with `generateLinkHref`. */
@@ -4410,6 +4462,18 @@ export function layerToHtml(
   // Handle Code Embed layers - render as iframe for SSR
   if (layer.name === 'htmlEmbed') {
     const htmlEmbedCode = layer.settings?.htmlEmbed?.code || '<div>Add your custom code here</div>';
+
+    // Static export has no React hydration to replace the SSR iframe with
+    // an inline HtmlEmbedRenderer mount, and iframes default to ~150px
+    // tall with no `height` set — clipping the user's content. Emit the
+    // code inline so it renders at natural height, matching the editor.
+    // <script> tags in initial document HTML are executed by the browser,
+    // so user-pasted scripts run exactly as authored.
+    if (pageLinkContext?.isStaticExport) {
+      attrs.push('data-html-embed="true"');
+      const inlineAttrsStr = attrs.length > 0 ? ' ' + attrs.join(' ') : '';
+      return `<div${inlineAttrsStr}>${htmlEmbedCode}</div>`;
+    }
 
     // Create a complete HTML document for iframe srcdoc
     const iframeContent = `<!DOCTYPE html>
