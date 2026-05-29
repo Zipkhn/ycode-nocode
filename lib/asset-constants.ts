@@ -60,6 +60,7 @@ export const ALLOWED_MIME_TYPES: Record<AssetCategory, string[]> = {
   ],
   documents: [
     'application/json',
+    'application/zip',
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -92,10 +93,11 @@ export const MAX_UPLOAD_FILE_SIZE = 50 * 1024 * 1024;
  * Get accept attribute string for file input based on category
  */
 export function getAcceptString(category?: AssetCategory): string {
-  if (!category) {
-    return Object.values(ALLOWED_MIME_TYPES).flat().join(',');
-  }
-  return ALLOWED_MIME_TYPES[category].join(',');
+  const base = !category
+    ? Object.values(ALLOWED_MIME_TYPES).flat()
+    : ALLOWED_MIME_TYPES[category];
+  const extras = (!category || category === ASSET_CATEGORIES.DOCUMENTS) ? ['.lottie'] : [];
+  return [...base, ...extras].join(',');
 }
 
 /** Generate a unique storage path for a file upload */

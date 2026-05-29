@@ -99,15 +99,18 @@ export default function LottieSettings({ layer, onLayerUpdate }: LottieSettingsP
                 className="w-full justify-start min-w-0"
                 onClick={() => {
                   openFileManager((asset) => {
-                    if (asset.mime_type !== 'application/json') {
-                      toast.error('Invalid file', { description: 'Please select a Lottie .json file.' });
+                    const isLottie = asset.mime_type === 'application/json'
+                      || asset.mime_type === 'application/zip'
+                      || /\.lottie$/i.test(asset.filename);
+                    if (!isLottie) {
+                      toast.error('Invalid file', { description: 'Please select a Lottie .json or .lottie file.' });
                       return false;
                     }
                     setSrc(createAssetVariable(asset.id));
                   }, currentAssetId, ASSET_CATEGORIES.DOCUMENTS);
                 }}
               >
-                <span className="truncate">{currentAsset?.filename || 'Choose .json file'}</span>
+                <span className="truncate">{currentAsset?.filename || 'Choose .json or .lottie file'}</span>
                 {currentAsset && (
                   <span
                     role="button"
@@ -130,7 +133,7 @@ export default function LottieSettings({ layer, onLayerUpdate }: LottieSettingsP
               <Input
                 value={customUrl}
                 onChange={(e) => setSrc(createDynamicTextVariable(e.target.value))}
-                placeholder="https://example.com/anim.json"
+                placeholder="https://example.com/anim.json or .lottie"
               />
             </div>
           </div>

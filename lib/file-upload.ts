@@ -11,6 +11,40 @@ import sharp from 'sharp';
 import type { Asset } from '@/types';
 
 /**
+ * Convert a .lottie (ZIP) file to a self-contained .json Lottie animation.
+ * Extracts the first animation, inlines image assets as data URIs.
+ * Returns null on failure (caller falls back to raw upload).
+ */
+async function convertDotLottieToJson(file: File): Promise<File | null> {
+  try {
+    const { unzipSync, strFromU8 } = await import('fflate');
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const entries = unzipSync(buf);
+
+    const manifestRaw = entries['manifest.json'];
+    if (!manifestRaw) return null;
+    const manifest = JSON.parse(strFromU8(manifestRaw));
+    const animId = manifest?.animations?.[0]?.id;
+    if (!animId) return null;
+
+    // Skip conversion if the bundle embeds images — base64-inlining would bloat
+    // the file far beyond the original .lottie. Keep canvas rendering instead.
+    if (Object.keys(entries).some((k) => /^images\//i.test(k))) return null;
+
+    const animRaw = entries[`animations/${animId}.json`];
+    if (!animRaw) return null;
+    const anim = JSON.parse(strFromU8(animRaw));
+
+    const json = JSON.stringify(anim);
+    const newName = file.name.replace(/\.lottie$/i, '.json');
+    return new File([json], newName, { type: 'application/json' });
+  } catch (err) {
+    console.error('[lottie] dotLottie→JSON conversion failed:', err);
+    return null;
+  }
+}
+
+/**
  * Validate SVG content
  * @param content - SVG content to validate
  * @returns true if valid, false otherwise
@@ -178,6 +212,12 @@ export async function uploadFile(
   assetFolderId?: string | null
 ): Promise<Asset | null> {
   try {
+    // Convert .lottie (zip) → .json so it renders via SVG (lottie-web) instead of canvas
+    if (/\.lottie$/i.test(file.name)) {
+      const converted = await convertDotLottieToJson(file);
+      if (converted) file = converted;
+    }
+
     const filename = getDisplayName(file.name, customName);
 
     // Handle SVG files - store content directly without uploading to storage
@@ -250,6 +290,10 @@ export async function uploadFile(
       fileToUpload = file;
       fileExtension = file.name.split('.').pop() || '';
       mimeType = file.type;
+      // .lottie files have no registered browser MIME — normalize to zip
+      if (/\.lottie$/i.test(file.name) && (!mimeType || mimeType === 'application/octet-stream')) {
+        mimeType = 'application/zip';
+      }
       fileSize = file.size;
       // Get dimensions for non-converted images
       dimensions = await getImageDimensions(file);
