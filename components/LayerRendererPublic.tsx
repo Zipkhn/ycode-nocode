@@ -22,7 +22,7 @@ import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/slider-constants';
 import { getDynamicTextContent, getImageUrlFromVariable, getVideoUrlFromVariable, getIframeUrlFromVariable, isFieldVariable, isAssetVariable, isStaticTextVariable, isDynamicTextVariable, getStaticTextContent, getAssetId, resolveDesignStyles } from '@/lib/variable-utils';
 import { getTranslatedAssetId, getTranslatedText } from '@/lib/locale-runtime';
 import { isValidLinkSettings, generateLinkHref, resolveLinkAttrs, isLinkAtCollectionBoundary, type LinkResolutionContext } from '@/lib/link-utils';
-import { DEFAULT_ASSETS, buildImageSizes, generateImageSrcset, getOptimizedImageUrl, parseImageDimension } from '@/lib/asset-utils';
+import { DEFAULT_ASSETS, buildImageSizes, generateImageSrcset, getOptimizedImageUrl, getSvgAspectRatioStyle, parseImageDimension } from '@/lib/asset-utils';
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
 import { renderRichText, hasBlockElementsWithInlineVariables, getTextStyleClasses, flattenTiptapParagraphs, type RichTextLinkContext, type RenderComponentBlockFn } from '@/lib/text-format-utils';
 import { combineBgValues, mergeStaticBgVars } from '@/lib/tailwind-class-mapper';
@@ -1339,10 +1339,17 @@ const LayerItem: React.FC<{
         iconHtml = DEFAULT_ASSETS.ICON;
       }
 
+      // Derive aspect-ratio from the SVG viewBox so an icon with only one of
+      // width/height set resolves the missing axis to its true proportions
+      // instead of collapsing. Inert when both dimensions are explicitly set.
+      const iconAspectRatio = getSvgAspectRatioStyle(iconHtml);
+      const iconElementStyle = (typeof elementProps.style === 'object' && elementProps.style) || undefined;
+
       return (
         <Tag
           {...elementProps}
           data-icon="true"
+          style={iconAspectRatio ? { aspectRatio: iconAspectRatio, ...iconElementStyle } : iconElementStyle}
           dangerouslySetInnerHTML={{ __html: iconHtml }}
         />
       );

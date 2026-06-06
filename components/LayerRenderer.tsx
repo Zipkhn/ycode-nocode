@@ -22,7 +22,7 @@ import { DEFAULT_ASSETS, ASSET_CATEGORIES, isAssetOfType } from '@/lib/asset-uti
 import { parseMultiAssetFieldValue, buildAssetVirtualValues } from '@/lib/multi-asset-utils';
 import { parseMultiReferenceValue, resolveReferenceFieldsSync } from '@/lib/collection-utils';
 import { MULTI_ASSET_COLLECTION_ID } from '@/lib/collection-field-utils';
-import { buildImageSizes, generateImageSrcset, getOptimizedImageUrl, parseImageDimension } from '@/lib/asset-utils';
+import { buildImageSizes, generateImageSrcset, getOptimizedImageUrl, getSvgAspectRatioStyle, parseImageDimension } from '@/lib/asset-utils';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { toast } from 'sonner';
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
@@ -2682,10 +2682,17 @@ const LayerItemImpl: React.FC<{
         iconHtml = DEFAULT_ASSETS.ICON;
       }
 
+      // Derive aspect-ratio from the SVG viewBox so an icon with only one of
+      // width/height set resolves the missing axis to its true proportions
+      // instead of collapsing. Inert when both dimensions are explicitly set.
+      const iconAspectRatio = getSvgAspectRatioStyle(iconHtml);
+      const iconElementStyle = (typeof elementProps.style === 'object' && elementProps.style) || undefined;
+
       return (
         <Tag
           {...elementProps}
           data-icon="true"
+          style={iconAspectRatio ? { aspectRatio: iconAspectRatio, ...iconElementStyle } : iconElementStyle}
           dangerouslySetInnerHTML={{ __html: iconHtml }}
         />
       );

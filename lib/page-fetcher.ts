@@ -10,7 +10,7 @@ import { enrichItemsWithCountValues } from '@/lib/repositories/collectionCountRe
 import type { Page, PageFolder, PageLayers, Component, ComponentVariable, CollectionItemWithValues, CollectionField, Layer, CollectionPaginationMeta, Translation, Locale } from '@/types';
 import { getCollectionVariable, resolveFieldValue, evaluateVisibility, evaluateCondition, getLayerHtmlTag, filterDisabledSliderLayers } from '@/lib/layer-utils';
 import { isFieldVariable, isAssetVariable, createDynamicTextVariable, createDynamicRichTextVariable, createAssetVariable, getDynamicTextContent, getVariableStringValue, getAssetId, resolveDesignStyles } from '@/lib/variable-utils';
-import { buildImageSizes, generateImageSrcset, getOptimizedImageUrl, getAssetProxyUrl, DEFAULT_ASSETS, collectLayerAssetIds, buildSvgDataUrl, parseImageDimension } from '@/lib/asset-utils';
+import { buildImageSizes, generateImageSrcset, getOptimizedImageUrl, getAssetProxyUrl, DEFAULT_ASSETS, collectLayerAssetIds, buildSvgDataUrl, parseImageDimension, getSvgAspectRatioStyle } from '@/lib/asset-utils';
 import { resolveComponents, applyComponentOverrides } from '@/lib/resolve-components';
 import { getComponentVariantLayers } from '@/lib/component-variant-utils';
 import { isTiptapDoc, hasBlockElementsWithResolver } from '@/lib/tiptap-utils';
@@ -4319,6 +4319,19 @@ export function layerToHtml(
   if (cmsGradient) {
     const existingImg = inlineStyles['--bg-img']?.split(', ').find(v => v.startsWith('url(')) || bgImageVars?.['--bg-img'];
     inlineStyles['--bg-img'] = combineBgValues(existingImg, cmsGradient);
+  }
+
+  // Icons render their SVG at 100% of the container, so an icon with only one
+  // of width/height set collapses on the other (auto) axis. Derive an
+  // aspect-ratio from the icon's viewBox so the missing axis resolves to the
+  // icon's true proportions. It stays inert when both dimensions are set.
+  if (layer.name === 'icon' && !inlineStyles['aspect-ratio'] && !inlineStyles['aspectRatio']) {
+    const iconSrcForAspect = layer.variables?.icon?.src;
+    const iconContentForAspect = iconSrcForAspect ? (getVariableStringValue(iconSrcForAspect) || '') : '';
+    const iconAspectRatio = getSvgAspectRatioStyle(iconContentForAspect || DEFAULT_ASSETS.ICON);
+    if (iconAspectRatio) {
+      inlineStyles['aspect-ratio'] = iconAspectRatio;
+    }
   }
 
   if (Object.keys(inlineStyles).length > 0) {
