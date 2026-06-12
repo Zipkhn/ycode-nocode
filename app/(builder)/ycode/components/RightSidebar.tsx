@@ -77,6 +77,7 @@ import { useEditorStore } from '@/stores/useEditorStore';
 import { useComponentsStore } from '@/stores/useComponentsStore';
 import { usePagesStore } from '@/stores/usePagesStore';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
+import { useGlobalsStore } from '@/stores/useGlobalsStore';
 import { useLayerStylesStore } from '@/stores/useLayerStylesStore';
 import { useCanvasTextEditorStore } from '@/stores/useCanvasTextEditorStore';
 import { useEditorActions, useEditorUrl } from '@/hooks/use-editor-url';
@@ -258,6 +259,7 @@ const RightSidebar = React.memo(function RightSidebar({
   const collections = useCollectionsStore((state) => state.collections);
   const fields = useCollectionsStore((state) => state.fields);
   const loadFields = useCollectionsStore((state) => state.loadFields);
+  const globals = useGlobalsStore((state) => state.globals);
 
   // Resolve the active variant id while editing a component, falling back to
   // the first variant if state references a stale id.
@@ -1692,8 +1694,8 @@ const RightSidebar = React.memo(function RightSidebar({
   const fieldGroups = useMemo(() => {
     if (!selectedLayerId || !allLayers.length) return undefined;
     const page = editingComponentId ? null : currentPage;
-    return buildFieldGroupsForLayer(selectedLayerId, allLayers, page, fields, collections);
-  }, [selectedLayerId, allLayers, currentPage, fields, collections, editingComponentId]);
+    return buildFieldGroupsForLayer(selectedLayerId, allLayers, page, fields, collections, globals);
+  }, [selectedLayerId, allLayers, currentPage, fields, collections, globals, editingComponentId]);
 
   // Get collection fields for the currently selected collection layer (for Sort By dropdown)
   const selectedCollectionFields = useMemo(() => {

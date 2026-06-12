@@ -17,12 +17,14 @@ import { getAllPages } from '@/lib/repositories/pageRepository';
 import { getAllPageFolders } from '@/lib/repositories/pageFolderRepository';
 import { getMapboxAccessToken, getGoogleMapsEmbedApiKey } from '@/lib/map-server';
 import { getAllColorVariables } from '@/lib/repositories/colorVariableRepository';
+import { getAllGlobalVariables } from '@/lib/repositories/globalVariableRepository';
 import { getSettingByKey } from '@/lib/repositories/settingsRepository';
 import { getItemsWithValues, getItemsWithValuesByIds } from '@/lib/repositories/collectionItemRepository';
 import { getValuesByItemIds } from '@/lib/repositories/collectionItemValueRepository';
 import { getFieldsByCollectionId } from '@/lib/repositories/collectionFieldRepository';
 import { REF_PAGE_PREFIX, REF_COLLECTION_PREFIX, isCollectionItemKeyword, parseCollectionLinkValue } from '@/lib/link-utils';
 import { getClassesString, hasPasswordFormLayer } from '@/lib/layer-utils';
+import { buildGlobalsMetaMap, buildGlobalsValueMap } from '@/lib/collection-field-utils';
 import { buildLocalizedPageUrls, type LocalizedDynamicSlug } from '@/lib/page-utils';
 import { getTranslatableKey } from '@/lib/locale-runtime';
 import { getTranslationsByLocale } from '@/lib/repositories/translationRepository';
@@ -533,12 +535,18 @@ export default async function PageRenderer({
   }
 
   // Fetch server-side settings needed by LayerRenderer (map tokens, color variables, timezone)
-  const [mapboxToken, googleMapsEmbedKey, serverColorVariables, timezoneSetting] = await Promise.all([
+  // Globals follow the page's draft/published mode so previews see draft values.
+  const [mapboxToken, googleMapsEmbedKey, serverColorVariables, timezoneSetting, globalVariables] = await Promise.all([
     getMapboxAccessToken(),
     getGoogleMapsEmbedApiKey(),
     getAllColorVariables(),
     getSettingByKey('timezone').catch(() => null),
+    getAllGlobalVariables(usePublishedData).catch(() => []),
   ]);
+  // Flat id -> value map merged into resolution at render time.
+  const globalsData = buildGlobalsValueMap(globalVariables);
+  // Flat id -> metadata map used to resolve global type/name at render time.
+  const globalsMeta = buildGlobalsMetaMap(globalVariables);
   const serverSettings: Record<string, unknown> = {};
   if (mapboxToken) {
     serverSettings.mapbox_access_token = mapboxToken;
@@ -569,6 +577,14 @@ export default async function PageRenderer({
           }
         }
       }
+    }
+  }
+
+  // Image-typed globals store an asset id as their value — pre-resolve those
+  // assets so global-bound images render on published pages (no client store).
+  for (const global of globalVariables) {
+    if (global.type === 'image' && global.value) {
+      layerAssetIds.add(global.value);
     }
   }
 
@@ -795,6 +811,8 @@ export default async function PageRenderer({
           resolvedAssets={resolvedAssets}
           components={components}
           serverSettings={serverSettings}
+          globalsData={Object.keys(globalsData).length > 0 ? globalsData : undefined}
+          globalsMeta={Object.keys(globalsMeta).length > 0 ? globalsMeta : undefined}
           lcpCandidateLayerId={lcpCandidateLayerId}
           passwordProtection={is401Page ? passwordProtection : undefined}
         />

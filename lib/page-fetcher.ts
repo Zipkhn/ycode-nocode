@@ -34,13 +34,15 @@ import { formatFieldValue, resolveFieldFromSources } from '@/lib/cms-variables-u
 import { buildLayerTranslationKey, getTranslationByKey, hasValidTranslationValue, getTranslationValue, injectTranslatedText, applyCmsTranslations, translateComponentOverrides } from '@/lib/localisation-utils';
 import { formatDateFieldsInItemValues } from '@/lib/date-format-utils';
 import { getSettingByKey } from '@/lib/repositories/settingsRepository';
+import { getAllGlobalVariables } from '@/lib/repositories/globalVariableRepository';
 import { parseMultiAssetFieldValue, buildAssetVirtualValues } from '@/lib/multi-asset-utils';
 import { combineBgValues, mergeStaticBgVars } from '@/lib/tailwind-class-mapper';
 import { generateInitialAnimationCSS } from '@/lib/animation-utils';
 import { getMapIframeProps, DEFAULT_MAP_SETTINGS } from '@/lib/map-utils';
 import { getMapboxAccessToken, getGoogleMapsEmbedApiKey } from '@/lib/map-server';
 import { getAssetsByIds } from '@/lib/repositories/assetRepository';
-import { isVirtualAssetField, findDisplayField, hasDynamicDateRule, isDynamicDateCondition } from '@/lib/collection-field-utils';
+import { isVirtualAssetField, findDisplayField, hasDynamicDateRule, isDynamicDateCondition, buildGlobalsMetaMap, buildGlobalsValueMap, mergeGlobalsIntoFieldData, type GlobalFieldMeta } from '@/lib/collection-field-utils';
+import { getDefaultFormatId, isFormatValidForFieldType } from '@/lib/variable-format-utils';
 import type { DynamicVisibilityCondition, FieldVariable, AssetVariable, DynamicTextVariable, LinkSettings } from '@/types';
 import type { DesignColorVariable } from '@/types';
 
@@ -591,9 +593,13 @@ async function fetchPageByPathInternal(
 
             // Inject dynamic page collection data into layers (including expanded component layers)
             // This resolves inline variables like "Name → Location" on the page
+            const [dynamicPageGlobals, dynamicPageGlobalsMeta] = await Promise.all([
+              buildGlobalsDataMap(isPublished),
+              buildGlobalsMetaDataMap(isPublished),
+            ]);
             const layersWithInjectedData = await Promise.all(
               layersWithComponents.map((layer: Layer) =>
-                injectCollectionData(layer, enhancedItemValues, collectionFields, isPublished, undefined, rawItemValues, timezone)
+                injectCollectionData(layer, enhancedItemValues, collectionFields, isPublished, undefined, rawItemValues, timezone, dynamicPageGlobals, dynamicPageGlobalsMeta)
               )
             );
 
@@ -1155,6 +1161,29 @@ async function batchResolveReferenceFields(
  * @param rawItemValues - Unformatted values (ISO dates) for applying custom format presets
  * @returns Layer with resolved field values
  */
+/**
+ * Build a flat `globalId -> value` map of site-wide global variables for the
+ * given publish mode. Used to merge globals into collection/page item values so
+ * global-source bindings resolve at build time (published/preview SSR).
+ */
+async function buildGlobalsDataMap(isPublished: boolean): Promise<Record<string, string>> {
+  try {
+    return buildGlobalsValueMap(await getAllGlobalVariables(isPublished));
+  } catch (error) {
+    console.error('[page-fetcher] Failed to load global variables:', error);
+    return {};
+  }
+}
+
+async function buildGlobalsMetaDataMap(isPublished: boolean): Promise<Record<string, GlobalFieldMeta>> {
+  try {
+    return buildGlobalsMetaMap(await getAllGlobalVariables(isPublished));
+  } catch (error) {
+    console.error('[page-fetcher] Failed to load global variable metadata:', error);
+    return {};
+  }
+}
+
 async function injectCollectionData(
   layer: Layer,
   itemValues: Record<string, string>,
@@ -1162,13 +1191,19 @@ async function injectCollectionData(
   isPublished: boolean = true,
   layerDataMap?: Record<string, Record<string, string>>,
   rawItemValues?: Record<string, string>,
-  timezone: string = 'UTC'
+  timezone: string = 'UTC',
+  globalsData?: Record<string, string>,
+  globalsMeta?: Record<string, GlobalFieldMeta>
 ): Promise<Layer> {
   // Callers (resolveCollectionLayers, fetchPageByPath) already run
   // resolveReferenceFields before passing values here. Re-resolving on
   // every recursive child would fire O(N × D × R) redundant Supabase
   // queries that overwhelm the connection and hang the request.
-  const enhancedValues = itemValues;
+  // Merge site-wide globals so global-source bindings inside collection
+  // loops/dynamic pages resolve at build time (item values win on collision,
+  // though global ids are unique UUIDs so collisions never happen). itemValues
+  // is always defined here, so the merged result is never undefined.
+  const enhancedValues = mergeGlobalsIntoFieldData(itemValues, globalsData)!;
 
   const updates: Partial<Layer> = {};
   // Start with all original variables; each section overwrites only its own key
@@ -1191,7 +1226,7 @@ async function injectCollectionData(
         };
       }
 
-      const resolvedContent = resolveRichTextVariables(content, enhancedValues, layerDataMap, rawItemValues, timezone);
+      const resolvedContent = resolveRichTextVariables(content, enhancedValues, layerDataMap, rawItemValues, timezone, globalsMeta);
       resolvedVars.text = {
         type: 'dynamic_rich_text',
         data: { content: resolvedContent },
@@ -1329,7 +1364,7 @@ async function injectCollectionData(
         if (child.variables?.collection?.id) {
           return Promise.resolve(child);
         }
-        return injectCollectionData(child, enhancedValues, fields, isPublished, layerDataMap, rawItemValues, timezone);
+        return injectCollectionData(child, enhancedValues, fields, isPublished, layerDataMap, rawItemValues, timezone, globalsData, globalsMeta);
       })
     );
     updates.children = resolvedChildren;
@@ -1445,7 +1480,8 @@ function resolveRichTextVariables(
   itemValues: Record<string, string>,
   layerDataMap?: Record<string, Record<string, string>>,
   rawItemValues?: Record<string, string>,
-  timezone: string = 'UTC'
+  timezone: string = 'UTC',
+  globalsMeta?: Record<string, GlobalFieldMeta>
 ): any {
   if (!content || typeof content !== 'object') {
     return content;
@@ -1456,7 +1492,8 @@ function resolveRichTextVariables(
     const variable = content.attrs?.variable;
     if (variable?.type === 'field' && variable.data?.field_id) {
       const fieldId = variable.data.field_id;
-      const fieldType = variable.data.field_type;
+      const globalMeta = variable.data.source === 'global' ? globalsMeta?.[fieldId] : undefined;
+      const fieldType = globalMeta?.type ?? variable.data.field_type;
       const relationships = variable.data.relationships || [];
       const collectionLayerId = variable.data.collection_layer_id;
 
@@ -1473,10 +1510,22 @@ function resolveRichTextVariables(
         value = itemValues[fullPath];
       }
 
+      // Collection rich_text values are pre-parsed into Tiptap objects by
+      // castValue, but globals store their value as a raw JSON string. Parse
+      // string-encoded rich_text here so global rich_text variables expand into
+      // block structure instead of rendering as literal JSON.
+      if (fieldType === 'rich_text' && typeof value === 'string') {
+        try {
+          value = JSON.parse(value);
+        } catch {
+          // Leave as-is; falls through to plain-text rendering below.
+        }
+      }
+
       // Handle rich_text fields - preserve block structure for proper rendering
       if (fieldType === 'rich_text' && isTiptapDoc(value)) {
         const resolvedBlocks = value.content.map((block: any) =>
-          resolveRichTextVariables(block, itemValues, layerDataMap, rawItemValues, timezone)
+          resolveRichTextVariables(block, itemValues, layerDataMap, rawItemValues, timezone, globalsMeta)
         );
         return resolvedBlocks.flat();
       }
@@ -1490,16 +1539,21 @@ function resolveRichTextVariables(
         };
       }
 
-      // Apply custom format using raw (unformatted) values when available
-      // Date values in itemValues are pre-formatted by formatDateFieldsInItemValues,
-      // so custom format presets need the original ISO string from rawItemValues
-      const format = variable.data.format;
+      // Apply custom format using raw (unformatted) values when available.
+      // Collection date values in itemValues are pre-formatted by
+      // formatDateFieldsInItemValues, so custom presets need the original ISO
+      // string from rawItemValues. Globals aren't present in rawItemValues but
+      // store their raw value directly, so fall back to the resolved value.
+      const storedFormat = variable.data.format;
+      const format = globalMeta && !isFormatValidForFieldType(storedFormat, fieldType)
+        ? getDefaultFormatId(fieldType)
+        : storedFormat;
       let textValue: string;
-      if (format && rawItemValues) {
-        const rawValue = rawItemValues[fullPath];
+      if (format) {
+        const rawValue = rawItemValues?.[fullPath] ?? value;
         textValue = rawValue != null
           ? formatFieldValue(rawValue, fieldType, timezone, format)
-          : (value != null ? String(value) : '');
+          : '';
       } else {
         textValue = value != null ? String(value) : '';
       }
@@ -1517,7 +1571,7 @@ function resolveRichTextVariables(
   if (Array.isArray(content)) {
     // Flatten arrays that may contain nested arrays from rich_text expansion
     return content.flatMap(node => {
-      const resolved = resolveRichTextVariables(node, itemValues, layerDataMap, rawItemValues, timezone);
+      const resolved = resolveRichTextVariables(node, itemValues, layerDataMap, rawItemValues, timezone, globalsMeta);
       return Array.isArray(resolved) ? resolved : [resolved];
     });
   }
@@ -1528,11 +1582,11 @@ function resolveRichTextVariables(
     if (key === 'content' && Array.isArray(content[key])) {
       // Flatten the content array in case of expanded rich_text nodes
       result[key] = content[key].flatMap((node: any) => {
-        const resolved = resolveRichTextVariables(node, itemValues, layerDataMap, rawItemValues, timezone);
+        const resolved = resolveRichTextVariables(node, itemValues, layerDataMap, rawItemValues, timezone, globalsMeta);
         return Array.isArray(resolved) ? resolved : [resolved];
       });
     } else if (typeof content[key] === 'object' && content[key] !== null) {
-      result[key] = resolveRichTextVariables(content[key], itemValues, layerDataMap, rawItemValues, timezone);
+      result[key] = resolveRichTextVariables(content[key], itemValues, layerDataMap, rawItemValues, timezone, globalsMeta);
     } else {
       result[key] = content[key];
     }
@@ -2174,6 +2228,13 @@ export async function resolveCollectionLayers(
     timezone = (await getSettingByKey('timezone') as string | null) || 'UTC';
   }
 
+  // Fetch site-wide globals once for the whole tree so global-source bindings
+  // inside collection loops resolve at build time. Keyed by id (== field_id).
+  const [globalsData, globalsMeta] = await Promise.all([
+    buildGlobalsDataMap(isPublished),
+    buildGlobalsMetaDataMap(isPublished),
+  ]);
+
   // Scan all collection layers to determine which field IDs are actually used in templates
   const allCollectionIds = collectAllCollectionIds(layers);
   const mergedBoundFieldIds = new Set<string>();
@@ -2272,7 +2333,7 @@ export async function resolveCollectionLayers(
                 // Inject virtual field data into the resolved children
                 const injectedChildren = await Promise.all(
                   resolvedChildren.map(child =>
-                    injectCollectionData(child, virtualValues, undefined, isPublished, updatedLayerDataMap, undefined, timezone)
+                    injectCollectionData(child, virtualValues, undefined, isPublished, updatedLayerDataMap, undefined, timezone, globalsData, globalsMeta)
                   )
                 );
 
@@ -2294,7 +2355,9 @@ export async function resolveCollectionLayers(
                   isPublished,
                   updatedLayerDataMap,
                   undefined,
-                  timezone
+                  timezone,
+                  globalsData,
+                  globalsMeta
                 );
 
                 // Build the cloned layer with original IDs first
@@ -2525,7 +2588,7 @@ export async function resolveCollectionLayers(
               // Then inject field data into the resolved children
               const injectedChildren = await Promise.all(
                 resolvedChildren.map(child =>
-                  injectCollectionData(child, enhancedValues, collectionFields, isPublished, updatedLayerDataMap, rawEnhancedValues, timezone)
+                  injectCollectionData(child, enhancedValues, collectionFields, isPublished, updatedLayerDataMap, rawEnhancedValues, timezone, globalsData, globalsMeta)
                 )
               );
 
@@ -3360,6 +3423,10 @@ export async function renderCollectionItemsToHtml(
     ensureMapTokens(),
   ]);
   const htmlTimezone = (timezoneRaw as string | null) || 'UTC';
+  const [globalsData, globalsMeta] = await Promise.all([
+    buildGlobalsDataMap(isPublished),
+    buildGlobalsMetaDataMap(isPublished),
+  ]);
 
   // Enrich slugs with cross-collection link field references
   const enrichedSlugs = { ...collectionItemSlugs };
@@ -3403,7 +3470,7 @@ export async function renderCollectionItemsToHtml(
       // Inject collection data into each layer of the template (text, images, etc.)
       const injectedLayers = await Promise.all(
         clonedTemplate.map((layer: Layer) =>
-          injectCollectionDataForHtml(layer, enhancedValues, collectionFields, isPublished, rawValues, htmlTimezone)
+          injectCollectionDataForHtml(layer, enhancedValues, collectionFields, isPublished, rawValues, htmlTimezone, globalsData, globalsMeta)
         )
       );
 
@@ -3535,7 +3602,9 @@ async function injectCollectionDataForHtml(
   fields: CollectionField[],
   isPublished: boolean,
   rawItemValues?: Record<string, string>,
-  timezone: string = 'UTC'
+  timezone: string = 'UTC',
+  globalsData?: Record<string, string>,
+  globalsMeta?: Record<string, GlobalFieldMeta>
 ): Promise<Layer> {
   // Nested collection layers are resolved separately by resolveCollectionLayers,
   // which clones them per referenced item and injects each item's own values.
@@ -3548,7 +3617,7 @@ async function injectCollectionDataForHtml(
   // Reference fields are resolved once per item by the caller
   // (renderCollectionItemsToHtml). Re-resolving on every recursive
   // child would cause redundant Supabase queries.
-  const enhancedValues = itemValues;
+  const enhancedValues = mergeGlobalsIntoFieldData(itemValues, globalsData)!;
 
   const updates: Partial<Layer> = {};
   const resolvedVars: Record<string, unknown> = { ...layer.variables };
@@ -3570,7 +3639,7 @@ async function injectCollectionDataForHtml(
         };
       }
 
-      const resolvedContent = resolveRichTextVariables(content, enhancedValues, undefined, rawItemValues, timezone);
+      const resolvedContent = resolveRichTextVariables(content, enhancedValues, undefined, rawItemValues, timezone, globalsMeta);
       resolvedVars.text = {
         type: 'dynamic_rich_text',
         data: { content: resolvedContent },
@@ -3668,7 +3737,7 @@ async function injectCollectionDataForHtml(
   if (layer.children) {
     const resolvedChildren = await Promise.all(
       layer.children.map(child =>
-        injectCollectionDataForHtml(child, enhancedValues, fields, isPublished, rawItemValues, timezone)
+        injectCollectionDataForHtml(child, enhancedValues, fields, isPublished, rawItemValues, timezone, globalsData, globalsMeta)
       )
     );
     updates.children = resolvedChildren;
