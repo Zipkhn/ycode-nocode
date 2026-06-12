@@ -123,6 +123,7 @@ export interface EffectsDesign {
   backdropBlur?: string;
   filter?: string;
   backdropFilter?: string;
+  mixBlendMode?: string;
 }
 
 export interface PositioningDesign {
@@ -292,6 +293,8 @@ export interface LayerStyle {
   id: string;
   name: string;
   group?: string; // Element category (e.g. "text", "block", "button") for scoped filtering
+  /** Role within a combo-class stack. Used for UI affordances (base vs combo vs synced global). */
+  kind?: 'base' | 'combo' | 'global';
 
   // Style data
   classes: string;
@@ -405,11 +408,38 @@ export interface Layer {
   settings?: LayerSettings;
 
   // Layer Styles (reusable design system)
-  styleId?: string; // Reference to applied LayerStyle
+  /**
+   * @deprecated Use `styleIds`. A single applied LayerStyle. Still read for
+   * backward compatibility via `getStyleIds()` and migrated to `styleIds` on
+   * the next write.
+   */
+  styleId?: string;
+  /**
+   * Ordered stack of applied LayerStyles, low to high priority (base class
+   * first, combo classes after). Mirrors Webflow's combo-class chain. The flat
+   * `classes` string is derived from this stack (plus `styleOverrides`) via
+   * `resolveLayerClasses`.
+   */
+  styleIds?: string[];
   styleOverrides?: {
     classes?: string;
     design?: DesignProperties;
-  }; // Tracks local changes after style applied
+    /**
+     * @deprecated Per-chip overrides now live in `styleOverridesByStyle`. This
+     * single highest-priority blob is kept for backward compatibility (legacy
+     * layers/imports) and is still applied last by `resolveLayerClasses`.
+     */
+    styleId?: string;
+  }; // Legacy: local changes after style applied (highest priority)
+  /**
+   * Per-style local overrides, keyed by the `LayerStyle` id in the stack. Each
+   * entry REPLACES that style's classes for THIS layer only (the rest of the
+   * stack still cascades around it). This is what makes customization unique to
+   * the selected chip: editing while "Heading 3" is active writes
+   * `styleOverridesByStyle["heading-3-id"]`, shows "Customized" on that chip
+   * only, and "Update" folds just that entry back into the shared style.
+   */
+  styleOverridesByStyle?: Record<string, { classes?: string; design?: DesignProperties }>;
 
   // Components (reusable layer trees)
   componentId?: string; // Reference to applied Component
@@ -457,6 +487,17 @@ export interface Layer {
   _paginationMeta?: CollectionPaginationMeta;
   // SSR-only property for dynamic inline styles from CMS color field bindings
   _dynamicStyles?: Record<string, string>;
+  // SSR-only property: when a conditionalVisibility rule references a date
+  // preset (e.g. `$today`), the layer is kept in the tree even if the
+  // export-time eval is false, and this metadata is attached so layerToHtml
+  // can serialize it for the static-export client-side runtime to re-eval.
+  // Non-date conditions are baked to a boolean at export time; only
+  // date-preset conditions are re-evaluated client-side against the current date.
+  _dynamicVisibilityRule?: {
+    /** Project timezone (IANA) for resolving date presets on the client. */
+    timezone?: string;
+    groups: Array<{ conditions: DynamicVisibilityCondition[] }>;
+  };
   // SSR-only property for filterable collection config (when collection has linked filter inputs)
   _filterConfig?: {
     collectionId: string;
@@ -689,6 +730,9 @@ export interface Page {
   settings: PageSettings; // Page settings (CMS, auth, seo, custom code)
   content_hash?: string; // SHA-256 hash of page metadata for change detection
   is_published: boolean;
+  is_publishable: boolean; // Whether the page goes live on publish (false = draft)
+  has_published_version?: boolean; // Computed (builder listing only): a live row exists
+  is_modified?: boolean; // Computed (builder listing only): draft differs from live
   created_at: string;
   updated_at: string;
   deleted_at: string | null; // Soft delete timestamp
@@ -1458,6 +1502,16 @@ export interface VisibilityCondition {
   // For self source: when true, the current dynamic page item ID is injected
   // into the comparison set alongside any statically picked IDs in `value`.
   includesCurrentPageItem?: boolean;
+  // How the compare value is sourced. Defaults to 'static' (uses `value`).
+  // 'current_page' binds the compare value to the current dynamic page item:
+  //   - reference/multi_reference fields compare against the page item's own ID
+  //     (the "Current Category/Tag" pattern)
+  //   - scalar fields compare against the value of `currentPageFieldId` on the
+  //     current page item
+  valueMode?: 'static' | 'current_page';
+  // For scalar fields with valueMode 'current_page': the field on the current
+  // dynamic page item whose value is used as the compare value.
+  currentPageFieldId?: string;
   // For linking filter value to an input layer inside a Filter
   inputLayerId?: string;
   inputLayerId2?: string; // For second bound (e.g. 'is_between')
@@ -1465,6 +1519,13 @@ export interface VisibilityCondition {
   runtimeVarPath?: string; // dot-notation path e.g. "forms.contact.email"
   // For current_page source
   pageField?: 'locale' | 'name' | 'folder_name' | 'title_tag' | 'meta_description';
+  // Date fields only: marks the value as sourced from a filter form input
+  // (vs. a preset or custom date). Persisted so the UI stays in input mode
+  // even before an input is linked. Absent on conditions created before this
+  // existed — those fall back to linked-state/custom inference.
+  dateInput?: boolean;
+  // Same as `dateInput`, but for the second bound (`is_between`).
+  dateInput2?: boolean;
 }
 
 export interface VisibilityConditionGroup {
@@ -1477,6 +1538,15 @@ export interface ConditionalVisibility {
   defaultVisibility?: 'visible' | 'hidden'; // base state when no condition matches
   groups: VisibilityConditionGroup[];
 }
+
+/**
+ * A single condition in a serialized dynamic-date visibility rule (static export).
+ * Date-preset conditions are re-evaluated against the current date on the client;
+ * all other conditions carry their export-time result, baked in.
+ */
+export type DynamicVisibilityCondition =
+  | { dynamic: true; operator: VisibilityOperator; value: string; fieldValue: string; dateOnly?: boolean }
+  | { dynamic: false; result: boolean };
 
 // Localisation Types
 

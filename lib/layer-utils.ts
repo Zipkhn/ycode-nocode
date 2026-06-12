@@ -1959,6 +1959,8 @@ export interface VisibilityContext {
   currentItemId?: string;
   /** ID of the dynamic page's collection item, when on a dynamic page. */
   pageCollectionItemId?: string | null;
+  /** Project timezone (IANA) used for day-aware date condition comparisons. */
+  timezone?: string;
 }
 
 /**
@@ -1967,11 +1969,12 @@ export interface VisibilityContext {
  * @param context - The context containing field values and collection counts
  * @returns True if condition is met, false otherwise
  */
-function evaluateCondition(
+export function evaluateCondition(
   condition: import('@/types').VisibilityCondition,
   context: VisibilityContext
 ): boolean {
   const { collectionLayerData, pageCollectionData, pageCollectionCounts, currentItemId, pageCollectionItemId } = context;
+  const timezone = context.timezone || 'UTC';
 
   // Self conditions: compare the item being evaluated against a set of item
   // IDs (statically picked and/or the current dynamic page item). Used for
@@ -2084,16 +2087,61 @@ function evaluateCondition(
     const fieldId = condition.fieldId;
     if (!fieldId) return true;
 
-    // Use source-aware resolution (collection layer data first, then page data)
+    // Use source-aware resolution (collection layer data first, then page data).
+    // Multi-reference / multi-asset values can arrive already parsed as arrays
+    // (e.g. from the SSR collection cache). `String([...])` would comma-join them
+    // into an unparseable string, so serialize arrays back to JSON — the form
+    // every downstream parser (parseMultiReferenceValue, JSON.parse, `[`-prefix
+    // checks) expects.
     const rawValue = resolveFieldFromSources(fieldId, undefined, collectionLayerData, pageCollectionData);
-    const value = String(rawValue ?? '');
+    const value = Array.isArray(rawValue) ? JSON.stringify(rawValue) : String(rawValue ?? '');
+    const fieldType = condition.fieldType || 'text';
+    const isDateOnly = fieldType === 'date_only';
+
+    // Resolve the compare value. In 'current_page' mode it is bound to the
+    // current dynamic page item instead of the static `condition.value`:
+    //   - reference fields inject the page item's own ID into the compared ID
+    //     set (alongside any statically picked IDs), so reference operators parse
+    //     it normally — this is the "Current Category/Tag" pattern
+    //   - scalar fields compare against the page item's `currentPageFieldId` value
+    // Reference detection also keys off the operator so it stays correct even if
+    // `fieldType` was not persisted on the condition.
     let compareValue = String(condition.value ?? '');
+    if (condition.valueMode === 'current_page') {
+      const isReferenceField = fieldType === 'reference'
+        || fieldType === 'multi_reference'
+        || ['is_one_of', 'is_not_one_of', 'contains_all_of', 'contains_exactly'].includes(condition.operator);
+
+      // When the page item context is unavailable (e.g. the editor preview before
+      // a CMS item is selected), skip the condition instead of filtering everything
+      // out — mirrors the `self` source returning true when there is no current item.
+      if (isReferenceField && !pageCollectionItemId) return true;
+      if (!isReferenceField && !pageCollectionData) return true;
+
+      if (isReferenceField) {
+        const ids = parseItemIdList(condition.value);
+        if (pageCollectionItemId && !ids.includes(pageCollectionItemId)) {
+          ids.push(pageCollectionItemId);
+        }
+        compareValue = JSON.stringify(ids);
+      } else if (condition.currentPageFieldId) {
+        compareValue = String(pageCollectionData?.[condition.currentPageFieldId] ?? '');
+      }
+    }
     let compareValue2 = condition.value2;
     let effectiveOperator = condition.operator;
-    const fieldType = condition.fieldType || 'text';
+
+    // In 'current_page' mode the compare set is a single injected page-item id, so
+    // 'contains exactly' (exact set equality) can essentially never match a real
+    // multi-reference field — it would only keep items whose entire reference set is
+    // just the current item. The intent of the "Current X" pattern is "contains the
+    // current item", so treat it as 'contains_all_of'.
+    if (condition.valueMode === 'current_page' && effectiveOperator === 'contains_exactly') {
+      effectiveOperator = 'contains_all_of';
+    }
 
     if (isDateFieldType(fieldType) && isDatePreset(compareValue)) {
-      const resolved = resolveDateFilterValue(effectiveOperator, compareValue, compareValue2);
+      const resolved = resolveDateFilterValue(effectiveOperator, compareValue, compareValue2, timezone);
       if (resolved) {
         effectiveOperator = resolved.operator as typeof effectiveOperator;
         compareValue = resolved.value;
@@ -2117,7 +2165,7 @@ function evaluateCondition(
           return parseFloat(value) === parseFloat(compareValue);
         }
         if (isDateFieldType(fieldType)) {
-          return compareDateFilter(value, 'is', compareValue);
+          return compareDateFilter(value, 'is', compareValue, undefined, timezone, isDateOnly);
         }
         return value === compareValue;
 
@@ -2129,7 +2177,7 @@ function evaluateCondition(
           return parseFloat(value) !== parseFloat(compareValue);
         }
         if (isDateFieldType(fieldType)) {
-          return !compareDateFilter(value, 'is', compareValue);
+          return !compareDateFilter(value, 'is', compareValue, undefined, timezone, isDateOnly);
         }
         return value !== compareValue;
 
@@ -2158,15 +2206,16 @@ function evaluateCondition(
       case 'gte':
         return parseFloat(value) >= parseFloat(compareValue);
 
-      // Date operators (day-aware: `YYYY-MM-DD` filter values span the full UTC day)
+      // Date operators (day-aware: `YYYY-MM-DD` filter values span the full day
+      // in the project timezone; `date_only` fields compare in UTC)
       case 'is_before':
-        return compareDateFilter(value, 'is_before', compareValue);
+        return compareDateFilter(value, 'is_before', compareValue, undefined, timezone, isDateOnly);
 
       case 'is_after':
-        return compareDateFilter(value, 'is_after', compareValue);
+        return compareDateFilter(value, 'is_after', compareValue, undefined, timezone, isDateOnly);
 
       case 'is_between':
-        return compareDateFilter(value, 'is_between', compareValue, compareValue2);
+        return compareDateFilter(value, 'is_between', compareValue, compareValue2, timezone, isDateOnly);
 
       case 'is_not_empty':
         return isPresent;
@@ -2329,6 +2378,32 @@ export function evaluateVisibility(
   }
 
   return anyMatched ? result : defaultVisible;
+}
+
+/**
+ * Evaluate collection item filters (the `filters` field on a collection layer).
+ *
+ * Distinct from evaluateVisibility: filtering uses pure gate semantics, NOT
+ * the show/hide + defaultVisibility model used for layer visibility.
+ *  - No groups → keep the item (true)
+ *  - OR logic within a group, AND logic between groups
+ *  - A group with no matching condition fails → item excluded (false)
+ * An item is kept only when every non-empty group has at least one true
+ * condition. This is what current_page / collection filtering relies on.
+ */
+export function evaluateCollectionFilters(
+  filters: import('@/types').ConditionalVisibility | undefined,
+  context: VisibilityContext
+): boolean {
+  if (!filters?.groups?.length) return true;
+
+  for (const group of filters.groups) {
+    if (!group.conditions?.length) continue;
+    const groupTrue = group.conditions.some(c => evaluateCondition(c, context));
+    if (!groupTrue) return false;
+  }
+
+  return true;
 }
 
 /**

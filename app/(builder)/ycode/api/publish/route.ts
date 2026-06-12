@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { noCache } from '@/lib/api-response';
 import { publishPages } from '@/lib/services/pageService';
-import { publishCollectionWithItems, groupItemsByCollection, cleanupDeletedCollections } from '@/lib/services/collectionService';
+import { publishCollectionWithItems, groupItemsByCollection, cleanupDeletedCollections, getCollectionsNeedingDeletionCleanup } from '@/lib/services/collectionService';
 import { publishLocalisation } from '@/lib/services/localisationService';
 import type { PublishLocalisationResult } from '@/lib/services/localisationService';
 import { publishFolders } from '@/lib/services/folderService';
@@ -18,8 +18,9 @@ import { dispatchSitePublishedEvent } from '@/lib/services/webhookService';
 import { getAllDraftPages, hardDeleteSoftDeletedPages, backfillMissingPageHashes } from '@/lib/repositories/pageRepository';
 import { publishComponents, getUnpublishedComponents, hardDeleteSoftDeletedComponents } from '@/lib/repositories/componentRepository';
 import { publishLayerStyles, getUnpublishedLayerStyles, hardDeleteSoftDeletedLayerStyles } from '@/lib/repositories/layerStyleRepository';
-import { getAllCollections } from '@/lib/repositories/collectionRepository';
-import { getItemsByCollectionId } from '@/lib/repositories/collectionItemRepository';
+import { getAllCollections, getCollectionsRaw } from '@/lib/repositories/collectionRepository';
+import { getAllFields } from '@/lib/repositories/collectionFieldRepository';
+import { getAllItemsByCollectionId, getAllItemsRaw } from '@/lib/repositories/collectionItemRepository';
 import { publishAssets, getUnpublishedAssets, hardDeleteSoftDeletedAssets } from '@/lib/repositories/assetRepository';
 import { publishAssetFolders, getUnpublishedAssetFolders, hardDeleteSoftDeletedAssetFolders } from '@/lib/repositories/assetFolderRepository';
 import { publishFonts } from '@/lib/repositories/fontRepository';
@@ -30,6 +31,20 @@ import type { Setting, PublishStats, PublishTableStats } from '@/types';
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+/** Group rows (fields, items, …) by their parent collection_id. */
+function groupByCollectionId<T extends { collection_id: string }>(rows: T[]): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const row of rows) {
+    const list = map.get(row.collection_id);
+    if (list) {
+      list.push(row);
+    } else {
+      map.set(row.collection_id, [row]);
+    }
+  }
+  return map;
+}
 
 interface PublishRequest {
   publishAll?: boolean; // If true and no specific items provided, publish all unpublished items
@@ -156,6 +171,7 @@ export async function POST(request: NextRequest) {
     const changedLayerStyleIds: string[] = [];
     const deletedCollectionItemSlugs: Map<string, string[]> = new Map();
     const renamedPageOldRoutes: string[] = [];
+    const unpublishedPageRoutes: string[] = [];
     let localisationResult: PublishLocalisationResult | null = null;
 
     // Backfill any missing content_hash values before publish so change
@@ -186,6 +202,7 @@ export async function POST(request: NextRequest) {
         const pagesResult = await publishPages(pageIds);
         publishedPageIds.push(...pagesResult.changedPageIds);
         renamedPageOldRoutes.push(...pagesResult.renamedPageOldRoutes);
+        unpublishedPageRoutes.push(...pagesResult.unpublishedPageRoutes);
         result.changes.pages = pagesResult.count;
         stats.tables.pages.added = pagesResult.count;
         stats.tables.pages.durationMs = pagesResult.timing.pagesDurationMs;
@@ -200,6 +217,7 @@ export async function POST(request: NextRequest) {
           const pagesResult = await publishPages(allPageIds);
           publishedPageIds.push(...pagesResult.changedPageIds);
           renamedPageOldRoutes.push(...pagesResult.renamedPageOldRoutes);
+          unpublishedPageRoutes.push(...pagesResult.unpublishedPageRoutes);
           result.changes.pages = pagesResult.count;
           stats.tables.pages.added = pagesResult.count;
           stats.tables.pages.durationMs = pagesResult.timing.pagesDurationMs;
@@ -225,7 +243,7 @@ export async function POST(request: NextRequest) {
 
         if (collectionIds && collectionIds.length > 0) {
           for (const collectionId of collectionIds) {
-            const { items } = await getItemsByCollectionId(collectionId, false);
+            const items = await getAllItemsByCollectionId(collectionId, false);
             collectionPublishes.push({
               collectionId,
               itemIds: items.map((item: any) => item.id),
@@ -252,6 +270,9 @@ export async function POST(request: NextRequest) {
               collectionId: collectionPublish.collectionId,
               itemIds: collectionPublish.itemIds,
             });
+            if (!publishResult.success) {
+              console.error(`[Publish] collection ${collectionPublish.collectionId} FAILED (${collectionPublish.itemIds.length} items):`, publishResult.errors);
+            }
             const p = publishResult.published;
             const changed = (p?.itemsCount || 0)
               + (p?.valuesCount || 0)
@@ -285,12 +306,39 @@ export async function POST(request: NextRequest) {
       } else if (isPublishingAll) {
         const allCollections = await getAllCollections({ is_published: false });
 
+        // Bulk pre-fetch published collections, all draft/published fields, and all
+        // draft/published items in a handful of direct-DB reads, then group by
+        // collection. This replaces the per-collection metadata/field/item
+        // round-trips that dominated publish time.
+        const publishedCollections = await getCollectionsRaw(true);
+        const publishedCollectionById = new Map(publishedCollections.map(c => [c.id, c]));
+        const draftFieldsByCollection = groupByCollectionId(await getAllFields(false));
+        const publishedFieldsByCollection = groupByCollectionId(await getAllFields(true));
+        const draftItemsByCollection = groupByCollectionId(await getAllItemsRaw(false));
+        const publishedItemsByCollection = groupByCollectionId(await getAllItemsRaw(true));
+        // One global probe instead of two detection queries per collection: only
+        // the collections in this set have soft-deleted draft items/fields to clean.
+        const collectionsNeedingCleanup = await getCollectionsNeedingDeletionCleanup();
+
         for (const collection of allCollections) {
-          const { items } = await getItemsByCollectionId(collection.id, false);
+          const draftItems = draftItemsByCollection.get(collection.id) ?? [];
           const publishResult = await publishCollectionWithItems({
             collectionId: collection.id,
-            itemIds: items.map((item: any) => item.id),
+            itemIds: draftItems.map(item => item.id),
+            skipItemValidation: true,
+            skipDeletionCleanup: !collectionsNeedingCleanup.has(collection.id),
+            prefetched: {
+              draftCollection: collection,
+              publishedCollection: publishedCollectionById.get(collection.id) ?? null,
+              draftFields: draftFieldsByCollection.get(collection.id) ?? [],
+              publishedFields: publishedFieldsByCollection.get(collection.id) ?? [],
+              draftItems,
+              publishedItems: publishedItemsByCollection.get(collection.id) ?? [],
+            },
           });
+          if (!publishResult.success) {
+            console.error(`[Publish] collection ${collection.id} (${collection.name}) FAILED (${draftItems.length} items):`, publishResult.errors);
+          }
           const p = publishResult.published;
           const changedItems = p?.itemsCount || 0;
           const changedValues = p?.valuesCount || 0;
@@ -610,7 +658,12 @@ export async function POST(request: NextRequest) {
       // components/styles. The builder only regenerates CSS for pages open
       // in memory — pages not loaded keep stale generated_css/content_hash.
       // This ensures batchPublishPageLayers detects the real hash change.
-      if (!globalChanged && cssAffectedPageIds.length > 0) {
+      //
+      // Runs regardless of globalChanged: this is a data-publish step (it
+      // pushes style-sync-rewritten draft layers to the published version),
+      // not a cache operation. Skipping it when a global resource changed
+      // would leave those pages' published layers stale.
+      if (cssAffectedPageIds.length > 0) {
         try {
           const { generateCSSForPages } = await import('@/lib/server/cssGenerator');
           await generateCSSForPages(cssAffectedPageIds);
@@ -703,6 +756,13 @@ export async function POST(request: NextRequest) {
           await invalidatePages(renamedPageOldRoutes);
           invalidationResult.invalidatedRoutes.push(...renamedPageOldRoutes);
           console.log(`[Cache] invalidated ${renamedPageOldRoutes.length} renamed page old route(s)`);
+        }
+
+        // Routes of pages removed from the live site (set to draft)
+        if (unpublishedPageRoutes.length > 0) {
+          await invalidatePages(unpublishedPageRoutes);
+          invalidationResult.invalidatedRoutes.push(...unpublishedPageRoutes);
+          console.log(`[Cache] invalidated ${unpublishedPageRoutes.length} unpublished page route(s)`);
         }
 
         // Deleted CMS item routes (old slugs that should no longer exist)

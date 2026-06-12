@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
+import { getSettingByKey } from '@/lib/repositories/settingsRepository';
 import { getItemsByCollectionId } from '@/lib/repositories/collectionItemRepository';
 import { getValuesByItemIds } from '@/lib/repositories/collectionItemValueRepository';
 import { getFieldsByCollectionId } from '@/lib/repositories/collectionFieldRepository';
@@ -28,6 +29,11 @@ interface FilterCondition {
   // For source === 'self': also include the current dynamic page item's ID
   // in the comparison set at runtime.
   includesCurrentPageItem?: boolean;
+  // 'current_page' binds the compare value to the current dynamic page item:
+  // reference fields inject the page item's ID; scalar fields use the value of
+  // `currentPageFieldId` on the page item.
+  valueMode?: 'static' | 'current_page';
+  currentPageFieldId?: string;
 }
 
 // PostgREST encodes .in() values into a URL query param.
@@ -88,9 +94,11 @@ async function getIdsMatchingFilter(
   filter: FilterCondition,
   isPublished: boolean,
   allItemIds: string[],
+  timezone: string,
 ): Promise<Set<string>> {
   const { fieldId, operator, value } = filter;
   const allSet = new Set(allItemIds);
+  const isDateOnly = filter.fieldType === 'date_only';
 
   const selectIds = (chunk: string[]) =>
     client
@@ -138,7 +146,7 @@ async function getIdsMatchingFilter(
         );
         const result = new Set<string>();
         for (const row of data) {
-          if (compareDateFilter(String(row.value), 'is', value)) result.add(row.item_id);
+          if (compareDateFilter(String(row.value), 'is', value, undefined, timezone, isDateOnly)) result.add(row.item_id);
         }
         return result;
       }
@@ -191,7 +199,7 @@ async function getIdsMatchingFilter(
         );
         const matchIds = new Set<string>();
         for (const row of data) {
-          if (compareDateFilter(String(row.value), 'is', value)) matchIds.add(row.item_id);
+          if (compareDateFilter(String(row.value), 'is', value, undefined, timezone, isDateOnly)) matchIds.add(row.item_id);
         }
         return new Set([...allSet].filter(id => !matchIds.has(id)));
       }
@@ -262,7 +270,7 @@ async function getIdsMatchingFilter(
       );
       const result = new Set<string>();
       for (const row of data) {
-        if (compareDateFilter(String(row.value), 'is_before', value)) result.add(row.item_id);
+        if (compareDateFilter(String(row.value), 'is_before', value, undefined, timezone, isDateOnly)) result.add(row.item_id);
       }
       return result;
     }
@@ -273,7 +281,7 @@ async function getIdsMatchingFilter(
       );
       const result = new Set<string>();
       for (const row of data) {
-        if (compareDateFilter(String(row.value), 'is_after', value)) result.add(row.item_id);
+        if (compareDateFilter(String(row.value), 'is_after', value, undefined, timezone, isDateOnly)) result.add(row.item_id);
       }
       return result;
     }
@@ -291,11 +299,11 @@ async function getIdsMatchingFilter(
         const storedValue = String(row.value);
         // Open-ended ranges fall back to the relevant single-bound operator.
         if (startRaw && endRaw) {
-          if (compareDateFilter(storedValue, 'is_between', startRaw, endRaw)) result.add(row.item_id);
+          if (compareDateFilter(storedValue, 'is_between', startRaw, endRaw, timezone, isDateOnly)) result.add(row.item_id);
         } else if (startRaw) {
-          if (!compareDateFilter(storedValue, 'is_before', startRaw)) result.add(row.item_id);
+          if (!compareDateFilter(storedValue, 'is_before', startRaw, undefined, timezone, isDateOnly)) result.add(row.item_id);
         } else if (endRaw) {
-          if (!compareDateFilter(storedValue, 'is_after', endRaw)) result.add(row.item_id);
+          if (!compareDateFilter(storedValue, 'is_after', endRaw, undefined, timezone, isDateOnly)) result.add(row.item_id);
         }
       }
       return result;
@@ -439,10 +447,43 @@ function getSelfFilterMatches(
   return new Set(candidateIds.filter(id => compareSet.has(id)));
 }
 
+/**
+ * Resolve a `valueMode: 'current_page'` filter into a concrete static filter by
+ * binding its compare value to the current dynamic page item:
+ *   - reference fields inject the page item's ID into the compared ID set
+ *   - scalar fields read the page item's `currentPageFieldId` value
+ * Mirrors the SSR resolution in `evaluateCondition`.
+ */
+async function resolveCurrentPageFilter(
+  filter: FilterCondition,
+  isPublished: boolean,
+  pageCollectionItemId?: string,
+): Promise<FilterCondition> {
+  const isReferenceField = filter.fieldType === 'reference'
+    || filter.fieldType === 'multi_reference'
+    || ['is_one_of', 'is_not_one_of', 'contains_all_of', 'contains_exactly'].includes(filter.operator);
+  if (isReferenceField) {
+    const ids = parseItemIdList(filter.value);
+    if (pageCollectionItemId && !ids.includes(pageCollectionItemId)) {
+      ids.push(pageCollectionItemId);
+    }
+    // 'contains exactly' against a single injected page-item id can never match a real
+    // multi-reference set — the "Current X" intent is "contains the current item".
+    const operator = filter.operator === 'contains_exactly' ? 'contains_all_of' : filter.operator;
+    return { ...filter, operator, value: JSON.stringify(ids) };
+  }
+  if (filter.currentPageFieldId && pageCollectionItemId) {
+    const valueMap = await getFieldValuesForItems(filter.currentPageFieldId, isPublished, [pageCollectionItemId]);
+    return { ...filter, value: valueMap.get(pageCollectionItemId) ?? '' };
+  }
+  return { ...filter, value: '' };
+}
+
 async function getFilteredItemIds(
   collectionId: string,
   isPublished: boolean,
   filterGroups: FilterCondition[][],
+  timezone: string,
   pageCollectionItemId?: string,
 ): Promise<{ matchingIds: string[]; total: number }> {
   const client = await getSupabaseAdmin();
@@ -467,13 +508,16 @@ async function getFilteredItemIds(
         currentIds = new Set([...currentIds].filter(id => matchingForFilter.has(id)));
         continue;
       }
+      if (filter.valueMode === 'current_page') {
+        filter = await resolveCurrentPageFilter(filter, isPublished, pageCollectionItemId);
+      }
       if (isDateFieldType(filter.fieldType) && isDatePreset(filter.value)) {
-        const resolved = resolveDateFilterValue(filter.operator, filter.value, filter.value2);
+        const resolved = resolveDateFilterValue(filter.operator, filter.value, filter.value2, timezone);
         if (resolved) {
           filter = { ...filter, operator: resolved.operator, value: resolved.value, value2: resolved.value2 };
         }
       }
-      const matchingForFilter = await getIdsMatchingFilter(client, filter, isPublished, [...currentIds]);
+      const matchingForFilter = await getIdsMatchingFilter(client, filter, isPublished, [...currentIds], timezone);
       currentIds = new Set([...currentIds].filter(id => matchingForFilter.has(id)));
     }
 
@@ -574,10 +618,13 @@ export async function POST(
       return noCache({ error: 'collectionLayerId is required' }, 400);
     }
 
+    const timezone = (await getSettingByKey('timezone') as string | null) || 'UTC';
+
     const { matchingIds, total: filteredTotal } = await getFilteredItemIds(
       collectionId,
       isPublished,
       filterGroups,
+      timezone,
       pageCollectionItemId,
     );
 

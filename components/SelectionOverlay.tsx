@@ -113,6 +113,14 @@ export function SelectionOverlay({
     const iframeRect = iframeElement.getBoundingClientRect();
     const containerRect = containerElement.getBoundingClientRect();
 
+    // The canvas is scaled with `transform: scale()` on a wrapper, so inner
+    // element rects (measured via getBoundingClientRect inside the iframe) are
+    // reported in the iframe's own unscaled layout coordinates in every browser.
+    // Multiplying by the scale factor (`scale` = zoom/100) maps them to on-screen
+    // pixels. NOTE: do NOT derive the multiplier from iframeRect.width /
+    // innerRootWidth — the iframe element width (canvas width) and the content
+    // layout width can differ, which over-scaled outlines on Safari.
+
     // Ensure we have the right number of child outline divs
     while (container.children.length < targetElements.length) {
       const div = document.createElement('div');

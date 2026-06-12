@@ -269,7 +269,7 @@ export function getCanvasIframeHtml(mountId: string = 'canvas-mount'): string {
     /* Injected at runtime by Canvas.tsx to ensure priority and bypass caching */
   </style>
 </head>
-<body id="ybody" class="h-full">
+<body id="ybody" class="min-h-full">
   <div id="${mountId}" class="contents"></div>
 </body>
 </html>`;

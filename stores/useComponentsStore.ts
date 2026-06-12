@@ -16,7 +16,7 @@ import {
 import { detachStyleFromLayers, updateLayersWithStyle } from '@/lib/layer-style-utils';
 import { scheduleIdle } from '@/lib/schedule-idle';
 import { generateId } from '@/lib/utils';
-import type { Component, ComponentVariant, Layer } from '@/types';
+import type { Component, ComponentVariant, Layer, LayerStyle } from '@/types';
 
 /**
  * Per-component, per-variant working copy of layers used while editing a
@@ -203,8 +203,8 @@ interface ComponentsActions {
   deleteTextVariable: (componentId: string, variableId: string) => Promise<void>;
 
   // Layer style operations
-  updateStyleOnLayers: (styleId: string, newClasses: string, newDesign?: Layer['design']) => void;
-  detachStyleFromAllLayers: (styleId: string) => void;
+  updateStyleOnLayers: (styleId: string, stylesById: Map<string, LayerStyle>) => void;
+  detachStyleFromAllLayers: (styleId: string, stylesById?: Map<string, LayerStyle>) => void;
 
   // State management
   setError: (error: string | null) => void;
@@ -768,9 +768,36 @@ export const useComponentsStore = create<ComponentsStore>((set, get) => {
       });
     },
 
-    // Rename a component (convenience method)
+    // Rename a component with optimistic update (rolls back on failure)
     renameComponent: async (id, newName) => {
-      await get().updateComponent(id, { name: newName });
+      const previousName = get().components.find((c) => c.id === id)?.name;
+
+      set((state) => ({
+        components: state.components.map((c) => (c.id === id ? { ...c, name: newName } : c)),
+      }));
+
+      try {
+        const response = await fetch(`/ycode/api/components/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName }),
+        });
+
+        const result = await response.json();
+        if (result.error) throw new Error(result.error);
+
+        set((state) => ({
+          components: state.components.map((c) => (c.id === id ? result.data : c)),
+        }));
+      } catch (error) {
+        console.error('Failed to rename component:', error);
+        if (previousName !== undefined) {
+          set((state) => ({
+            components: state.components.map((c) => (c.id === id ? { ...c, name: previousName } : c)),
+            error: 'Failed to rename component',
+          }));
+        }
+      }
     },
 
     // Get component by ID (convenience method)
@@ -1611,16 +1638,16 @@ export const useComponentsStore = create<ComponentsStore>((set, get) => {
      * Update all layers using a specific style across all components
      * Used when a style is updated
      */
-    updateStyleOnLayers: (styleId, newClasses, newDesign) => {
-      updateComponentLayers((layers) => updateLayersWithStyle(layers, styleId, newClasses, newDesign));
+    updateStyleOnLayers: (styleId, stylesById) => {
+      updateComponentLayers((layers) => updateLayersWithStyle(layers, styleId, stylesById));
     },
 
     /**
      * Detach a style from all layers across all components
      * Used when a style is deleted
      */
-    detachStyleFromAllLayers: (styleId) => {
-      updateComponentLayers((layers) => detachStyleFromLayers(layers, styleId));
+    detachStyleFromAllLayers: (styleId, stylesById) => {
+      updateComponentLayers((layers) => detachStyleFromLayers(layers, styleId, stylesById));
     },
 
     // Error management

@@ -5,7 +5,9 @@ import { DndContext, DragOverlay, closestCenter, useDraggable, useDroppable } fr
 import { buildPageTree, flattenPageTree, rebuildPageTree, getNodeIcon, isHomepage, type PageTreeNode, type FlattenedPageNode } from '@/lib/page-utils';
 import Icon from '@/components/ui/icon';
 import PageContextMenu from './PageContextMenu';
+import { getPageStatusAvailability } from './PageStatusBadge';
 import type { Page, PageFolder } from '@/types';
+import type { StatusAction } from '@/lib/collection-field-utils';
 import { cn } from '@/lib/utils';
 import { useTreeDragDrop, type DropPositionCalculation } from '@/hooks/use-tree-drag-drop';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -25,6 +27,7 @@ interface PagesTreeProps {
   onDuplicate?: (id: string, type: 'folder' | 'page') => void;
   onRename?: (id: string, type: 'folder' | 'page') => void;
   onToggleDraftOnly?: (id: string) => void;
+  onStatusChange?: (id: string, action: StatusAction) => void;
 }
 
 interface PageRowProps {
@@ -44,6 +47,7 @@ interface PageRowProps {
   onDuplicate?: (id: string, type: 'folder' | 'page') => void;
   onRename?: (id: string, type: 'folder' | 'page') => void;
   onToggleDraftOnly?: () => void;
+  onStatusChange?: (id: string, action: StatusAction) => void;
 }
 
 // Helper function to get display name
@@ -89,6 +93,7 @@ const PageRow = React.memo(function PageRow({
   onDuplicate,
   onRename,
   onToggleDraftOnly,
+  onStatusChange,
 }: PageRowProps) {
   // Check if this is an error page or the virtual error pages folder
   const isErrorPage = node.type === 'page' && (node.data as Page).error_page !== null;
@@ -116,6 +121,10 @@ const PageRow = React.memo(function PageRow({
   const hasChildren = node.type === 'folder';
   const isCollapsed = node.collapsed || false;
 
+  // Publish status applies to regular pages only (not folders or error pages)
+  const statusPage = node.type === 'page' && !isErrorPage ? (node.data as Page) : null;
+  const statusAvailability = getPageStatusAvailability(statusPage);
+
   return (
     <PageContextMenu
       item={node.data}
@@ -127,6 +136,8 @@ const PageRow = React.memo(function PageRow({
       onRename={onRename ? () => onRename(node.id, node.type) : undefined}
       onToggleDraftOnly={node.type === 'page' && onToggleDraftOnly ? onToggleDraftOnly : undefined}
       isDraftOnly={node.type === 'page' && !!(node.data as Page).settings?.draft_only}
+      onStatusChange={statusPage && onStatusChange ? (action) => onStatusChange(node.id, action) : undefined}
+      statusAvailability={statusAvailability}
     >
       <div className="relative">
       {/* Vertical connector lines - one for each depth level */}
@@ -221,9 +232,14 @@ const PageRow = React.memo(function PageRow({
           className={`size-3 ml-1 mr-2 shrink-0 ${isSelected ? 'opacity-90' : 'opacity-50'}`}
         />
 
-        {/* Label */}
-        <span className="flex-grow text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap pointer-events-none">
-          {getNodeDisplayName(node)}
+        {/* Label + draft indicator (icon sits right after the name) */}
+        <span className="flex-grow flex items-center gap-2 min-w-0 pointer-events-none">
+          <span className="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
+            {getNodeDisplayName(node)}
+          </span>
+          {statusPage?.is_publishable === false && (
+            <Icon name="eye-off" className="size-3.5 shrink-0 opacity-70" />
+          )}
         </span>
 
         {/* Settings dropdown (for pages and folders) */}
@@ -251,7 +267,31 @@ const PageRow = React.memo(function PageRow({
               >
                 {node.type === 'page' ? 'Page settings' : 'Folder settings'}
               </DropdownMenuItem>
-              
+
+              {statusPage && onStatusChange && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStatusChange(node.id, 'stage');
+                    }}
+                    disabled={!statusAvailability.canStage}
+                  >
+                    Stage for publish
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onStatusChange(node.id, 'draft');
+                    }}
+                    disabled={!statusAvailability.canDraft}
+                  >
+                    Set as draft
+                  </DropdownMenuItem>
+                </>
+              )}
+
               <DropdownMenuSeparator />
               
               <DropdownMenuItem
@@ -263,7 +303,6 @@ const PageRow = React.memo(function PageRow({
                 }}
                 disabled={
                   !onDuplicate ||
-                  (node.type === 'page' && (node.data as Page).is_dynamic) ||
                   (node.type === 'page' && (node.data as Page).error_page !== null)
                 }
               >
@@ -348,6 +387,7 @@ export default function PagesTree({
   onDuplicate,
   onRename,
   onToggleDraftOnly,
+  onStatusChange,
 }: PagesTreeProps) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
@@ -725,6 +765,7 @@ export default function PagesTree({
             onDuplicate={onDuplicate}
             onRename={onRename}
             onToggleDraftOnly={onToggleDraftOnly && node.type === 'page' ? () => onToggleDraftOnly(node.id) : undefined}
+            onStatusChange={onStatusChange}
           />
         ))}
 

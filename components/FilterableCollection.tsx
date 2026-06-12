@@ -4,7 +4,6 @@ import React, { useEffect, useLayoutEffect, useRef, useCallback, useState } from
 import { useFilterStore } from '@/stores/useFilterStore';
 import { LOAD_MORE_APPENDED_ATTR } from '@/components/LoadMoreCollection';
 import type { ConditionalVisibility, Layer } from '@/types';
-import { isDateFieldType, isDatePreset, resolveDateFilterValue } from '@/lib/collection-field-utils';
 
 interface FilterableCollectionProps {
   children: React.ReactNode;
@@ -200,6 +199,8 @@ export default function FilterableCollection({
       fieldType?: string;
       source?: 'collection_field' | 'self';
       includesCurrentPageItem?: boolean;
+      valueMode?: 'static' | 'current_page';
+      currentPageFieldId?: string;
     };
     const operatorsWithoutValue = new Set([
       'is_present',
@@ -233,6 +234,21 @@ export default function FilterableCollection({
         }
 
         if (!condition.fieldId) continue;
+
+        // Current-page conditions are forwarded verbatim; the server resolves the
+        // compare value from the current dynamic page item (its own ID for
+        // reference fields, or `currentPageFieldId`'s value for scalar fields).
+        if (condition.valueMode === 'current_page') {
+          activeInGroup.push({
+            fieldId: condition.fieldId,
+            operator: condition.operator,
+            value: condition.value || '',
+            fieldType: condition.fieldType,
+            valueMode: 'current_page',
+            currentPageFieldId: condition.currentPageFieldId,
+          });
+          continue;
+        }
 
         let value = condition.inputLayerId ? '' : (condition.value || '');
         let value2 = condition.inputLayerId2 ? '' : condition.value2;
@@ -292,18 +308,12 @@ export default function FilterableCollection({
           value = JSON.stringify([value]);
         }
 
-        let resolvedOperator: string = condition.operator;
-        if (isDateFieldType(condition.fieldType) && isDatePreset(value)) {
-          const resolved = resolveDateFilterValue(condition.operator, value, value2);
-          if (!resolved) continue;
-          resolvedOperator = resolved.operator;
-          value = resolved.value;
-          value2 = resolved.value2;
-        }
-
+        // Date presets (e.g. `$today`) are forwarded verbatim — the filter API
+        // resolves them against the project timezone, so "today" matches the
+        // site's configured timezone rather than the visitor's browser.
         activeInGroup.push({
           fieldId: condition.fieldId,
-          operator: resolvedOperator,
+          operator: condition.operator,
           value,
           value2,
           fieldType: condition.fieldType,
@@ -588,6 +598,8 @@ export default function FilterableCollection({
       fieldType?: string;
       source?: 'collection_field' | 'self';
       includesCurrentPageItem?: boolean;
+      valueMode?: 'static' | 'current_page';
+      currentPageFieldId?: string;
     }>>,
     offset: number,
     append: boolean,

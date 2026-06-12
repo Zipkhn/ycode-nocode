@@ -21,8 +21,8 @@ import { getMapIframeProps, DEFAULT_MAP_SETTINGS, resolveMarkerColor } from '@/l
 import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/slider-constants';
 import { getDynamicTextContent, getImageUrlFromVariable, getVideoUrlFromVariable, getIframeUrlFromVariable, isFieldVariable, isAssetVariable, isStaticTextVariable, isDynamicTextVariable, getStaticTextContent, getAssetId, resolveDesignStyles } from '@/lib/variable-utils';
 import { getTranslatedAssetId, getTranslatedText } from '@/lib/locale-runtime';
-import { isValidLinkSettings, generateLinkHref, resolveLinkAttrs, isLinkAtCollectionBoundary, type LinkResolutionContext } from '@/lib/link-utils';
-import { DEFAULT_ASSETS, buildImageSizes, generateImageSrcset, getOptimizedImageUrl, parseImageDimension } from '@/lib/asset-utils';
+import { isValidLinkSettings, generateLinkHref, resolveLinkAttrs, isLinkAtCollectionBoundary, isLinkToCurrentPage, type LinkResolutionContext } from '@/lib/link-utils';
+import { DEFAULT_ASSETS, buildImageSizes, generateImageSrcset, getOptimizedImageUrl, getSvgAspectRatioStyle, parseImageDimension } from '@/lib/asset-utils';
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
 import { renderRichText, hasBlockElementsWithInlineVariables, getTextStyleClasses, flattenTiptapParagraphs, type RichTextLinkContext, type RenderComponentBlockFn } from '@/lib/text-format-utils';
 import { combineBgValues, mergeStaticBgVars } from '@/lib/tailwind-class-mapper';
@@ -97,6 +97,8 @@ interface LayerRendererPublicProps {
   currentLocale?: Locale | null;
   availableLocales?: Locale[];
   localeSelectorFormat?: 'locale' | 'code';
+  /** Pre-computed relative URLs per locale ID (translated slugs) for the locale selector. */
+  localizedPageUrls?: Record<string, string>;
   isInsideForm?: boolean;
   isInsideLink?: boolean;
   parentFormSettings?: FormSettings;
@@ -140,6 +142,7 @@ const LayerRendererPublic: React.FC<LayerRendererPublicProps> = ({
   currentLocale,
   availableLocales = [],
   localeSelectorFormat,
+  localizedPageUrls,
   isInsideForm = false,
   isInsideLink = false,
   parentFormSettings,
@@ -253,6 +256,7 @@ const LayerRendererPublic: React.FC<LayerRendererPublicProps> = ({
         currentLocale={currentLocale}
         availableLocales={availableLocales}
         localeSelectorFormat={localeSelectorFormat}
+        localizedPageUrls={localizedPageUrls}
         isInsideForm={isInsideForm}
         isInsideLink={isInsideLink}
         parentFormSettings={parentFormSettings}
@@ -295,6 +299,7 @@ const LayerItem: React.FC<{
   currentLocale?: Locale | null;
   availableLocales?: Locale[];
   localeSelectorFormat?: 'locale' | 'code';
+  localizedPageUrls?: Record<string, string>;
   isInsideForm?: boolean;
   isInsideLink?: boolean;
   parentFormSettings?: FormSettings;
@@ -325,6 +330,7 @@ const LayerItem: React.FC<{
   currentLocale,
   availableLocales,
   localeSelectorFormat,
+  localizedPageUrls,
   isInsideForm = false,
   isInsideLink = false,
   parentFormSettings,
@@ -385,6 +391,7 @@ const LayerItem: React.FC<{
     currentLocale,
     availableLocales,
     localeSelectorFormat,
+    localizedPageUrls,
     isInsideForm,
     isInsideLink,
     parentFormSettings,
@@ -399,7 +406,7 @@ const LayerItem: React.FC<{
     serverSettings,
     lcpCandidateLayerId,
     passwordProtection,
-  }), [isPublished, pageId, collectionLayerData, collectionLayerItemId, effectiveLayerDataMap, pageCollectionItemId, pageCollectionItemData, pageCollectionSortedItemIds, hiddenLayerInfo, currentLocale, availableLocales, localeSelectorFormat, isInsideForm, isInsideLink, parentFormSettings, pages, folders, collectionItemSlugs, isPreview, translations, anchorMap, resolvedAssets, componentsProp, serverSettings, lcpCandidateLayerId, passwordProtection]);
+  }), [isPublished, pageId, collectionLayerData, collectionLayerItemId, effectiveLayerDataMap, pageCollectionItemId, pageCollectionItemData, pageCollectionSortedItemIds, hiddenLayerInfo, currentLocale, availableLocales, localeSelectorFormat, localizedPageUrls, isInsideForm, isInsideLink, parentFormSettings, pages, folders, collectionItemSlugs, isPreview, translations, anchorMap, resolvedAssets, componentsProp, serverSettings, lcpCandidateLayerId, passwordProtection]);
 
   const renderComponentBlock: RenderComponentBlockFn = useCallback(
     (comp, resolvedLayers, _overrides, key, innerAncestorIds) => {
@@ -748,6 +755,7 @@ const LayerItem: React.FC<{
   const layerLinkContext: LinkResolutionContext = {
     pages,
     folders,
+    pageId,
     collectionItemSlugs,
     collectionItemId: collectionLayerItemId,
     pageCollectionItemId,
@@ -886,6 +894,9 @@ const LayerItem: React.FC<{
         const linkAttrs = resolveLinkAttrs(layer.variables.link, layerLinkContext);
         if (linkAttrs) {
           Object.assign(elementProps, linkAttrs);
+          if (isLinkToCurrentPage(layer.variables.link, layerLinkContext, linkAttrs.href)) {
+            elementProps['aria-current'] = 'page';
+          }
         } else if (isLinkAtCollectionBoundary(layer.variables.link, layerLinkContext)) {
           elementProps['aria-disabled'] = 'true';
           elementProps['data-link-disabled'] = 'true';
@@ -1340,10 +1351,17 @@ const LayerItem: React.FC<{
         iconHtml = DEFAULT_ASSETS.ICON;
       }
 
+      // Derive aspect-ratio from the SVG viewBox so an icon with only one of
+      // width/height set resolves the missing axis to its true proportions
+      // instead of collapsing. Inert when both dimensions are explicitly set.
+      const iconAspectRatio = getSvgAspectRatioStyle(iconHtml);
+      const iconElementStyle = (typeof elementProps.style === 'object' && elementProps.style) || undefined;
+
       return (
         <Tag
           {...elementProps}
           data-icon="true"
+          style={iconAspectRatio ? { aspectRatio: iconAspectRatio, ...iconElementStyle } : iconElementStyle}
           dangerouslySetInnerHTML={{ __html: iconHtml }}
         />
       );
@@ -1616,6 +1634,17 @@ const LayerItem: React.FC<{
       const shouldAutoPlay = mediaProps.autoplay === true;
       delete mediaProps.autoplay;
 
+      // React doesn't reliably reflect `muted` to the DOM during SSR/hydration,
+      // so apply it via ref. Mobile browsers reject autoplay unless the element
+      // is actually muted at play() time.
+      const shouldMute = mediaProps.muted === true;
+
+      // Mobile (iOS/Android) only autoplays videos rendered inline. Without
+      // playsInline it forces fullscreen and blocks autoplay.
+      if (htmlTag === 'video') {
+        mediaProps.playsInline = true;
+      }
+
       if (mediaSrc) {
         mediaProps.src = mediaSrc;
       }
@@ -1625,14 +1654,14 @@ const LayerItem: React.FC<{
       }
 
       // Handle special attributes that need to be set on the DOM element
-      // (autoplay and volume must be set via JavaScript on the DOM element)
+      // (autoplay, muted, and volume must be set via JavaScript on the DOM element)
       if (htmlTag === 'audio' || htmlTag === 'video') {
         const originalRef = mediaProps.ref;
         const volumeValue = normalizedAttributes?.volume
           ? parseInt(normalizedAttributes.volume) / 100
           : undefined;
 
-        if (shouldAutoPlay || volumeValue !== undefined) {
+        if (shouldAutoPlay || shouldMute || volumeValue !== undefined) {
           mediaProps.ref = (element: HTMLAudioElement | HTMLVideoElement | null) => {
             if (originalRef) {
               if (typeof originalRef === 'function') {
@@ -1643,6 +1672,11 @@ const LayerItem: React.FC<{
             }
 
             if (element) {
+              // Mute before play() so mobile browsers allow autoplay.
+              if (shouldMute) {
+                element.muted = true;
+                element.setAttribute('muted', '');
+              }
               if (shouldAutoPlay) {
                 element.autoplay = true;
                 element.setAttribute('autoplay', '');
@@ -1681,6 +1715,7 @@ const LayerItem: React.FC<{
               currentLocale={currentLocale}
               availableLocales={availableLocales}
               localeSelectorFormat={localeSelectorFormat}
+              localizedPageUrls={localizedPageUrls}
               isInsideForm={isInsideForm}
               isInsideLink={isInsideLink}
               parentFormSettings={parentFormSettings}
@@ -1743,6 +1778,7 @@ const LayerItem: React.FC<{
             availableLocales={availableLocales}
             currentPageSlug={currentPageSlug}
             isPublished={isPublished}
+            localizedPageUrls={localizedPageUrls}
           />
         </Tag>
       );
@@ -1803,6 +1839,7 @@ const LayerItem: React.FC<{
       content = (
         <a
           {...linkAttrs}
+          {...(isLinkToCurrentPage(linkSettings, layerLinkContext, linkAttrs.href) ? { 'aria-current': 'page' } : {})}
           className="contents"
         >
           {content}

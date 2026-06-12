@@ -9,6 +9,38 @@ import { getTiptapTextContent } from '@/lib/text-format-utils';
 import { buildPasswordFormSubtree } from '@/lib/password-form-template';
 
 /**
+ * Build a revision key from a page's effective password protection (its own
+ * settings plus any ancestor folder settings). Used by the builder to reload
+ * the preview iframe when password settings change but the URL stays the same.
+ */
+export function buildPreviewAuthRevision(
+  page: Page | null | undefined,
+  folders: PageFolder[],
+): string {
+  if (!page) return '';
+
+  const parts: string[] = [
+    page.updated_at,
+    String(page.settings?.auth?.enabled ?? false),
+    page.settings?.auth?.password ?? '',
+  ];
+
+  let folderId = page.page_folder_id;
+  while (folderId) {
+    const folder = folders.find((f) => f.id === folderId);
+    if (!folder) break;
+    parts.push(
+      folder.updated_at,
+      String(folder.settings?.auth?.enabled ?? false),
+      folder.settings?.auth?.password ?? '',
+    );
+    folderId = folder.page_folder_id;
+  }
+
+  return parts.join('|');
+}
+
+/**
  * Reserved slugs that cannot be used at the root level (null parent folder)
  * These conflict with the app's routing structure
  */
@@ -277,6 +309,64 @@ export function buildLocalizedDynamicPageUrl(
 
   // Replace {slug} placeholder with the actual slug value
   return patternPath.replace(/\{slug\}/g, collectionItemSlug);
+}
+
+/**
+ * Slug context for a dynamic (CMS-driven) page, used to resolve the translated
+ * item slug per locale.
+ */
+export interface LocalizedDynamicSlug {
+  /** Collection item ID (translation `source_id`). */
+  itemId: string;
+  /** Translation `content_key` for the slug field (e.g. `field:key:slug`). */
+  contentKey: string;
+  /** Default-locale slug value, used as the fallback. */
+  defaultValue: string;
+}
+
+/**
+ * Build relative localized URLs for a page across every locale, keyed by locale ID.
+ * Reuses translated folder/page slugs and, for dynamic pages, the translated CMS
+ * item slug. Powers the locale selector so switching language preserves the
+ * correct translated path.
+ *
+ * @param translationsByLocale - Per-locale translation maps keyed by translatable key
+ * @param dynamicSlug - Slug context for dynamic pages (omit for static pages)
+ *
+ * @example
+ * buildLocalizedPageUrls(page, folders, locales, translationsByLocale, dynamicSlug)
+ * // { 'locale-en': '/solutions/structured-websites', 'locale-fr': '/fr/solutions/sites-structures' }
+ */
+export function buildLocalizedPageUrls(
+  page: Page,
+  allFolders: PageFolder[],
+  locales: Locale[],
+  translationsByLocale: Record<string, Record<string, Translation> | undefined>,
+  dynamicSlug?: LocalizedDynamicSlug | null
+): Record<string, string> {
+  const urls: Record<string, string> = {};
+
+  for (const locale of locales) {
+    const isDefaultLocale = locale.is_default;
+    const localeArg = isDefaultLocale ? null : locale;
+    const translations = isDefaultLocale ? undefined : translationsByLocale[locale.id];
+
+    if (dynamicSlug) {
+      const translatedSlug = isDefaultLocale
+        ? dynamicSlug.defaultValue
+        : translations?.[getTranslatableKey({
+          source_type: 'cms',
+          source_id: dynamicSlug.itemId,
+          content_key: dynamicSlug.contentKey,
+        })]?.content_value || dynamicSlug.defaultValue;
+
+      urls[locale.id] = buildLocalizedDynamicPageUrl(page, allFolders, translatedSlug, localeArg, translations);
+    } else {
+      urls[locale.id] = buildLocalizedSlugPath(page, allFolders, 'page', localeArg, translations);
+    }
+  }
+
+  return urls;
 }
 
 /**

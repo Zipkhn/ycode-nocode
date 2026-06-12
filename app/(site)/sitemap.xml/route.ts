@@ -71,7 +71,7 @@ export async function GET() {
     );
 
     // Fetch translations for each non-default locale (default locale uses original slugs)
-    const translationsByLocale: Record<string, Record<string, Translation>> = {};
+    const translationsByLocale = new Map<string, Record<string, Translation>>();
     if (locales.length > 1) {
       for (const locale of locales) {
         if (!locale.is_default) {
@@ -80,7 +80,7 @@ export async function GET() {
           for (const t of translations) {
             translationsMap[`${t.source_type}:${t.source_id}:${t.content_key}`] = t;
           }
-          translationsByLocale[locale.id] = translationsMap;
+          translationsByLocale.set(locale.id, translationsMap);
         }
       }
     }

@@ -26,6 +26,7 @@ export interface CreatePageData {
   name: string;
   slug: string;
   is_published?: boolean;
+  is_publishable?: boolean;
   page_folder_id?: string | null;
   order?: number;
   depth?: number;
@@ -43,6 +44,7 @@ export interface UpdatePageData {
   name?: string;
   slug?: string;
   is_published?: boolean;
+  is_publishable?: boolean;
   page_folder_id?: string | null;
   order?: number;
   depth?: number;
@@ -799,46 +801,47 @@ export async function duplicatePage(pageId: string): Promise<Page> {
     throw new Error('Page not found');
   }
 
-  // Dynamic pages cannot be duplicated
-  if (originalPage.is_dynamic) {
-    throw new Error('Dynamic pages cannot be duplicated');
-  }
-
   const newName = `${originalPage.name} (Copy)`;
 
-  // Generate base slug from the new name
-  const baseSlug = newName
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+  // Dynamic pages keep their original slug pattern (e.g. '*'); the conflicting
+  // slug warning between dynamic pages in the same folder is handled in the UI.
+  let newSlug = originalPage.slug;
 
-  // Get all existing slugs in the same folder to find a unique one
-  let query = client
-    .from('pages')
-    .select('slug')
-    .eq('is_published', false)
-    .is('error_page', null)
-    .is('deleted_at', null);
+  if (!originalPage.is_dynamic) {
+    // Generate base slug from the new name
+    const baseSlug = newName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
 
-  // Handle null parent folder properly
-  if (originalPage.page_folder_id === null) {
-    query = query.is('page_folder_id', null);
-  } else {
-    query = query.eq('page_folder_id', originalPage.page_folder_id);
-  }
+    // Get all existing slugs in the same folder to find a unique one
+    let query = client
+      .from('pages')
+      .select('slug')
+      .eq('is_published', false)
+      .is('error_page', null)
+      .is('deleted_at', null);
 
-  const { data: existingPages } = await query;
+    // Handle null parent folder properly
+    if (originalPage.page_folder_id === null) {
+      query = query.is('page_folder_id', null);
+    } else {
+      query = query.eq('page_folder_id', originalPage.page_folder_id);
+    }
 
-  const existingSlugs = (existingPages || []).map(p => p.slug.toLowerCase());
+    const { data: existingPages } = await query;
 
-  // Find unique slug
-  let newSlug = baseSlug;
-  if (existingSlugs.includes(baseSlug)) {
-    let counter = 2;
-    newSlug = `${baseSlug}-${counter}`;
-    while (existingSlugs.includes(newSlug)) {
-      counter++;
+    const existingSlugs = (existingPages || []).map(p => p.slug.toLowerCase());
+
+    // Find unique slug
+    newSlug = baseSlug;
+    if (existingSlugs.includes(baseSlug)) {
+      let counter = 2;
       newSlug = `${baseSlug}-${counter}`;
+      while (existingSlugs.includes(newSlug)) {
+        counter++;
+        newSlug = `${baseSlug}-${counter}`;
+      }
     }
   }
 
@@ -1006,7 +1009,7 @@ export async function getUnpublishedPagesCount(): Promise<number> {
   const [draftResult, publishedResult] = await Promise.all([
     client
       .from('pages')
-      .select('id, content_hash, page_folder_id, page_layers!inner(content_hash)')
+      .select('id, content_hash, page_folder_id, is_publishable, page_layers!inner(content_hash)')
       .eq('is_published', false)
       .eq('page_layers.is_published', false)
       .is('deleted_at', null)
@@ -1046,9 +1049,17 @@ export async function getUnpublishedPagesCount(): Promise<number> {
   let count = 0;
   for (const draft of draftResult.data) {
     const pub = publishedMap.get(draft.id);
+    const isDraftOnly = (draft as { is_publishable?: boolean }).is_publishable === false;
 
     if (!pub) {
-      count++; // Never published
+      // Never published: only counts if it is meant to go live
+      if (!isDraftOnly) count++;
+      continue;
+    }
+
+    // Marked as draft but still live: will be removed on publish
+    if (isDraftOnly) {
+      count++;
       continue;
     }
 
@@ -1129,8 +1140,16 @@ export async function getUnpublishedPages(): Promise<Page[]> {
 
   for (const draftPage of draftResult.data) {
     const pub = publishedMap.get(draftPage.id);
+    const isDraftOnly = draftPage.is_publishable === false;
 
     if (!pub) {
+      // Never published: only pending if it is meant to go live
+      if (!isDraftOnly) unpublishedPages.push(draftPage);
+      continue;
+    }
+
+    // Marked as draft but still live: will be removed on publish
+    if (isDraftOnly) {
       unpublishedPages.push(draftPage);
       continue;
     }
@@ -1221,4 +1240,85 @@ export async function hardDeleteSoftDeletedPages(): Promise<{ count: number; del
   }
 
   return { count: deletedDrafts.length, deletedPageIds: ids };
+}
+
+/**
+ * Set the is_publishable flag on a page's draft row.
+ */
+export async function setPagePublishable(pageId: string, isPublishable: boolean): Promise<void> {
+  const client = await getSupabaseAdmin();
+  if (!client) throw new Error('Supabase not configured');
+
+  const { error } = await client
+    .from('pages')
+    .update({ is_publishable: isPublishable, updated_at: new Date().toISOString() })
+    .eq('id', pageId)
+    .eq('is_published', false);
+
+  if (error) throw new Error(`Failed to update page publishable flag: ${error.message}`);
+}
+
+/**
+ * Remove a page's published version (live row + layers via CASCADE).
+ * @returns true if a published row existed
+ */
+export async function deletePublishedPage(pageId: string): Promise<boolean> {
+  const client = await getSupabaseAdmin();
+  if (!client) throw new Error('Supabase not configured');
+
+  const { data: published } = await client
+    .from('pages')
+    .select('id')
+    .eq('id', pageId)
+    .eq('is_published', true)
+    .maybeSingle();
+
+  if (!published) return false;
+
+  const { error } = await client
+    .from('pages')
+    .delete()
+    .eq('id', pageId)
+    .eq('is_published', true);
+
+  if (error) throw new Error(`Failed to remove published page: ${error.message}`);
+
+  return true;
+}
+
+/**
+ * Annotate draft pages with computed publish status for the builder listing:
+ * has_published_version (a live row exists) and is_modified (draft differs from live).
+ */
+export async function enrichDraftPagesWithPublishStatus(pages: Page[]): Promise<Page[]> {
+  if (pages.length === 0) return pages;
+
+  const client = await getSupabaseAdmin();
+  if (!client) return pages;
+
+  const ids = pages.map(p => p.id);
+
+  const [{ data: publishedPages }, { data: draftLayers }, { data: publishedLayers }] = await Promise.all([
+    client.from('pages').select('id, content_hash, page_folder_id').in('id', ids).eq('is_published', true).is('deleted_at', null),
+    client.from('page_layers').select('page_id, content_hash').in('page_id', ids).eq('is_published', false).is('deleted_at', null),
+    client.from('page_layers').select('page_id, content_hash').in('page_id', ids).eq('is_published', true).is('deleted_at', null),
+  ]);
+
+  const publishedById = new Map((publishedPages || []).map(p => [p.id, p]));
+  const draftLayerHash = new Map((draftLayers || []).map(l => [l.page_id, l.content_hash]));
+  const publishedLayerHash = new Map((publishedLayers || []).map(l => [l.page_id, l.content_hash]));
+
+  return pages.map(page => {
+    const pub = publishedById.get(page.id);
+    if (!pub) {
+      return { ...page, has_published_version: false, is_modified: false };
+    }
+    const metaChanged = hashesDiffer(page.content_hash ?? null, pub.content_hash);
+    const layersChanged = hashesDiffer(
+      draftLayerHash.get(page.id) ?? null,
+      publishedLayerHash.get(page.id) ?? null
+    );
+    const folderChanged = page.page_folder_id !== pub.page_folder_id;
+    return { ...page, has_published_version: true, is_modified: metaChanged || layersChanged || folderChanged };
+  });
 }

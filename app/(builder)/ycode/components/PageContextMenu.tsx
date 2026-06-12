@@ -3,7 +3,9 @@
 import React, { useState } from 'react';
 import { ContextMenu,ContextMenuContent,ContextMenuItem,ContextMenuSeparator,ContextMenuTrigger } from '@/components/ui/context-menu';
 import type { Page, PageFolder } from '@/types';
+import type { StatusAction } from '@/lib/collection-field-utils';
 import { isHomepage } from '@/lib/page-utils';
+import type { PageStatusAvailability } from './PageStatusBadge';
 
 interface PageContextMenuProps {
   item: Page | PageFolder;
@@ -18,6 +20,8 @@ interface PageContextMenuProps {
   isDraftOnly?: boolean;
   onAddPage?: () => void; // For folders
   onAddFolder?: () => void; // For folders
+  onStatusChange?: (action: StatusAction) => void; // For pages
+  statusAvailability?: PageStatusAvailability;
 }
 
 /**
@@ -37,9 +41,10 @@ function PageContextMenuInner({
   isDraftOnly,
   onAddPage,
   onAddFolder,
+  onStatusChange,
+  statusAvailability,
 }: Omit<PageContextMenuProps, 'children'>) {
   const isItemHomepage = nodeType === 'page' && isHomepage(item as Page);
-  const isItemDynamic = nodeType === 'page' && (item as Page).is_dynamic;
   const isTempItem = item.id.startsWith('temp-page-') || item.id.startsWith('temp-folder-');
 
   return (
@@ -55,6 +60,24 @@ function PageContextMenuInner({
         <>
           <ContextMenuItem onClick={onOpen}>
             <span>Open page</span>
+          </ContextMenuItem>
+        </>
+      )}
+
+      {onStatusChange && statusAvailability && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            onClick={() => onStatusChange('stage')}
+            disabled={!statusAvailability.canStage}
+          >
+            <span>Stage for publish</span>
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => onStatusChange('draft')}
+            disabled={!statusAvailability.canDraft}
+          >
+            <span>Set as draft</span>
           </ContextMenuItem>
         </>
       )}
@@ -94,7 +117,7 @@ function PageContextMenuInner({
       {(onDuplicate || onDelete) && <ContextMenuSeparator />}
 
       {onDuplicate && (
-        <ContextMenuItem onClick={onDuplicate} disabled={isItemDynamic}>
+        <ContextMenuItem onClick={onDuplicate}>
           <span>Duplicate</span>
         </ContextMenuItem>
       )}
@@ -121,6 +144,8 @@ function PageContextMenu({
   isDraftOnly,
   onAddPage,
   onAddFolder,
+  onStatusChange,
+  statusAvailability,
 }: PageContextMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -142,6 +167,8 @@ function PageContextMenu({
           isDraftOnly={isDraftOnly}
           onAddPage={onAddPage}
           onAddFolder={onAddFolder}
+          onStatusChange={onStatusChange}
+          statusAvailability={statusAvailability}
         />
       )}
     </ContextMenu>
