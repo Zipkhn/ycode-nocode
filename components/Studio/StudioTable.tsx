@@ -10,6 +10,8 @@ export interface StudioRow {
   type: VariableType;
   /** Optional group label shown as a sticky sub-header */
   group?: string;
+  /** When true (and onRemoveRow is provided), shows a remove control on hover */
+  removable?: boolean;
 }
 
 export interface StudioMode {
@@ -24,6 +26,7 @@ export interface StudioTableProps {
   onValueChange: (rowKey: string, modeId: string, value: string) => void;
   onAddMode?: () => void;
   onAddRow?: () => void;
+  onRemoveRow?: (rowKey: string) => void;
   addRowLabel?: string;
   searchable?: boolean;
 }
@@ -123,6 +126,7 @@ export function StudioTable({
   onValueChange,
   onAddMode,
   onAddRow,
+  onRemoveRow,
   addRowLabel = '+ Create variable',
   searchable = true,
 }: StudioTableProps) {
@@ -226,6 +230,15 @@ export function StudioTable({
                           <TypeIcon type={row.type} />
                           <span className="truncate text-[11px] text-white/80">{row.label}</span>
                           <span className="hidden group-hover:block text-[9px] text-white/25 truncate font-mono ml-auto">{row.key}</span>
+                          {row.removable && onRemoveRow && (
+                            <button
+                              onClick={() => onRemoveRow(row.key)}
+                              className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 text-white/40 hover:text-red-400 transition-all text-[10px]"
+                              title="Remove text style"
+                            >
+                              ✕
+                            </button>
+                          )}
                         </div>
                       </td>
                       {modes.map((mode, ci) => (

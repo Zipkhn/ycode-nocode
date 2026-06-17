@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { StudioTable, type StudioRow, type StudioMode } from '../StudioTable';
 import type { StudioVariablesHook } from '../hooks/useStudioVariables';
 import { useFontsStore } from '@/stores/useFontsStore';
+import { parseCustomLevels, slugifyLevel, RESERVED_LEVEL_KEYS } from '../utils/bridge-generators';
 
 interface Props { hook: StudioVariablesHook }
 
@@ -25,7 +26,7 @@ const SIZE_MODES: StudioMode[] = [
   { id: 'min', label: 'Mobile'  },
 ];
 
-const SIZE_ROWS: StudioRow[] = TYPO_LEVELS.map(({ key, label }) => ({
+const BUILTIN_SIZE_ROWS: StudioRow[] = TYPO_LEVELS.map(({ key, label }) => ({
   key,
   label,
   type: 'number',
@@ -60,10 +61,45 @@ function TrimInput({ varKey, vars, setVar }: { varKey: string; vars: Record<stri
 }
 
 export function TypographySection({ hook }: Props) {
-  const { variables, setVar } = hook;
+  const { variables, setVar, setVars, removeVar, saveUpdates } = hook;
   const fonts = useFontsStore(s => s.fonts)
     .filter(f => f.type !== 'default')
     .filter((f, i, arr) => arr.findIndex(x => x.family === f.family) === i);
+
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+
+  const customLevels = parseCustomLevels(variables);
+  const sizeRows: StudioRow[] = [
+    ...BUILTIN_SIZE_ROWS,
+    ...customLevels.map(l => ({ key: l.key, label: l.label, type: 'number' as const, group: 'Custom', removable: true })),
+  ];
+
+  const addLevel = () => {
+    const key = slugifyLevel(newName);
+    if (!key || RESERVED_LEVEL_KEYS.has(key) || customLevels.some(l => l.key === key)) {
+      setNewName(''); setAdding(false); return;
+    }
+    setVars({
+      [`_typography---font-size--${key}-max`]: '1.5',
+      [`_typography---font-size--${key}-min`]: '1.25',
+      [`${key}-font-weight`]:    '400',
+      [`${key}-line-height`]:    '1.5',
+      [`${key}-letter-spacing`]: '0em',
+      [`${key}-margin-bottom`]:  '0rem',
+    });
+    setNewName(''); setAdding(false);
+  };
+
+  const removeLevel = (key: string) => {
+    [
+      `_typography---font-size--${key}-max`, `_typography---font-size--${key}-min`,
+      `${key}-font-weight`, `${key}-line-height`, `${key}-letter-spacing`,
+      `${key}-margin-bottom`, `${key}-text-wrap`, `${key}-font-family`,
+    ].forEach(removeVar);
+    // Regenerate persisted bridges (+ publish mirror) once the var refs settle.
+    setTimeout(() => { saveUpdates({}).catch(() => {}); }, 0);
+  };
 
   const getValue = (rowKey: string, modeId: string) =>
     variables[`_typography---font-size--${rowKey}-${modeId}`] ?? '';
@@ -124,14 +160,42 @@ export function TypographySection({ hook }: Props) {
 
         {/* Sizes table */}
         <div className="border-t border-white/10 mt-2">
-          <div className="px-3 py-1 bg-white/[0.03] text-[10px] font-semibold uppercase tracking-wider text-white/40">
-            Sizes
+          <div className="flex items-center px-3 py-1 bg-white/[0.03] border-b border-white/5">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 flex-1">
+              Sizes
+            </span>
+            <button
+              onClick={() => setAdding(a => !a)}
+              className="text-[10px] text-white/40 hover:text-white/70 transition-colors"
+            >
+              + Add text style
+            </button>
           </div>
+
+          {adding && (
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5 bg-white/[0.02]">
+              <input
+                type="text" autoFocus
+                value={newName} onChange={e => setNewName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addLevel()}
+                placeholder="Style name (e.g. Caption)"
+                className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-[11px] text-white placeholder:text-white/30 outline-none focus:border-white/20"
+              />
+              <button onClick={addLevel} className="px-2 py-1 rounded border border-white/10 text-[11px] text-white/50 hover:text-white hover:bg-white/5 transition-colors">
+                Create
+              </button>
+              <button onClick={() => { setAdding(false); setNewName(''); }} className="text-white/30 hover:text-white/60 text-[10px]">
+                ✕
+              </button>
+            </div>
+          )}
+
           <StudioTable
-            rows={SIZE_ROWS}
+            rows={sizeRows}
             modes={SIZE_MODES}
             getValue={getValue}
             onValueChange={handleChange}
+            onRemoveRow={removeLevel}
             searchable={false}
           />
         </div>

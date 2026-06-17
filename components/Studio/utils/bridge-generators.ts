@@ -38,6 +38,104 @@ export function labelToUuidKey(label: string): string {
   return `__uuid--${label.replace(/\s*\/\s*/g, '-').replace(/\s+/g, '-').toLowerCase()}`;
 }
 
+// ── Custom typography levels (user-added text styles) ───────────────────────────
+
+/** Level keys reserved by built-in typography — custom levels cannot reuse them. */
+export const RESERVED_LEVEL_KEYS = new Set<string>([
+  'display', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'large', 'body', 'small', 'text-large', 'text-main', 'text-small',
+]);
+
+export interface CustomLevel { key: string; label: string; }
+
+export function slugifyLevel(name: string): string {
+  return name.trim().toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function titleCaseLevel(slug: string): string {
+  return slug.split('-').filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+/**
+ * Derive custom text-style levels from the variable map. A custom level exists
+ * iff `_typography---font-size--{slug}-max` is present and {slug} isn't reserved.
+ * No separate registry is stored — keeps the persisted CSS free of JSON-in-a-var.
+ */
+export function parseCustomLevels(variables: Record<string, string>): CustomLevel[] {
+  const out: CustomLevel[] = [];
+  const seen = new Set<string>();
+  for (const k of Object.keys(variables)) {
+    const m = k.match(/^_typography---font-size--(.+)-max$/);
+    if (!m) continue;
+    const key = m[1];
+    if (RESERVED_LEVEL_KEYS.has(key) || seen.has(key)) continue;
+    if (!/^[a-z0-9-]+$/.test(key)) continue;
+    seen.add(key);
+    out.push({ key, label: titleCaseLevel(key) });
+  }
+  return out;
+}
+
+// ── Custom theme colors (user-added theme tokens) ───────────────────────────────
+
+/** Theme token keys reserved by built-in colors — custom tokens cannot reuse them. */
+export const RESERVED_THEME_KEYS = new Set<string>([
+  'background', 'background-2', 'text-main', 'text-heading', 'text-muted', 'border', 'accent',
+]);
+
+/** Derive custom theme color tokens from `theme-light--{slug}` keys (excl. built-ins & gradients). */
+export function parseCustomThemeColors(variables: Record<string, string>): CustomLevel[] {
+  const out: CustomLevel[] = [];
+  const seen = new Set<string>();
+  for (const k of Object.keys(variables)) {
+    const m = k.match(/^theme-light--(.+)$/);
+    if (!m) continue;
+    const key = m[1];
+    if (key.startsWith('gradient-')) continue;
+    if (RESERVED_THEME_KEYS.has(key) || seen.has(key)) continue;
+    if (!/^[a-z0-9-]+$/.test(key)) continue;
+    seen.add(key);
+    out.push({ key, label: titleCaseLevel(key) });
+  }
+  return out;
+}
+
+/**
+ * Emit a light/dark-aware `--theme--{slug}` variable + `.u-bg/-text-color/-border-color`
+ * utilities for each custom theme color. Independent of Ycode color variables.
+ */
+export function generateCustomThemeColorsBridgeCSS(variables: Record<string, string>): string {
+  const tokens = parseCustomThemeColors(variables);
+  if (!tokens.length) return '';
+  const scope = ':where(body)';
+  const lightDecls: string[] = [];
+  const darkDecls: string[] = [];
+  const utils: string[] = [];
+  for (const { key } of tokens) {
+    const lightRaw = variables[`theme-light--${key}`] || '';
+    const darkRaw  = variables[`theme-dark--${key}`]  || '';
+    const light = resolveVarToHex(lightRaw, variables) || lightRaw;
+    const dark  = resolveVarToHex(darkRaw, variables)  || darkRaw;
+    if (light) lightDecls.push(`  --theme--${key}: ${light};`);
+    if (dark)  darkDecls.push(`  --theme--${key}: ${dark};`);
+    utils.push(
+      `${scope} .u-bg-${key}{background-color:var(--theme--${key})!important}`,
+      `${scope} .u-text-color-${key}{color:var(--theme--${key})!important}`,
+      `${scope} .u-border-color-${key}{border-color:var(--theme--${key})!important}`,
+    );
+  }
+  const lines: string[] = ['/* Studio Custom Theme Colors Bridge */'];
+  if (lightDecls.length) lines.push(`${scope}{`, ...lightDecls, '}');
+  if (darkDecls.length)  lines.push('.u-theme-dark,.dark{', ...darkDecls, '}');
+  lines.push(...utils);
+  return lines.join('\n');
+}
+
 // ── Spacing Bridge ────────────────────────────────────────────────────────────
 
 interface SpacingParams {
@@ -130,6 +228,24 @@ export function generateTypographyBridgeCSS(variables: Record<string, string>): 
     const twPart = tw ? `;text-wrap:${tw}!important` : '';
     lines.push(`${selector}{font-weight:${fw}!important;line-height:${lh}!important;letter-spacing:${ls}!important;margin-bottom:${mb}!important${twPart}}`);
   }
+  // Custom levels → `.u-text-{slug}` with the same fluid clamp as built-ins.
+  for (const lvl of parseCustomLevels(variables)) {
+    const k = lvl.key;
+    const minV = `var(--_typography---font-size--${k}-min, 1)`;
+    const maxV = `var(--_typography---font-size--${k}-max, 1.25)`;
+    const vMin = 'var(--site--viewport-min, 20)';
+    const vMax = 'var(--site--viewport-max, 90)';
+    const fs = `clamp(calc(${minV} * 1rem), calc(${minV} * 1rem + (${maxV} - ${minV}) * (100vw - ${vMin} * 1rem) / (${vMax} - ${vMin})), calc(${maxV} * 1rem))`;
+    const fw = variables[`${k}-font-weight`]    || '400';
+    const lh = variables[`${k}-line-height`]     || '1.5';
+    const ls = variables[`${k}-letter-spacing`]  || '0em';
+    const mb = variables[`${k}-margin-bottom`]   || '0rem';
+    const tw = variables[`${k}-text-wrap`];
+    const ff = variables[`${k}-font-family`];
+    const twPart = tw ? `;text-wrap:${tw}!important` : '';
+    const ffPart = ff ? `;font-family:${ff}!important` : '';
+    lines.push(`${scope} .u-text-${k}{font-size:${fs}!important;font-weight:${fw}!important;line-height:${lh}!important;letter-spacing:${ls}!important;margin-bottom:${mb}!important${twPart}${ffPart}}`);
+  }
   return lines.join('\n');
 }
 
@@ -195,5 +311,7 @@ export function getCompleteBridgeCSS(
   ];
   const themeDark = generateThemeDarkBridgeCSS(variables);
   if (themeDark) parts.push(themeDark);
+  const themeColors = generateCustomThemeColorsBridgeCSS(variables);
+  if (themeColors) parts.push(themeColors);
   return parts.join('\n\n');
 }

@@ -9,6 +9,7 @@ import {
   generateThemeDarkBridgeCSS,
   generateRadiusBridgeCSS,
   generateCustomVarsBridgeCSS,
+  generateCustomThemeColorsBridgeCSS,
   TYPOGRAPHY_LEVELS,
   type CustomVarsConfig,
 } from '../utils/bridge-generators';
@@ -137,6 +138,9 @@ export function useStudioVariables(): StudioVariablesHook {
     const customVarsCSS = generateCustomVarsBridgeCSS(customVarsConfig);
     const TAG_CUSTOM = 'studio-runtime-custom-vars';
 
+    const themeColorsCSS = generateCustomThemeColorsBridgeCSS(variables);
+    const TAG_THEME_COLORS = 'studio-runtime-theme-colors';
+
     const inject = (doc: Document | null | undefined) => {
       if (!doc?.head) return;
       let el = doc.getElementById(TAG_SPACING) as HTMLStyleElement | null;
@@ -148,6 +152,9 @@ export function useStudioVariables(): StudioVariablesHook {
       let customEl = doc.getElementById(TAG_CUSTOM) as HTMLStyleElement | null;
       if (!customEl) { customEl = doc.createElement('style') as HTMLStyleElement; customEl.id = TAG_CUSTOM; doc.head.appendChild(customEl); }
       customEl.textContent = customVarsCSS;
+      let themeColorsEl = doc.getElementById(TAG_THEME_COLORS) as HTMLStyleElement | null;
+      if (!themeColorsEl) { themeColorsEl = doc.createElement('style') as HTMLStyleElement; themeColorsEl.id = TAG_THEME_COLORS; doc.head.appendChild(themeColorsEl); }
+      themeColorsEl.textContent = themeColorsCSS;
     };
 
     inject(document);
@@ -209,6 +216,7 @@ export function useStudioVariables(): StudioVariablesHook {
           const dark = generateThemeDarkBridgeCSS(vars);
           if (dark) setOrCreate('studio-runtime-theme-dark', dark);
           setOrCreate('studio-runtime-radius', generateRadiusBridgeCSS());
+          setOrCreate('studio-runtime-theme-colors', generateCustomThemeColorsBridgeCSS(vars));
         } catch { /* cross-origin */ }
       });
     } catch (e) {

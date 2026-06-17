@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { StudioVariablesHook } from '../hooks/useStudioVariables';
+import { parseCustomLevels } from '../utils/bridge-generators';
 
 interface Props { hook: StudioVariablesHook }
 
@@ -27,6 +28,14 @@ function isShared(propKey: string) {
 export function TextStyleSection({ hook }: Props) {
   const { variables, setVar, removeVar } = hook;
 
+  const customLevels = parseCustomLevels(variables);
+  const allLevels: string[] = [...LEVELS, ...customLevels.map(c => c.key)];
+  const labelFor = (lvl: string) =>
+    LEVEL_LABELS[lvl] ?? customLevels.find(c => c.key === lvl)?.label ?? lvl;
+  // Custom levels get a per-level font-family var; built-ins share headings/body.
+  const cssKeyFor = (prop: typeof PROPS[number], lvl: string) =>
+    prop.key === 'font-family' && !(lvl in LEVEL_LABELS) ? `${lvl}-font-family` : prop.cssKey(lvl);
+
   return (
     <div className="flex flex-col h-full">
       {/* Search */}
@@ -38,9 +47,9 @@ export function TextStyleSection({ hook }: Props) {
           <thead className="sticky top-0 bg-[#111] z-10">
             <tr className="border-b border-white/10">
               <th className="text-left px-3 py-1.5 text-[11px] font-medium text-white/50 w-[140px] shrink-0">Property</th>
-              {LEVELS.map(l => (
+              {allLevels.map(l => (
                 <th key={l} className="text-center px-2 py-1.5 text-[11px] font-medium text-white/50 border-l border-white/5 min-w-[80px]">
-                  {LEVEL_LABELS[l]}
+                  {labelFor(l)}
                 </th>
               ))}
             </tr>
@@ -49,8 +58,8 @@ export function TextStyleSection({ hook }: Props) {
             {PROPS.map(prop => (
               <tr key={prop.key} className="border-b border-white/5 hover:bg-white/[0.04] transition-colors">
                 <td className="px-3 py-1 text-[11px] text-white/70 shrink-0">{prop.label}</td>
-                {LEVELS.map(lvl => {
-                  const cssKey = prop.cssKey(lvl);
+                {allLevels.map(lvl => {
+                  const cssKey = cssKeyFor(prop, lvl);
                   // font-family is shared (headings/body) — show read-only indicator for body
                   const val = variables[cssKey] ?? '';
                   const displayVal = prop.key === 'font-family'

@@ -2,6 +2,7 @@
 
 import React, { useState, useId } from 'react';
 import { resolveVarToHex } from '../utils/color-utils';
+import { parseCustomThemeColors, slugifyLevel, RESERVED_THEME_KEYS } from '../utils/bridge-generators';
 import type { StudioVariablesHook } from '../hooks/useStudioVariables';
 
 interface Props { hook: StudioVariablesHook }
@@ -120,9 +121,29 @@ function GradientSelect({
 // ── Main section ──────────────────────────────────────────────────────────────
 
 export function ThemeSection({ hook }: Props) {
-  const { variables, setVar, removeVar } = hook;
+  const { variables, setVar, setVars, removeVar, saveUpdates } = hook;
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
+  const [newColorName, setNewColorName] = useState('');
+  const [addingColor, setAddingColor] = useState(false);
+
+  const customColors = parseCustomThemeColors(variables);
+
+  const addColorToken = () => {
+    const slug = slugifyLevel(newColorName);
+    if (!slug || RESERVED_THEME_KEYS.has(slug) || customColors.some(c => c.key === slug)) {
+      setNewColorName(''); setAddingColor(false); return;
+    }
+    setVars({ [`theme-light--${slug}`]: '#111111', [`theme-dark--${slug}`]: '#eeeeee' });
+    setNewColorName(''); setAddingColor(false);
+  };
+
+  const removeColorToken = (key: string) => {
+    removeVar(`theme-light--${key}`);
+    removeVar(`theme-dark--${key}`);
+    // Regenerate persisted bridges (+ publish mirror) once the var refs settle.
+    setTimeout(() => { saveUpdates({}).catch(() => {}); }, 0);
+  };
 
   const gradientOptions = getGradientOptions(variables);
   const dynamicGradientTokens = getDynamicGradientTokens(variables);
@@ -155,6 +176,36 @@ export function ThemeSection({ hook }: Props) {
     <div className="h-full overflow-auto text-[11px]">
 
       {/* ── Colors ── */}
+      <div className="flex items-center px-3 py-1 bg-white/[0.03] border-b border-white/5">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 flex-1">
+          Colors
+        </span>
+        <button
+          onClick={() => setAddingColor(a => !a)}
+          className="text-[10px] text-white/40 hover:text-white/70 transition-colors"
+        >
+          + Add
+        </button>
+      </div>
+
+      {addingColor && (
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-white/5 bg-white/[0.02]">
+          <input
+            type="text" autoFocus
+            value={newColorName} onChange={e => setNewColorName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addColorToken()}
+            placeholder="Color name (e.g. brand)"
+            className="flex-1 bg-white/5 border border-white/10 rounded px-2 py-1 text-[11px] text-white placeholder:text-white/30 outline-none focus:border-white/20"
+          />
+          <button onClick={addColorToken} className="px-2 py-1 rounded border border-white/10 text-[11px] text-white/50 hover:text-white hover:bg-white/5 transition-colors">
+            Create
+          </button>
+          <button onClick={() => { setAddingColor(false); setNewColorName(''); }} className="text-white/30 hover:text-white/60 text-[10px]">
+            ✕
+          </button>
+        </div>
+      )}
+
       <table className="w-full border-collapse">
         <thead className="sticky top-0 z-10 bg-[#111]">
           <tr className="border-b border-white/10">
@@ -170,6 +221,30 @@ export function ThemeSection({ hook }: Props) {
           {COLOR_ROWS.map(row => (
             <tr key={row.key} className="border-b border-white/5 hover:bg-white/[0.04]">
               <td className="px-3 py-0.5 text-white/80">{row.label}</td>
+              {MODES.map(mode => (
+                <td key={mode} className="border-l border-white/5 px-2 py-0.5">
+                  <ColorCell
+                    value={getColorVal(row.key, mode)}
+                    onChange={v => setVar(`theme-${mode}--${row.key}`, v)}
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+          {customColors.map(row => (
+            <tr key={row.key} className="border-b border-white/5 hover:bg-white/[0.04] group">
+              <td className="px-3 py-0.5 text-white/80">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="truncate capitalize">{row.label}</span>
+                  <button
+                    onClick={() => removeColorToken(row.key)}
+                    className="ml-auto shrink-0 opacity-0 group-hover:opacity-100 text-white/40 hover:text-red-400 transition-all text-[10px]"
+                    title="Remove color"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </td>
               {MODES.map(mode => (
                 <td key={mode} className="border-l border-white/5 px-2 py-0.5">
                   <ColorCell
