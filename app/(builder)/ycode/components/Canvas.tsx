@@ -653,7 +653,7 @@ const Canvas = React.memo(function Canvas({
 
     const syncTheme = async () => {
       try {
-        const response = await fetch(`/global-theme.css?v=${Date.now()}`);
+        const response = await fetch(`/api/studio/css?v=${Date.now()}`);
         if (!response.ok) return;
         const css = await response.text();
         injectStudioTheme(iframeDoc, css);

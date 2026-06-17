@@ -192,7 +192,7 @@ export function useStudioVariables(): StudioVariablesHook {
 
   const triggerIframeCSSReload = useCallback(async () => {
     try {
-      const res = await fetch(`/global-theme.css?v=${Date.now()}`);
+      const res = await fetch(`/api/studio/css?v=${Date.now()}`);
       if (!res.ok) return;
       const css = await res.text();
       const vars    = variablesRef.current;

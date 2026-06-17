@@ -38,6 +38,14 @@ const nextConfig: NextConfig = {
     remotePatterns: imageRemotePatterns,
   },
 
+  // Bundle the committed global-theme.css with the Studio routes so they can read
+  // the static skeleton at runtime on serverless hosts (Vercel traces only files
+  // referenced via statically-analysable paths; ours uses process.cwd()).
+  outputFileTracingIncludes: {
+    '/api/studio': ['./public/global-theme.css', './app/global-theme.css'],
+    '/api/studio/css': ['./public/global-theme.css', './app/global-theme.css'],
+  },
+
   // Ensure sharp works properly in serverless environments (Vercel)
   // Also externalize Knex database drivers (we only use PostgreSQL)
   // This works for both webpack and Turbopack

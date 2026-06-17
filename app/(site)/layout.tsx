@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import RootLayoutShell, { defaultMetadata } from '@/components/RootLayoutShell';
 import { fetchGlobalPageSettings } from '@/lib/generate-page-metadata';
 import { renderRootLayoutHeadCode } from '@/lib/parse-head-html';
+import { loadCurrentTheme } from '@/lib/studio-theme-store';
+import { renderStudioDynamicCss } from '@/lib/studio-css';
 
 export async function generateMetadata(): Promise<Metadata> {
   if (process.env.SKIP_SETUP === 'true') {
@@ -46,6 +48,25 @@ export default async function SiteLayout({
       }
     } catch {
       // Supabase not configured — skip custom code
+    }
+
+    // Studio design system — inject the live theme (variables + bridges) from the
+    // DB so theme edits reach the published site without a rebuild. Overrides the
+    // stale build-time values from the global-theme.css bundle. Placed before
+    // custom head code so the user's custom CSS can still override it.
+    try {
+      const css = renderStudioDynamicCss(await loadCurrentTheme());
+      if (css.trim()) {
+        headElements = [
+          <style
+            key="studio-theme" id="studio-theme"
+            dangerouslySetInnerHTML={{ __html: css }}
+          />,
+          ...headElements,
+        ];
+      }
+    } catch {
+      // Supabase not configured — build-time bundle remains the fallback
     }
   }
 
