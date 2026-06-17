@@ -13,7 +13,7 @@ interface Props {
   duration: number;
 }
 
-const isDotLottie = (src: string) => /\.(lottie|zip)(\?|#|$)/i.test(src);
+export const isDotLottie = (src: string) => /\.(lottie|zip)(\?|#|$)/i.test(src);
 
 export default function LottiePlayer({ src, loop, autoplay, speed, reverse, renderer, useCustomDuration, duration }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,6 +44,7 @@ export default function LottiePlayer({ src, loop, autoplay, speed, reverse, rend
             devicePixelRatio: Math.max(window.devicePixelRatio || 1, 2),
           },
         });
+        player.addEventListener('loadError', () => console.warn('Lottie: dotLottie failed to load', src));
         if (useCustomDuration && duration > 0) {
           player.addEventListener('load', () => {
             const naturalMs = player.duration * 1000;
@@ -51,7 +52,7 @@ export default function LottiePlayer({ src, loop, autoplay, speed, reverse, rend
           });
         }
         cleanup = () => player.destroy();
-      });
+      }).catch(e => console.warn('Lottie: dotLottie module load failed', e));
     } else {
       let anim: import('lottie-web').AnimationItem | null = null;
       import('lottie-web').then(({ default: lottie }) => {
@@ -67,6 +68,8 @@ export default function LottiePlayer({ src, loop, autoplay, speed, reverse, rend
 
         anim.setDirection(reverse ? -1 : 1);
 
+        anim.addEventListener('data_failed', () => console.warn('Lottie: animation failed to load', src));
+
         anim.addEventListener('DOMLoaded', () => {
           if (!anim || cancelled) return;
           if (useCustomDuration && duration > 0) {
@@ -79,7 +82,7 @@ export default function LottiePlayer({ src, loop, autoplay, speed, reverse, rend
             anim.goToAndPlay(anim.totalFrames, true);
           }
         });
-      });
+      }).catch(e => console.warn('Lottie: lottie-web module load failed', e));
       cleanup = () => anim?.destroy();
     }
 

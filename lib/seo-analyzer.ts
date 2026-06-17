@@ -42,8 +42,10 @@ function collectHeadingTags(layers: Layer[]): string[] {
 function resolveHeadingTag(layer: Layer): string | null {
   const tag = layer.settings?.tag;
   if (tag && /^h[1-6]$/.test(tag)) return tag;
-  if (layer.name === 'heading') return tag || 'h2';
-  if (layer.name === 'text' && tag && /^h[1-6]$/.test(tag)) return tag;
+  // A 'heading' layer with no explicit tag defaults to h2. An explicit non-heading
+  // tag (p, div, blockquote…) means it no longer renders as a heading — exclude it,
+  // otherwise a value like 'p' poisons checkHeadingHierarchy (parseInt → NaN).
+  if (layer.name === 'heading' && !tag) return 'h2';
   return null;
 }
 

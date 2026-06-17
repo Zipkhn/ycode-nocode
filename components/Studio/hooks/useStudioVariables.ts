@@ -12,6 +12,7 @@ import {
   TYPOGRAPHY_LEVELS,
   type CustomVarsConfig,
 } from '../utils/bridge-generators';
+import { syncBridgesToCustomCss } from '../utils/bridge-sync';
 
 export type StudioStatus = 'idle' | 'saving' | 'done' | 'error';
 
@@ -217,39 +218,21 @@ export function useStudioVariables(): StudioVariablesHook {
 
   // ── saveUpdates (single source of truth) ─────────────────────────────────
 
-  const saveUpdatesInternal = useCallback(async (updates: Record<string, string>) => {
+  const performSave = useCallback(async (updates: Record<string, string>) => {
     const vars    = variablesRef.current;
     const sParams = spacingParamsRef.current;
     const bridges = getCompleteBridgeCSS(vars, sParams);
 
-    await fetch('/api/studio', {
+    const res = await fetch('/api/studio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ updates, bridges }),
     });
+    if (!res.ok) throw new Error(`POST /api/studio ${res.status}`);
 
-    // Sync bridge block to Ycode custom_css
+    // Sync bridge block to Ycode custom_css (publish mirror)
     try {
-      const settingsRes = await fetch('/ycode/api/settings/custom_css');
-      if (settingsRes.ok) {
-        const json = await settingsRes.json();
-        const currentCss = json.data || '';
-        const START = '/* STUDIO_RUNTIME_BRIDGES_START */';
-        const END   = '/* STUDIO_RUNTIME_BRIDGES_END */';
-        const varBlock = `:root {\n${Object.entries(vars).map(([k, v]) => `  --${k}: ${v};`).join('\n')}\n}`;
-        const block    = `\n${START}\n${varBlock}\n\n${bridges}\n${END}\n`;
-        let newCss = currentCss;
-        if (newCss.includes(START) && newCss.includes(END)) {
-          newCss = newCss.substring(0, newCss.indexOf(START)) + block + newCss.substring(newCss.indexOf(END) + END.length);
-        } else {
-          newCss = newCss.trimEnd() + block;
-        }
-        await fetch('/ycode/api/settings/custom_css', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: newCss }),
-        });
-      }
+      await syncBridgesToCustomCss(vars, bridges);
     } catch (e) {
       console.warn('Studio: custom_css sync failed', e);
     }
@@ -257,12 +240,21 @@ export function useStudioVariables(): StudioVariablesHook {
     triggerIframeCSSReload();
   }, [triggerIframeCSSReload]);
 
+  // Serialize saves: custom_css is a read-modify-write, so concurrent saves
+  // (mount sync vs. a fast edit) must not interleave their GET/PUT and clobber each other.
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const saveUpdatesInternal = useCallback((updates: Record<string, string>) => {
+    const next = saveChainRef.current.then(() => performSave(updates), () => performSave(updates));
+    saveChainRef.current = next.catch(() => {}); // keep the chain alive without unhandled rejection
+    return next;
+  }, [performSave]);
+
   // ── One-shot bridge sync after load ──────────────────────────────────────
 
   useEffect(() => {
     if (loading || mountBridgeSyncDone.current) return;
     mountBridgeSyncDone.current = true;
-    saveUpdatesInternal({ 'space-0': '0px' });
+    saveUpdatesInternal({ 'space-0': '0px' }).catch(() => {}); // self-heals on next edit
   }, [loading, saveUpdatesInternal]);
 
   const saveUpdates = useCallback(async (updates: Record<string, string>) => {
@@ -278,7 +270,9 @@ export function useStudioVariables(): StudioVariablesHook {
     }
   }, [saveUpdatesInternal]);
 
-  const debouncedSave = useDebounce(saveUpdatesInternal, 300);
+  // Debounce the status-wrapped saveUpdates (not the raw internal) so a failed
+  // keystroke save surfaces as status='error' instead of an unhandled rejection.
+  const debouncedSave = useDebounce(saveUpdates, 300);
 
   // ── Public setters ────────────────────────────────────────────────────────
 

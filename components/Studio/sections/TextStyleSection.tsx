@@ -72,13 +72,17 @@ export function TextStyleSection({ hook }: Props) {
                       </td>
                     );
                   }
+                  // Weights < 400 are rarely loaded in the canvas/published font set
+                  // → the browser falls back to 400. Flag it so it isn't a silent surprise.
+                  const weightWarn = prop.key === 'font-weight' && val !== '' && !isNaN(Number(val)) && Number(val) < 400;
                   return (
                     <td key={lvl} className="border-l border-white/5 px-2 py-0.5">
                       <input
                         type="text"
                         value={displayVal}
                         onChange={e => setVar(cssKey, e.target.value)}
-                        className="w-full bg-transparent text-white text-[11px] font-mono outline-none focus:bg-white/5 rounded px-1 py-0.5 text-center"
+                        className={`w-full bg-transparent text-[11px] font-mono outline-none rounded px-1 py-0.5 text-center ${weightWarn ? 'text-amber-400 ring-1 ring-amber-400/50 focus:bg-amber-400/10' : 'text-white focus:bg-white/5'}`}
+                        title={weightWarn ? `Weight ${val} may not be loaded — the font likely falls back to 400 in the canvas and on the published site.` : undefined}
                         spellCheck={false}
                       />
                     </td>

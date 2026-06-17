@@ -74,21 +74,22 @@ export function hslToHex(h: number, s: number, l: number): string {
 export function generateColorScale(baseHex: string, prefix: string): Record<string, string> {
   const hsl = hexToHsl(baseHex);
   if (!hsl) return {};
-  const [h, s, baseLightness] = hsl;
+  const [h, s, l] = hsl;
+  const baseLightness = l * 100; // hexToHsl returns l in 0..1; the step math below is on a 0..100 scale
   const result: Record<string, string> = { [`color--${prefix}-500`]: baseHex };
   const darkerSteps = [600, 700, 800, 900] as const;
   darkerSteps.forEach((step, idx) => {
     const t = (idx + 1) / darkerSteps.length;
     const lightness = baseLightness * (1 - t) + 10 * t;
     const saturation = s * (1 - t * 0.25);
-    result[`color--${prefix}-${step}`] = hslToHex(h, saturation, lightness);
+    result[`color--${prefix}-${step}`] = hslToHex(h, saturation, lightness / 100);
   });
   const lighterSteps = [400, 300, 200, 100, 50] as const;
   lighterSteps.forEach((step, idx) => {
     const t = (idx + 1) / lighterSteps.length;
     const lightness = baseLightness + (97 - baseLightness) * t;
     const saturation = s * (1 - t * 0.65);
-    result[`color--${prefix}-${step}`] = hslToHex(h, saturation, lightness);
+    result[`color--${prefix}-${step}`] = hslToHex(h, saturation, lightness / 100);
   });
   return result;
 }
