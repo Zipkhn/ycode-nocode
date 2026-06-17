@@ -29,6 +29,7 @@ if (process.env.SUPABASE_URL) {
 
 const nextConfig: NextConfig = {
   trailingSlash: false,
+  devIndicators: false,
   staticPageGenerationTimeout: 120,
   experimental: {
     proxyClientMaxBodySize: '500mb',
