@@ -7,6 +7,8 @@ import { getItemWithValues, getItemsWithValues, getItemsWithValuesByIds, getItem
 import { getValuesByItemIds } from '@/lib/repositories/collectionItemValueRepository';
 import { getFieldsByCollectionId } from '@/lib/repositories/collectionFieldRepository';
 import { enrichItemsWithCountValues } from '@/lib/repositories/collectionCountRepository';
+import { getLocaleScaffoldTranslations, getCmsTranslationsForItems } from '@/lib/repositories/translationRepository';
+import { getTranslatableKey } from '@/lib/locale-runtime';
 import type { Page, PageFolder, PageLayers, Component, ComponentVariable, CollectionItemWithValues, CollectionField, Layer, CollectionPaginationMeta, Translation, Locale } from '@/types';
 import { getCollectionVariable, resolveFieldValue, evaluateVisibility, evaluateCollectionFilters, evaluateCondition, getLayerHtmlTag, filterDisabledSliderLayers } from '@/lib/layer-utils';
 import { isFieldVariable, isAssetVariable, createDynamicTextVariable, createDynamicRichTextVariable, createAssetVariable, getDynamicTextContent, getVariableStringValue, getAssetId, resolveDesignStyles } from '@/lib/variable-utils';
@@ -214,43 +216,96 @@ export async function loadTranslationsForLocale(
       return { locale: null, translations: {} };
     }
 
-    // Fetch all translations for this locale. Supabase caps PostgREST
-    // responses at 1000 rows by default — projects with more translations
-    // were silently truncated, causing entire layers to render in the
-    // source language on SSR while the editor (which fetches via its own
-    // paginated API) showed them correctly. Page through explicit ranges.
-    const PAGE_SIZE = 1000;
-    const translations: Translation[] = [];
-    for (let from = 0; ; from += PAGE_SIZE) {
-      const { data: page, error } = await supabase
-        .from('translations')
-        .select('*')
-        .eq('locale_id', locale.id)
-        .eq('is_published', isPublished)
-        .is('deleted_at', null)
-        .range(from, from + PAGE_SIZE - 1);
+    // Load the per-locale "scaffold" only: page/folder/component translations
+    // plus CMS *slug* rows. This covers routing, SEO, page/component rendering
+    // and URL generation. The bulk CMS *content* translations (text/rich text)
+    // — which dominate large catalogues and previously made every render fetch
+    // the entire locale catalogue — are loaded on demand per rendered item via
+    // `ensureCmsTranslations`.
+    const scaffold = await getLocaleScaffoldTranslations(locale.id, isPublished, tenantId);
 
-      if (error) {
-        console.error('Failed to fetch translations page:', error);
-        break;
-      }
-
-      if (!page || page.length === 0) break;
-      translations.push(...(page as Translation[]));
-      if (page.length < PAGE_SIZE) break;
-    }
-
-    // Build translations map keyed by translatable key
     const translationsMap: Record<string, Translation> = {};
-    for (const translation of translations) {
-      const key = `${translation.source_type}:${translation.source_id}:${translation.content_key}`;
-      translationsMap[key] = translation;
+    for (const translation of scaffold) {
+      translationsMap[getTranslatableKey(translation)] = translation;
     }
+
+    registerTranslationContext(translationsMap, locale.id, isPublished, tenantId);
 
     return { locale, translations: translationsMap };
   } catch (error) {
     console.error('Failed to load translations for locale:', localeCode, error);
     return { locale: null, translations: {} };
+  }
+}
+
+// ── Scoped CMS translation augmentation ───────────────────────────────────
+//
+// `loadTranslationsForLocale` returns a scaffold map (no CMS *content*). Each
+// server render path then augments that same map object in place with the CMS
+// translations for exactly the collection items it materialises, so
+// `applyCmsTranslations` finds them. The map identity is preserved as it is
+// threaded through the render pipeline, so all holders observe the additions.
+//
+// Tracking the locale/publish/tenant + already-loaded item ids on a WeakMap
+// keyed by the map object keeps render call sites free of extra plumbing.
+
+interface TranslationLoadContext {
+  localeId: string;
+  isPublished: boolean;
+  tenantId?: string;
+  loadedItemIds: Set<string>;
+}
+
+const translationLoadContexts = new WeakMap<object, TranslationLoadContext>();
+
+/** Associate a freshly-built scaffold map with its locale loading context. */
+function registerTranslationContext(
+  translations: Record<string, Translation>,
+  localeId: string,
+  isPublished: boolean,
+  tenantId?: string,
+): void {
+  translationLoadContexts.set(translations, {
+    localeId,
+    isPublished,
+    tenantId,
+    loadedItemIds: new Set(),
+  });
+}
+
+/**
+ * Ensure CMS *content* translations for the given collection item IDs are
+ * present in `translations`, fetching any that haven't been loaded yet and
+ * merging them into the same map object.
+ *
+ * No-ops when the map has no registered context (e.g. default locale, or maps
+ * built outside `loadTranslationsForLocale`) — in those cases the caller
+ * either needs no translations or already holds the full set.
+ */
+export async function ensureCmsTranslations(
+  translations: Record<string, Translation> | null | undefined,
+  itemIds: Array<string | null | undefined>,
+): Promise<void> {
+  if (!translations) return;
+  const ctx = translationLoadContexts.get(translations);
+  if (!ctx) return;
+
+  const missing: string[] = [];
+  for (const id of itemIds) {
+    if (id && !ctx.loadedItemIds.has(id)) {
+      ctx.loadedItemIds.add(id);
+      missing.push(id);
+    }
+  }
+  if (missing.length === 0) return;
+
+  try {
+    const rows = await getCmsTranslationsForItems(ctx.localeId, ctx.isPublished, missing, ctx.tenantId);
+    for (const row of rows) {
+      translations[getTranslatableKey(row)] = row;
+    }
+  } catch (error) {
+    console.error('Failed to load scoped CMS translations:', error);
   }
 }
 
@@ -298,15 +353,17 @@ async function getCollectionItemBySlug(
             // Extract item ID from translation key
             const itemId = translation.source_id;
 
-            // Verify this item belongs to the correct collection
-            const { data: item, error: itemError } = await supabase
+            // Verify this item belongs to the correct collection. On the public
+            // path also require is_publishable so unpublished items can't resolve.
+            let itemQuery = supabase
               .from('collection_items')
               .select('*')
               .eq('id', itemId)
               .eq('collection_id', collectionId)
               .eq('is_published', isPublished)
-              .is('deleted_at', null)
-              .single();
+              .is('deleted_at', null);
+            if (isPublished) itemQuery = itemQuery.eq('is_publishable', true);
+            const { data: item, error: itemError } = await itemQuery.single();
 
             if (!itemError && item) {
               // Found the item via translation - return it with all values
@@ -332,15 +389,17 @@ async function getCollectionItemBySlug(
       return null;
     }
 
-    // Verify the item belongs to the correct collection
-    const { data: item, error: itemError } = await supabase
+    // Verify the item belongs to the correct collection. On the public path
+    // also require is_publishable so unpublished items can't resolve.
+    let itemQuery = supabase
       .from('collection_items')
       .select('*')
       .eq('id', valueData.item_id)
       .eq('collection_id', collectionId)
       .eq('is_published', isPublished)
-      .is('deleted_at', null)
-      .single();
+      .is('deleted_at', null);
+    if (isPublished) itemQuery = itemQuery.eq('is_publishable', true);
+    const { data: item, error: itemError } = await itemQuery.single();
 
     if (itemError || !item) {
       return null;
@@ -522,6 +581,7 @@ async function fetchPageByPathInternal(
                 new Set(),
                 translations
               );
+              await ensureCmsTranslations(translations, [collectionItem.id]);
               enhancedItemValues = applyCmsTranslations(collectionItem.id, enhancedItemValues, collectionFields, translations, { includeIncomplete: !isPublished });
               enhancedItemValues = formatDateFieldsInItemValues(enhancedItemValues, collectionFields, timezone);
 
@@ -570,6 +630,7 @@ async function fetchPageByPathInternal(
             );
 
             // Apply CMS translations to the item values
+            await ensureCmsTranslations(translations, [collectionItem.id]);
             enhancedItemValues = applyCmsTranslations(collectionItem.id, enhancedItemValues, collectionFields, translations, { includeIncomplete: !isPublished });
 
             const rawItemValues = { ...enhancedItemValues };
@@ -1009,6 +1070,7 @@ async function resolveReferenceFields(
 
       // Translate the referenced item's values so localized pages render
       // referenced CMS content in the active locale (not the source language)
+      await ensureCmsTranslations(translations, [refItem.id]);
       const refValues = applyCmsTranslations(refItem.id, refItem.values, refFields, translations, { includeIncomplete: !isPublished });
 
       // Build the path prefix for this level
@@ -1120,6 +1182,7 @@ async function batchResolveReferenceFields(
   // Translate each referenced item's values once (reused across all rows that
   // reference it) so localized pages render referenced CMS content in the
   // active locale instead of the source language.
+  await ensureCmsTranslations(translations, Array.from(allRefItemIds));
   const translatedRefValuesById = new Map<string, Record<string, string>>();
   const getTranslatedRefValues = (refItem: CollectionItemWithValues, refFields: CollectionField[]): Record<string, string> => {
     let cached = translatedRefValuesById.get(refItem.id);
@@ -1745,16 +1808,32 @@ interface CollectionDataCache {
  *
  * Stops recursion at child layers that define their own collection scope.
  */
-function collectBoundFieldIds(layers: Layer[]): { fieldIds: Set<string>; fieldPaths: Set<string> } {
+function collectBoundFieldIds(layers: Layer[]): { fieldIds: Set<string>; fieldPaths: Set<string>; pathsByLayerId: Map<string, Set<string>> } {
   const fieldIds = new Set<string>();
   const fieldPaths = new Set<string>();
+  // Paths bound with an explicit collection_layer_id pointing at an ancestor
+  // collection layer (e.g. a binding inside a nested collection that reads a
+  // field from the enclosing collection). These must be re-attributed to that
+  // ancestor so its reference paths get resolved on SSR.
+  const pathsByLayerId = new Map<string, Set<string>>();
 
-  function addFieldVariable(fv: { type: 'field'; data: { field_id: string | null; relationships?: string[] } }) {
+  function addFieldVariable(fv: { type: 'field'; data: { field_id: string | null; relationships?: string[]; collection_layer_id?: string } }) {
     const fid = fv.data.field_id;
     if (!fid) return;
     fieldIds.add(fid);
     const rels = fv.data.relationships || [];
-    fieldPaths.add(rels.length > 0 ? [fid, ...rels].join('.') : fid);
+    const path = rels.length > 0 ? [fid, ...rels].join('.') : fid;
+    fieldPaths.add(path);
+
+    const clid = fv.data.collection_layer_id;
+    if (clid) {
+      let set = pathsByLayerId.get(clid);
+      if (!set) {
+        set = new Set<string>();
+        pathsByLayerId.set(clid, set);
+      }
+      set.add(path);
+    }
   }
 
   function scanInlineVariableTags(html: string) {
@@ -1916,7 +1995,7 @@ function collectBoundFieldIds(layers: Layer[]): { fieldIds: Set<string>; fieldPa
   }
 
   layers.forEach(scanLayer);
-  return { fieldIds, fieldPaths };
+  return { fieldIds, fieldPaths, pathsByLayerId };
 }
 
 function collectAllCollectionIds(layers: Layer[]): Set<string> {
@@ -1984,10 +2063,17 @@ async function buildCollectionCache(
   const refCollectionIds: string[] = [];
   const refFieldIdToCollectionId = new Map<string, string>();
   for (const f of fieldsData || []) {
-    if (f.type === 'reference' && f.reference_collection_id && !collectionIds.has(f.reference_collection_id)) {
+    if (f.type === 'reference' && f.reference_collection_id) {
       if (!boundFieldIds || boundFieldIds.has(f.id)) {
-        refCollectionIds.push(f.reference_collection_id);
+        // Always map the reference field to its target so relationship paths
+        // (refFieldId.targetFieldId) resolve. Only schedule a separate items
+        // fetch when the target isn't already a primary collection — otherwise
+        // its items are loaded by the primary fetch (with target fields merged
+        // into primaryFieldFilter below).
         refFieldIdToCollectionId.set(f.id, f.reference_collection_id);
+        if (!collectionIds.has(f.reference_collection_id)) {
+          refCollectionIds.push(f.reference_collection_id);
+        }
       }
     }
   }
@@ -2098,6 +2184,13 @@ async function buildCollectionCache(
   if (boundFieldIds && boundFieldIds.size > 0) {
     const merged = new Set(boundFieldIds);
     for (const sid of slugFieldIds) merged.add(sid);
+    // A primary collection can also be the target of a bound reference path
+    // (e.g. a nested collection whose items are referenced by an ancestor's
+    // reference field). Include those relationship target fields so the shared
+    // primary fetch loads them — otherwise the ancestor's path never resolves.
+    for (const [, fids] of refCollectionBoundFieldIds) {
+      for (const fid of fids) merged.add(fid);
+    }
     primaryFieldFilter = Array.from(merged);
   }
 
@@ -2199,11 +2292,29 @@ export async function resolveCollectionLayers(
   function scanCollectionLayersForBounds(layerList: Layer[]) {
     for (const layer of layerList) {
       if (layer.variables?.collection?.id) {
-        const { fieldIds: fids, fieldPaths: fpaths } = collectBoundFieldIds([layer]);
+        const { fieldIds: fids, fieldPaths: fpaths, pathsByLayerId } = collectBoundFieldIds([layer]);
         for (const fid of fids) mergedBoundFieldIds.add(fid);
         for (const fp of fpaths) mergedBoundFieldPaths.add(fp);
         boundFieldPathsByLayerId.set(layer.id, fpaths);
         scannedCollectionIds.add(layer.variables.collection.id);
+
+        // Re-attribute bindings that target an ancestor collection layer via
+        // collection_layer_id (ancestors are scanned before their descendants,
+        // so the target set already exists). Without this, a field read from an
+        // enclosing collection inside a nested collection never gets its
+        // reference paths resolved on SSR and renders empty.
+        for (const [targetLayerId, paths] of pathsByLayerId) {
+          if (targetLayerId === layer.id) continue;
+          let target = boundFieldPathsByLayerId.get(targetLayerId);
+          if (!target) {
+            target = new Set<string>();
+            boundFieldPathsByLayerId.set(targetLayerId, target);
+          }
+          for (const p of paths) {
+            target.add(p);
+            mergedBoundFieldPaths.add(p);
+          }
+        }
       }
       if (layer.children) scanCollectionLayersForBounds(layer.children);
     }
@@ -2499,6 +2610,7 @@ export async function resolveCollectionLayers(
           const slugField = collectionFields.find(f => f.key === 'slug');
 
           // Pre-process all items: translations + date formatting (pure computation)
+          await ensureCmsTranslations(translations, sortedItems.map(item => item.id));
           const preprocessed = sortedItems.map(item => {
             let translatedValues = applyCmsTranslations(item.id, item.values, collectionFields, translations, { includeIncomplete: !isPublished });
             const rawTranslatedValues = { ...translatedValues };
@@ -2641,6 +2753,7 @@ export async function resolveCollectionLayers(
               sortByInputLayerId: collectionVariable.sort_by_inputLayerId,
               sortOrderInputLayerId: collectionVariable.sort_order_inputLayerId,
               limit: isPaginated ? paginationConfig.items_per_page : collectionVariable.limit,
+              maxTotal,
               paginationMode: isPaginated ? paginationConfig.mode : undefined,
               layerTemplate: layer.children || [],
               collectionLayerClasses: Array.isArray(layer.classes) ? layer.classes : (layer.classes ? [layer.classes] : []),
@@ -2706,6 +2819,7 @@ export async function resolveCollectionLayers(
           },
         };
 
+        await ensureCmsTranslations(translations, sourceItems.map(item => item.id));
         const generatedOptions: Layer[] = sourceItems.map(item => {
           const translatedValues = applyCmsTranslations(item.id, item.values, sourceFields, translations, { includeIncomplete: !isPublished });
           const label = displayField ? (translatedValues[displayField.id] || 'Untitled') : 'Untitled';
@@ -2840,6 +2954,7 @@ export async function resolveCollectionLayers(
           const sourceCollectionId = layer.settings.optionsSource.collectionId;
           const items = cache.itemsByCollection.get(sourceCollectionId) || [];
           const fields = cache.fieldsByCollection.get(sourceCollectionId) || [];
+          await ensureCmsTranslations(translations, items.map(item => item.id));
           return buildInputGroupFragment(inputType, items, fields);
         } catch (error) {
           console.error(`Failed to resolve collection-sourced ${inputType} options for layer ${layer.id}:`, error);
@@ -3377,6 +3492,11 @@ export async function renderCollectionItemsToHtml(
     ensureMapTokens(),
   ]);
   const htmlTimezone = (timezoneRaw as string | null) || 'UTC';
+
+  // Augment the scoped translation map with CMS content for the items being
+  // rendered so `applyCmsTranslations` (here and in nested resolution) finds
+  // them — the map arrives as a per-locale scaffold without bulk CMS content.
+  await ensureCmsTranslations(translations, items.map(item => item.id));
 
   // Enrich slugs with cross-collection link field references
   const enrichedSlugs = { ...collectionItemSlugs };

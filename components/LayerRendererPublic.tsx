@@ -16,8 +16,9 @@
 import React, { useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import type { Layer, Locale, FormSettings, Component, DesignColorVariable, PasswordProtectionContext } from '@/types';
-import { getLayerHtmlTag, getClassesString, getText, resolveFieldValue, isTextContentLayer, getCollectionVariable, filterDisabledSliderLayers } from '@/lib/layer-utils';
+import { getLayerHtmlTag, getClassesString, getText, resolveFieldValue, isTextContentLayer, getCollectionVariable, filterDisabledSliderLayers, applyCustomAttributes } from '@/lib/layer-utils';
 import { getMapIframeProps, DEFAULT_MAP_SETTINGS, resolveMarkerColor } from '@/lib/map-utils';
+import { HTML_TO_REACT_ATTRS } from '@/lib/parse-head-html';
 import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/slider-constants';
 import { getDynamicTextContent, getImageUrlFromVariable, getVideoUrlFromVariable, getIframeUrlFromVariable, isFieldVariable, isAssetVariable, isStaticTextVariable, isDynamicTextVariable, getStaticTextContent, getAssetId, resolveDesignStyles } from '@/lib/variable-utils';
 import { getTranslatedAssetId, getTranslatedText } from '@/lib/locale-runtime';
@@ -216,6 +217,7 @@ const LayerRendererPublic: React.FC<LayerRendererPublicProps> = ({
               sortByInputLayerId={layer._filterConfig!.sortByInputLayerId}
               sortOrderInputLayerId={layer._filterConfig!.sortOrderInputLayerId}
               limit={layer._filterConfig!.limit}
+              maxTotal={layer._filterConfig!.maxTotal}
               paginationMode={layer._filterConfig!.paginationMode}
               layerTemplate={layer._filterConfig!.layerTemplate}
               collectionLayerClasses={layer._filterConfig!.collectionLayerClasses}
@@ -781,13 +783,6 @@ const LayerItem: React.FC<{
     const Tag = htmlTag as any;
     const { style: attrStyle, ...otherAttributes } = effectiveLayer.attributes || {};
 
-    // Map HTML attributes to React JSX equivalents
-    const htmlToJsxAttrMap: Record<string, string> = {
-      'for': 'htmlFor',
-      'class': 'className',
-      'autofocus': 'autoFocus',
-    };
-
     // Convert string boolean values to actual booleans and map HTML attrs to JSX
     const normalizedAttributes = Object.fromEntries(
       Object.entries(otherAttributes)
@@ -798,7 +793,7 @@ const LayerItem: React.FC<{
         })
         .map(([key, value]) => {
           // Map HTML attribute names to JSX equivalents
-          const jsxKey = htmlToJsxAttrMap[key] || key;
+          const jsxKey = HTML_TO_REACT_ATTRS[key.toLowerCase()] || key;
 
           // If value is already a boolean, keep it
           if (typeof value === 'boolean') {
@@ -973,11 +968,9 @@ const LayerItem: React.FC<{
       elementProps.id = layer.attributes.id;
     }
 
-    // Apply custom attributes from settings
+    // Apply custom attributes from settings (map HTML attr names to JSX equivalents)
     if (layer.settings?.customAttributes) {
-      Object.entries(layer.settings.customAttributes).forEach(([name, value]) => {
-        elementProps[name] = value;
-      });
+      applyCustomAttributes(elementProps, layer.settings.customAttributes);
     }
 
     // Select with placeholder: set defaultValue so React shows the placeholder option
@@ -1524,11 +1517,9 @@ const LayerItem: React.FC<{
             iframeProps.id = layer.attributes.id;
           }
 
-          // Apply custom attributes from settings
+          // Apply custom attributes from settings (map HTML attr names to JSX equivalents)
           if (layer.settings?.customAttributes) {
-            Object.entries(layer.settings.customAttributes).forEach(([name, value]) => {
-              iframeProps[name] = value;
-            });
+            applyCustomAttributes(iframeProps, layer.settings.customAttributes);
           }
 
           return (
