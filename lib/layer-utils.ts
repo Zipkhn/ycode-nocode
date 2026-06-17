@@ -2401,25 +2401,23 @@ export function evaluateVisibility(
 
   if (!conditionalVisibility?.groups?.length) return defaultVisible;
 
-  let anyMatched = false;
-  let result = defaultVisible;
+  // Groups are rules; defaultVisibility is the "Else" fallback when none match.
+  // Precedence: a matching HIDE always wins; otherwise a matching SHOW reveals
+  // (even when the layer is hidden by default); otherwise fall back to the default.
+  let showMatched = false;
+  let hideMatched = false;
 
   for (const group of conditionalVisibility.groups) {
     if (!group.conditions?.length) continue;
+    if (!group.conditions.some(c => evaluateCondition(c, context))) continue;
 
-    const groupTrue = group.conditions.some(c => evaluateCondition(c, context));
-
-    if (groupTrue) {
-      anyMatched = true;
-      if ((group.action ?? 'show') === 'hide') {
-        result = false; // HIDE overrides SHOW
-      } else if (result !== false) {
-        result = true;
-      }
-    }
+    if ((group.action ?? 'show') === 'hide') hideMatched = true;
+    else showMatched = true;
   }
 
-  return anyMatched ? result : defaultVisible;
+  if (hideMatched) return false;
+  if (showMatched) return true;
+  return defaultVisible;
 }
 
 /**

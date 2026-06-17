@@ -109,8 +109,10 @@ export const useColorVariablesStore = create<ColorVariablesStore>((set, get) => 
       const hexOnly = rawValue.split('/')[0];
 
       const toCssRgba = (val: string): string => {
+        // Only the "#rrggbb/NN" opacity shorthand is converted; gradients and
+        // other values (which may contain '/') pass through unchanged.
         const parts = val.split('/');
-        if (parts.length < 2) return val;
+        if (parts.length !== 2 || !/^#[0-9a-fA-F]{6}$/.test(parts[0])) return val;
         const hex = parts[0];
         const opacity = parseInt(parts[1]) / 100;
         const r = parseInt(hex.slice(1, 3), 16);
@@ -213,8 +215,10 @@ export const useColorVariablesStore = create<ColorVariablesStore>((set, get) => 
     if (colorVariables.length === 0 && !previewOverride) return '';
 
     const toCssValue = (val: string): string => {
+      // Only the "#rrggbb/NN" opacity shorthand is converted. Plain hex, rgba(),
+      // and gradients (which may contain '/' inside rgb(... / ...) stops) pass through.
       const parts = val.split('/');
-      if (parts.length < 2) return val;
+      if (parts.length !== 2 || !/^#[0-9a-fA-F]{6}$/.test(parts[0])) return val;
       const hex = parts[0];
       const opacity = parseInt(parts[1]) / 100;
       const r = parseInt(hex.slice(1, 3), 16);

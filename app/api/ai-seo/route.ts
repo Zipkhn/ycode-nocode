@@ -20,6 +20,7 @@
 
 import { NextResponse } from 'next/server';
 import type { ExtractedSegment } from '@/lib/page-text-extractor';
+import { localeToLanguage } from '@/lib/locale-language';
 
 interface SeoSuggestRequest {
   pageName: string;
@@ -35,15 +36,6 @@ interface SeoSuggestRequest {
 interface N8nResponse {
   description?: string;
   ai_summary?: string;
-}
-
-/**
- * Derive ISO 639-1 language code from a locale string.
- * 'fr_FR' → 'fr', 'en-US' → 'en', 'fr' → 'fr', null → 'en'
- */
-function localeToLanguage(locale: string | null | undefined): string {
-  if (!locale) return 'en';
-  return locale.split(/[_-]/)[0].toLowerCase() || 'en';
 }
 
 export async function POST(request: Request): Promise<NextResponse> {

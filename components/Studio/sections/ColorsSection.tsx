@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { COLOR_SCALE_STEPS, generateColorScale } from '../utils/color-utils';
+import { type GradientStop, type GradientDef, DEFAULT_GRADIENT, gradientToCss, cssToGradient } from '../utils/gradient-utils';
 import type { StudioVariablesHook } from '../hooks/useStudioVariables';
 
 interface Props { hook: StudioVariablesHook }
@@ -96,51 +97,7 @@ function PaletteBlock({ prefix, label, vars, setVars, setVar }: {
   );
 }
 
-// ── Gradient types + helpers ──────────────────────────────────────────────────
-
-interface GradientStop {
-  color: string;
-  position: number; // 0–100
-}
-
-interface GradientDef {
-  angle: number;
-  stops: GradientStop[];
-}
-
-const DEFAULT_GRADIENT: GradientDef = {
-  angle: 135,
-  stops: [
-    { color: '#3b82f6', position: 0 },
-    { color: '#8b5cf6', position: 100 },
-  ],
-};
-
 const ANGLE_PRESETS = [0, 45, 90, 135, 180, 270] as const;
-
-function gradientToCss(def: GradientDef): string {
-  const sorted = [...def.stops].sort((a, b) => a.position - b.position);
-  const stops = sorted.map(s => `${s.color} ${s.position}%`).join(', ');
-  return `linear-gradient(${def.angle}deg, ${stops})`;
-}
-
-function cssToGradient(css: string): GradientDef {
-  const m = css.match(/linear-gradient\(\s*(\d+)deg\s*,\s*([\s\S]+)\s*\)/);
-  if (!m) return DEFAULT_GRADIENT;
-  const angle = parseInt(m[1]);
-  const rawStops = m[2];
-  // split on commas not inside parens
-  const stopTokens = rawStops.split(/,(?![^(]*\))/).map(s => s.trim());
-  const stops: GradientStop[] = stopTokens.map(token => {
-    const parts = token.match(/^(#[0-9a-fA-F]{3,8})\s+(\d+(?:\.\d+)?)%$/);
-    if (parts) return { color: parts[1], position: parseFloat(parts[2]) };
-    return null;
-  }).filter(Boolean) as GradientStop[];
-  return {
-    angle,
-    stops: stops.length >= 2 ? stops : DEFAULT_GRADIENT.stops,
-  };
-}
 
 // ── Gradient editor ───────────────────────────────────────────────────────────
 
