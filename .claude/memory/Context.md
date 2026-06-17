@@ -36,9 +36,15 @@ A design-system panel injected into the builder's left sidebar. Key responsibili
 - **Ycode palette sync**: pushes Studio tokens to Ycode's `color-variables` store
 
 ### Studio Files
+> **Refactored**: the monolithic `components/StudioThemeEditor.tsx` was removed (2026-06-17). Studio is now modular under `components/Studio/`.
+
 | File | Role |
 |---|---|
-| `components/StudioThemeEditor.tsx` | Main Studio panel UI + all logic |
+| `components/Studio/StudioModal.tsx` | Main Studio modal shell + `useStudioStore` |
+| `components/Studio/StudioNav.tsx` / `StudioTable.tsx` | Nav + shared token table |
+| `components/Studio/sections/*.tsx` | Per-section UI (Colors, Typography, Spacing, Theme, CustomVariables…) |
+| `components/Studio/hooks/useStudioVariables.ts` | Variables state/logic |
+| `components/Studio/utils/*.ts` | bridge-generators, figma-io, color-utils, zip-utils |
 | `app/api/studio/route.ts` | GET/POST for `global-theme.css` |
 | `app/global-theme.css` | Theme source (STUDIO_CORE + STUDIO_THEME + STUDIO_RUNTIME_BRIDGES sections) |
 | `app/(builder)/ycode/components/ElementLibrary.tsx` | Hosts the Clean Slate toggle |
