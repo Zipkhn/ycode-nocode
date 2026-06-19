@@ -5,10 +5,13 @@ import CustomCodeInjector from '@/components/CustomCodeInjector';
 import LayerRendererPublic from '@/components/LayerRendererPublic';
 import SliderInitializer from '@/components/SliderInitializer';
 import LightboxInitializer from '@/components/LightboxInitializer';
+import RuntimeVisibility from '@/components/runtime/RuntimeVisibility';
+import FormStateWriter from '@/components/runtime/FormStateWriter';
 import PasswordForm from '@/components/PasswordForm';
 import YcodeBadge from '@/components/YcodeBadge';
 import { unstable_cache } from 'next/cache';
 import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables';
+import { pageHasRuntimeState } from '@/lib/runtime-visibility';
 import { renderRootLayoutHeadCode } from '@/lib/parse-head-html';
 import { generateInitialAnimationCSS, type HiddenLayerInfo } from '@/lib/animation-utils';
 import { buildCustomFontsCss, buildFontClassesCss, fetchGoogleFontsCss, getGoogleFontLinks } from '@/lib/font-utils';
@@ -836,6 +839,16 @@ export default async function PageRenderer({
 
       {/* Initialize lightbox modals */}
       {hasLightboxLayers(resolvedLayers) && <LightboxInitializer />}
+
+      {/* Client-reactive conditional visibility ("App State"): re-evaluate
+          runtime_var rules live and mirror form-field values into the runtime
+          var store. Gated so pages without runtime rules ship nothing extra. */}
+      {pageHasRuntimeState(resolvedLayers) && (
+        <>
+          <RuntimeVisibility />
+          <FormStateWriter />
+        </>
+      )}
 
       {/* Report content height to parent for zoom calculations (preview only) */}
       {!page.is_published && <ContentHeightReporter />}
