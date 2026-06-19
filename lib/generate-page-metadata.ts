@@ -24,7 +24,6 @@ import { getSiteBaseUrl } from '@/lib/url-utils';
 import {
   getCanonicalUrl,
   getRobotsDirectives,
-  isIndexablePage,
   type SeoGovernanceContext,
 } from '@/lib/seo-governance';
 
@@ -465,7 +464,3 @@ export async function generatePageMetadata(
 
   return metadata;
 }
-
-// Re-export governance helpers so callers can use them without a second import.
-export { isIndexablePage, getCanonicalUrl, getRobotsDirectives };
-export type { SeoGovernanceContext, RobotsDirectives } from '@/lib/seo-governance';
