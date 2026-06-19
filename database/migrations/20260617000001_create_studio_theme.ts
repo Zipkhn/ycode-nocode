@@ -1,6 +1,7 @@
 import type { Knex } from 'knex';
 import fs from 'fs/promises';
 import path from 'path';
+import { parseStudioVariablesFromCss } from '@/lib/studio-css';
 
 /**
  * Migration: Studio theme persistence in the database (Phase 1).
@@ -32,18 +33,10 @@ export async function up(knex: Knex): Promise<void> {
 
   try {
     const css = await fs.readFile(path.join(process.cwd(), 'public', 'global-theme.css'), 'utf-8');
-    const s = css.indexOf('/* STUDIO_CORE_START */');
-    const e = css.indexOf('/* STUDIO_CORE_END */');
-    if (s === -1 || e === -1) return;
-
-    const core = css.substring(s, e);
-    const variables: Record<string, string> = {};
-    const re = /--([a-zA-Z0-9_-]+):\s*([^;]+);/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(core)) !== null) {
-      if (m[2].includes('!important')) continue; // skip scoped/responsive overrides
-      variables[m[1]] = m[2];
-    }
+    // Reuse the guarded parser so the seed never stores §14 utility-rule locals
+    // (--min/--max/--v-min/--v-max) that would corrupt every typographic level.
+    const variables = parseStudioVariablesFromCss(css);
+    if (!variables) return;
 
     let customVarsConfig: unknown = null;
     const cs = css.indexOf('/* STUDIO_CUSTOM_VARS_START */');

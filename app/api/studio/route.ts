@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { loadCurrentTheme, writeThemeFile, saveStudioTheme } from '@/lib/studio-theme-store';
+import { RESERVED_LOCAL_PROPS } from '@/lib/studio-css';
 import type { CustomVarsConfig } from '@/components/Studio/utils/bridge-generators';
 
 /**
@@ -29,6 +30,9 @@ export async function POST(request: Request) {
     const variables = { ...current.variables };
     if (updates && typeof updates === 'object') {
       for (const [key, value] of Object.entries(updates)) {
+        // §14 utility-rule local aliases must never enter the token map (would
+        // corrupt typographic levels at render — see RESERVED_LOCAL_PROPS).
+        if (RESERVED_LOCAL_PROPS.has(key)) continue;
         if (value === '__remove__') delete variables[key];
         else variables[key] = String(value);
       }
