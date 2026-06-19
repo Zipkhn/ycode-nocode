@@ -51,8 +51,6 @@ export function SpacingSection({ hook }: Props) {
     saveUpdates(updates);
   };
 
-  const maxBarPx = tokenPx(5, spacingParams);
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto">

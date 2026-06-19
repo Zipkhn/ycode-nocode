@@ -76,11 +76,11 @@ function ColorCell({ value, onChange, id }: { value: string; onChange: (v: strin
 // ── Generic cell ──────────────────────────────────────────────────────────────
 
 function Cell({
-  rowKey, modeId, type, value, onChange, rowIdx, colIdx, totalCols,
+  rowKey, modeId, type, value, onChange, rowIdx, colIdx,
   onKeyDown,
 }: {
   rowKey: string; modeId: string; type: VariableType; value: string;
-  onChange: (v: string) => void; rowIdx: number; colIdx: number; totalCols: number;
+  onChange: (v: string) => void; rowIdx: number; colIdx: number;
   onKeyDown: (e: React.KeyboardEvent, ri: number, ci: number) => void;
 }) {
   const uid = useId();
@@ -167,8 +167,7 @@ export function StudioTable({
     target?.focus();
   }, [filtered.length, modes.length]);
 
-  // Flat index for keyboard nav
-  const flatIdx = 0;
+  // Flatten rows for keyboard nav
   const flatRows: StudioRow[] = [];
   for (const g of grouped) { for (const r of g.rows) flatRows.push(r); }
 
@@ -251,7 +250,6 @@ export function StudioTable({
                           onChange={v => onValueChange(row.key, mode.id, v)}
                           rowIdx={ri}
                           colIdx={ci}
-                          totalCols={modes.length}
                           onKeyDown={handleCellKey}
                         />
                       ))}

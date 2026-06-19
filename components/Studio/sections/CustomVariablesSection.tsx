@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useId } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { StudioVariablesHook, CustomVarsConfig } from '../hooks/useStudioVariables';
 import type { CustomMode, CustomVariable } from '../utils/bridge-generators';
 

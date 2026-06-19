@@ -5,26 +5,6 @@ import type { StudioVariablesHook } from '../hooks/useStudioVariables';
 
 interface Props { hook: StudioVariablesHook }
 
-function Field({ label, varKey, vars, setVar, step = 'any' }: {
-  label: string; varKey: string; vars: Record<string, string>;
-  setVar: (k: string, v: string) => void; step?: string;
-}) {
-  return (
-    <div className="flex items-center border-b border-white/5 hover:bg-white/[0.04] transition-colors group">
-      <span className="w-[200px] shrink-0 px-3 py-1.5 text-[11px] text-white/70 truncate">{label}</span>
-      <span className="border-l border-white/5 flex-1 px-2 py-0.5">
-        <input
-          type="text"
-          value={vars[varKey] ?? ''}
-          onChange={e => setVar(varKey, e.target.value)}
-          className="w-full bg-transparent text-white text-[11px] font-mono outline-none focus:bg-white/5 rounded px-1 py-0.5"
-          spellCheck={false}
-        />
-      </span>
-    </div>
-  );
-}
-
 export function GeneralSection({ hook }: Props) {
   const { variables, setVar } = hook;
 

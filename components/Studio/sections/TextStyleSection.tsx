@@ -21,10 +21,6 @@ const PROPS = [
   { key: 'text-wrap',       label: 'Text Wrap',       cssKey: (l: string) => `${l}-text-wrap`,      type: 'textwrap' },
 ] as const;
 
-function isShared(propKey: string) {
-  return propKey === 'font-family';
-}
-
 export function TextStyleSection({ hook }: Props) {
   const { variables, setVar, removeVar } = hook;
 

@@ -625,14 +625,6 @@ export function propertyToClass(
       case 'gridTemplateRows':
         // Replace spaces with underscores for Tailwind arbitrary value syntax
         return `grid-rows-[${value.replace(/\s+/g, '_')}]`;
-      case 'gridColumnSpan':
-        // Studio native: always emit u-col-span-{N}. "full" collapses to the 12-column max.
-        if (value === 'full') return 'u-col-span-12';
-        return `u-col-span-${value}`;
-      case 'gridRowSpan':
-        // Studio native: always emit u-row-span-{N}. "full" collapses to the 12-row max.
-        if (value === 'full') return 'u-row-span-12';
-        return `u-row-span-${value}`;
     }
   }
 
