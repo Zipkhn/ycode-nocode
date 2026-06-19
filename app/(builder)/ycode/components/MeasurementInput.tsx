@@ -7,9 +7,12 @@ type CSSUnit = typeof UNITS[number];
 
 const SPECIAL = new Set(['auto', 'full', 'screen', 'fit', 'min', 'max', 'none', '0', '']);
 
+// Longest suffix first so 'dvh'/'svw'/etc. win over 'vh'/'vw'
+const UNITS_BY_LEN = [...UNITS].sort((a, b) => b.length - a.length);
+
 function parseRaw(raw: string): { num: string; unit: CSSUnit } {
   if (!raw || SPECIAL.has(raw)) return { num: raw ?? '', unit: 'px' };
-  for (const u of UNITS) {
+  for (const u of UNITS_BY_LEN) {
     if (raw.endsWith(u)) return { num: raw.slice(0, -u.length), unit: u };
   }
   return { num: raw, unit: 'px' };
