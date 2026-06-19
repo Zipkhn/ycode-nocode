@@ -75,7 +75,7 @@ export const N8N_TEMPLATES: N8NTemplate[] = [
   {
     id: 'slack',
     name: 'Slack',
-    description: 'Envoie une notification dans un canal Slack à chaque soumission.',
+    description: 'Send a notification to a Slack channel on every submission.',
     icon: '💬',
     nodeType: 'n8n-nodes-base.slack',
     generate({ formId }) {
@@ -85,7 +85,7 @@ export const N8N_TEMPLATES: N8NTemplate[] = [
           resource: 'message',
           operation: 'post',
           channel: '#general',
-          text: `📬 Nouvelle soumission (${formId})\n\n${allFields}`,
+          text: `📬 New submission (${formId})\n\n${allFields}`,
           otherOptions: {},
         },
         id: uuid(),
@@ -109,7 +109,7 @@ export const N8N_TEMPLATES: N8NTemplate[] = [
   {
     id: 'google-sheets',
     name: 'Google Sheets',
-    description: 'Ajoute une ligne dans un Google Sheet à chaque soumission.',
+    description: 'Append a row to a Google Sheet on every submission.',
     icon: '📊',
     nodeType: 'n8n-nodes-base.googleSheets',
     generate({ formId, fieldHints = [] }) {
@@ -153,7 +153,7 @@ export const N8N_TEMPLATES: N8NTemplate[] = [
   {
     id: 'email',
     name: 'Email',
-    description: 'Envoie un email de notification (Gmail, SMTP, Outlook…).',
+    description: 'Send a notification email (Gmail, SMTP, Outlook…).',
     icon: '✉️',
     nodeType: 'n8n-nodes-base.emailSend',
     generate({ formId, fieldHints = [] }) {
@@ -165,9 +165,9 @@ export const N8N_TEMPLATES: N8NTemplate[] = [
       const action: N8NNode = {
         parameters: {
           fromEmail: 'noreply@yoursite.com',
-          toEmail: 'vous@yoursite.com',
-          subject: `Nouvelle soumission — ${formId}`,
-          text: `Nouveau message reçu :\n\n${bodyLines}\n\nReçu le : {{ $json.body.submittedAt }}`,
+          toEmail: 'you@yoursite.com',
+          subject: `New submission — ${formId}`,
+          text: `New message received:\n\n${bodyLines}\n\nReceived at: {{ $json.body.submittedAt }}`,
           options: {},
         },
         id: uuid(),
@@ -191,7 +191,7 @@ export const N8N_TEMPLATES: N8NTemplate[] = [
   {
     id: 'notion',
     name: 'Notion',
-    description: 'Crée une page dans une base de données Notion.',
+    description: 'Create a page in a Notion database.',
     icon: '📝',
     nodeType: 'n8n-nodes-base.notion',
     generate({ formId, fieldHints = [] }) {
@@ -231,11 +231,11 @@ export const N8N_TEMPLATES: N8NTemplate[] = [
     },
   },
 
-  // ── HTTP Request (générique) ──────────────────────────────────────────────────
+  // ── HTTP Request (generic) ──────────────────────────────────────────────────
   {
     id: 'http',
     name: 'HTTP Request',
-    description: 'Transfère les données vers n\'importe quelle API tierce.',
+    description: 'Forward the data to any third-party API.',
     icon: '🔗',
     nodeType: 'n8n-nodes-base.httpRequest',
     generate({ formId }) {

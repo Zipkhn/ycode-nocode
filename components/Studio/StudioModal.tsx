@@ -144,7 +144,7 @@ export function StudioModal() {
               {syncStatus === 'idle'    && 'Save'}
               {syncStatus === 'syncing' && 'Syncing…'}
               {syncStatus === 'done'    && '✓ Synced'}
-              {syncStatus === 'error'   && '✗ Erreur'}
+              {syncStatus === 'error'   && '✗ Error'}
             </button>
             <button
               onClick={close}
