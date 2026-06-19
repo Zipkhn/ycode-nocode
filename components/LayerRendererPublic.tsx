@@ -722,23 +722,21 @@ const LayerItem: React.FC<{
     ? getTextStyleClasses(layer.textStyles, 'paragraph')
     : '';
 
-  // `<button>` defaults to `display: inline-block` (shrink-wraps) and
-  // `text-align: center`, while `<a>` defaults to `display: inline` and inherits
-  // text-align (typically left). When a button-with-link is rendered as `<a>`,
-  // re-apply those button defaults so layout matches:
-  // - `w-fit`: only if no explicit width or block-level display class is set,
-  //   since those make the element block-level (full width) on purpose.
-  // - `text-center`: only if no explicit text-align class is set.
+  // Buttons shrink-wrap by default; in a grid/flex container an unsized button
+  // stretches. Mirror LayerRenderer (edit mode): apply `w-fit` to ALL buttons
+  // without an explicit width or block-level display class. `<a>`-rendered
+  // button-with-link also loses the centered text-align, so re-apply
+  // `text-center` for that case only.
   const BLOCK_DISPLAY_CLASSES = new Set([
     'flex', 'block', 'grid', 'table', 'flow-root',
   ]);
   const TEXT_ALIGN_CLASSES = new Set([
     'text-left', 'text-center', 'text-right', 'text-justify', 'text-start', 'text-end',
   ]);
-  const layerClassList = isButtonWithLink
+  const layerClassList = layer.name === 'button'
     ? (Array.isArray(layer.classes) ? layer.classes : (layer.classes || '').split(' '))
     : [];
-  const buttonNeedsFit = isButtonWithLink && (() => {
+  const buttonNeedsFit = layer.name === 'button' && (() => {
     const hasWidth = layerClassList.some((c: string) => /^w-/.test(c.split(':').pop() || ''));
     if (hasWidth) return false;
     const hasBlockDisplay = layerClassList.some((c: string) => BLOCK_DISPLAY_CLASSES.has(c.split(':').pop() || ''));
