@@ -41,6 +41,7 @@ import EffectControls from './EffectControls';
 import CollectionFiltersSettings from './CollectionFiltersSettings';
 import ConditionalVisibilitySettings from './ConditionalVisibilitySettings';
 import StateActionsSettings from './StateActionsSettings';
+import ConditionalStylesSettings from './ConditionalStylesSettings';
 import ImageSettings, { type ImageSettingsValue } from './ImageSettings';
 import VideoSettings, { type VideoSettingsValue } from './VideoSettings';
 import AudioSettings, { type AudioSettingsValue } from './AudioSettings';
@@ -3034,6 +3035,11 @@ const RightSidebar = React.memo(function RightSidebar({
             />
 
             <StateActionsSettings
+              layer={selectedLayer}
+              onLayerUpdate={handleLayerUpdate}
+            />
+
+            <ConditionalStylesSettings
               layer={selectedLayer}
               onLayerUpdate={handleLayerUpdate}
             />

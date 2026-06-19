@@ -17,6 +17,7 @@ import React, { useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import dynamic from 'next/dynamic';
 import type { Layer, Locale, FormSettings, Component, DesignColorVariable, PasswordProtectionContext } from '@/types';
 import { getLayerHtmlTag, getClassesString, getText, resolveFieldValue, isTextContentLayer, getCollectionVariable, filterDisabledSliderLayers, applyCustomAttributes } from '@/lib/layer-utils';
+import { STYLE_RULE_ATTR } from '@/lib/conditional-styles';
 import { getMapIframeProps, DEFAULT_MAP_SETTINGS, resolveMarkerColor } from '@/lib/map-utils';
 import { HTML_TO_REACT_ATTRS } from '@/lib/parse-head-html';
 import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/slider-constants';
@@ -882,6 +883,12 @@ const LayerItem: React.FC<{
       ...normalizedAttributes,
       suppressHydrationWarning: true,
     };
+
+    // Conditional styles (App State): serialize rules for the RuntimeStyles
+    // runtime to toggle classes live. Classes are compiled via cssGenerator.
+    if (layer.variables?.conditionalStyles?.length) {
+      elementProps[STYLE_RULE_ATTR] = JSON.stringify(layer.variables.conditionalStyles);
+    }
 
     // Apply link attributes for elements rendered as <a> (buttons with links or <a> layers)
     if (htmlTag === 'a' && layer.variables?.link) {

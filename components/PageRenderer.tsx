@@ -9,6 +9,7 @@ import RuntimeVisibility from '@/components/runtime/RuntimeVisibility';
 import FormStateWriter from '@/components/runtime/FormStateWriter';
 import VariableTriggers from '@/components/runtime/VariableTriggers';
 import RuntimeStateProvider from '@/components/runtime/RuntimeStateProvider';
+import RuntimeStyles from '@/components/runtime/RuntimeStyles';
 import PasswordForm from '@/components/PasswordForm';
 import YcodeBadge from '@/components/YcodeBadge';
 import { unstable_cache } from 'next/cache';
@@ -16,6 +17,7 @@ import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables';
 import { pageHasRuntimeState } from '@/lib/runtime-visibility';
 import { collectStateActionLayers } from '@/components/runtime/setVariableAction';
 import { buildStateDefaults } from '@/lib/project-variables';
+import { pageHasConditionalStyles } from '@/lib/conditional-styles';
 import { renderRootLayoutHeadCode } from '@/lib/parse-head-html';
 import { generateInitialAnimationCSS, type HiddenLayerInfo } from '@/lib/animation-utils';
 import { buildCustomFontsCss, buildFontClassesCss, fetchGoogleFontsCss, getGoogleFontLinks } from '@/lib/font-utils';
@@ -852,15 +854,14 @@ export default async function PageRenderer({
           visibility runtime so the first re-eval sees them). */}
       {Object.keys(stateDefaults).length > 0 && <RuntimeStateProvider defaults={stateDefaults} />}
 
-      {/* Client-reactive conditional visibility ("App State"): re-evaluate
-          runtime_var rules live and mirror form-field values into the runtime
-          var store. Gated so pages without runtime rules ship nothing extra. */}
-      {pageHasRuntimeState(resolvedLayers) && (
-        <>
-          <RuntimeVisibility />
-          <FormStateWriter />
-        </>
-      )}
+      {/* Client-reactive conditional visibility — re-evaluate runtime_var rules live. */}
+      {pageHasRuntimeState(resolvedLayers) && <RuntimeVisibility />}
+
+      {/* Conditional styles (App State): toggle classes by runtime variable. */}
+      {pageHasConditionalStyles(resolvedLayers) && <RuntimeStyles />}
+
+      {/* Mirror live form-field values into the store for any runtime consumer. */}
+      {(pageHasRuntimeState(resolvedLayers) || pageHasConditionalStyles(resolvedLayers)) && <FormStateWriter />}
 
       {/* Behavior triggers (click/hover/load) that mutate runtime variables. */}
       {stateActionLayers.length > 0 && <VariableTriggers triggers={stateActionLayers} />}

@@ -66,6 +66,12 @@ function extractClassesFromLayers(layers: Layer[]): Set<string> {
       });
     }
 
+    // Conditional styles (App State): classes applied at runtime — compile them
+    // here so Tailwind doesn't purge them and the runtime toggle has effect.
+    if (layer.variables?.conditionalStyles) {
+      layer.variables.conditionalStyles.forEach(rule => extractClasses(rule.className));
+    }
+
     if (layer.children && Array.isArray(layer.children)) {
       layer.children.forEach(child => processLayer(child));
     }

@@ -343,6 +343,15 @@ export interface VariableDefinition {
   defaultValue?: string;
 }
 
+/** A conditional style: add `className` to the element while the runtime condition holds. */
+export interface ConditionalStyleRule {
+  id: string;
+  className: string;                                 // Tailwind classes applied when matched
+  varPath: string;                                   // dot-path, e.g. "state.active"
+  operator: VisibilityOperator;
+  value?: string;
+}
+
 export interface InteractionTimeline {
   breakpoints: Breakpoint[];
   repeat: number; // -1 = infinite, 0 = none, n = repeat n times
@@ -558,6 +567,7 @@ export interface LayerVariables {
   // Collection data
   collection?: CollectionVariable;
   conditionalVisibility?: ConditionalVisibility;
+  conditionalStyles?: ConditionalStyleRule[];
 
   // Variables by type
   text?: DynamicTextVariable | DynamicRichTextVariable;
