@@ -16,7 +16,8 @@ export async function GET() {
       return NextResponse.json({ error: 'Studio core section not found' }, { status: 404 });
     }
     return NextResponse.json(theme);
-  } catch {
+  } catch (e) {
+    console.error('Studio GET: failed to read theme', e);
     return NextResponse.json({ error: 'Failed to read theme' }, { status: 500 });
   }
 }
@@ -47,7 +48,8 @@ export async function POST(request: Request) {
 
     // Don't hard-fail when Supabase is absent (local-without-Supabase keeps working via file).
     return NextResponse.json(saved ? { success: true } : { success: true, persisted: 'file' });
-  } catch {
+  } catch (e) {
+    console.error('Studio POST: failed to update theme', e);
     return NextResponse.json({ error: 'Failed to update theme' }, { status: 500 });
   }
 }

@@ -32,7 +32,6 @@ export const useStudioStore = create<StudioStore>(set => ({
 async function syncToYcodePalette(
   variables: Record<string, string>,
   loadColorVariables: () => Promise<void>,
-  triggerIframeCSSReload: () => Promise<void>,
   saveUpdates: (u: Record<string, string>) => Promise<void>,
 ) {
   const existing = await fetch('/ycode/api/color-variables').then(r => r.json());
@@ -97,7 +96,7 @@ export function StudioModal() {
   const handleSync = async () => {
     setSyncStatus('syncing');
     try {
-      await syncToYcodePalette(hook.variables, loadColorVariables, hook.triggerIframeCSSReload, hook.saveUpdates);
+      await syncToYcodePalette(hook.variables, loadColorVariables, hook.saveUpdates);
       setSyncStatus('done');
       setTimeout(() => setSyncStatus('idle'), 3000);
     } catch {
