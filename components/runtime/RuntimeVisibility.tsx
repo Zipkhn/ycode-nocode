@@ -18,24 +18,32 @@ import { ITEMS_INJECTED_EVENT } from '@/components/FilterableCollection';
  */
 export default function RuntimeVisibility() {
   useEffect(() => {
-    const apply = () => {
-      const vars = useRuntimeVarStore.getState().vars;
+    // Cache the tagged nodes + parsed rules so a store change only re-evaluates
+    // (no DOM query / JSON.parse per keystroke). Refresh on mount + injection.
+    let entries: { el: HTMLElement; rule: ClientVisibilityRule }[] = [];
+    const refresh = () => {
+      entries = [];
       document.querySelectorAll<HTMLElement>(`[${RUNTIME_STATE_ATTR}]`).forEach((el) => {
         const raw = el.getAttribute(RUNTIME_STATE_ATTR);
         if (!raw) return;
-        let rule: ClientVisibilityRule;
-        try { rule = JSON.parse(raw); } catch { return; }
-        if (evaluateClientRule(rule, vars)) el.style.removeProperty('display');
-        else el.style.display = 'none';
+        try { entries.push({ el, rule: JSON.parse(raw) as ClientVisibilityRule }); } catch { /* malformed */ }
       });
     };
+    const apply = () => {
+      const vars = useRuntimeVarStore.getState().vars;
+      for (const { el, rule } of entries) {
+        if (evaluateClientRule(rule, vars)) el.style.removeProperty('display');
+        else el.style.display = 'none';
+      }
+    };
+    const refreshAndApply = () => { refresh(); apply(); };
 
-    apply(); // initial pass after hydration
+    refreshAndApply(); // initial pass after hydration
     const unsubscribe = useRuntimeVarStore.subscribe(apply);
-    window.addEventListener(ITEMS_INJECTED_EVENT, apply);
+    window.addEventListener(ITEMS_INJECTED_EVENT, refreshAndApply);
     return () => {
       unsubscribe();
-      window.removeEventListener(ITEMS_INJECTED_EVENT, apply);
+      window.removeEventListener(ITEMS_INJECTED_EVENT, refreshAndApply);
     };
   }, []);
 

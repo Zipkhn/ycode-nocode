@@ -15,26 +15,40 @@ import type { ConditionalStyleRule } from '@/types';
  */
 export default function RuntimeStyles() {
   useEffect(() => {
-    const apply = () => {
-      const vars = useRuntimeVarStore.getState().vars;
+    // Cache nodes + parsed rules (+ pre-split class lists) so a store change only
+    // re-evaluates. Refresh on mount + injection.
+    let entries: { el: HTMLElement; rules: { rule: ConditionalStyleRule; classes: string[] }[] }[] = [];
+    const refresh = () => {
+      entries = [];
       document.querySelectorAll<HTMLElement>(`[${STYLE_RULE_ATTR}]`).forEach((el) => {
         const raw = el.getAttribute(STYLE_RULE_ATTR);
         if (!raw) return;
-        let rules: ConditionalStyleRule[];
-        try { rules = JSON.parse(raw); } catch { return; }
-        for (const rule of rules) {
-          const on = styleRuleMatches(rule, vars);
-          rule.className.split(/\s+/).filter(Boolean).forEach(c => el.classList.toggle(c, on));
-        }
+        try {
+          const rules = (JSON.parse(raw) as ConditionalStyleRule[]).map(rule => ({
+            rule,
+            classes: rule.className.split(/\s+/).filter(Boolean),
+          }));
+          entries.push({ el, rules });
+        } catch { /* malformed */ }
       });
     };
+    const apply = () => {
+      const vars = useRuntimeVarStore.getState().vars;
+      for (const { el, rules } of entries) {
+        for (const { rule, classes } of rules) {
+          const on = styleRuleMatches(rule, vars);
+          for (const c of classes) el.classList.toggle(c, on);
+        }
+      }
+    };
+    const refreshAndApply = () => { refresh(); apply(); };
 
-    apply();
+    refreshAndApply();
     const unsubscribe = useRuntimeVarStore.subscribe(apply);
-    window.addEventListener(ITEMS_INJECTED_EVENT, apply);
+    window.addEventListener(ITEMS_INJECTED_EVENT, refreshAndApply);
     return () => {
       unsubscribe();
-      window.removeEventListener(ITEMS_INJECTED_EVENT, apply);
+      window.removeEventListener(ITEMS_INJECTED_EVENT, refreshAndApply);
     };
   }, []);
 
