@@ -54,7 +54,7 @@
 
   --font-smoothing: antialiased;
 
-  --display-font-weight: 900; --display-line-height: 1.2; --display-letter-spacing: -0.02em; --display-margin-bottom: 0rem;
+  --display-font-weight: 600; --display-line-height: 1.2; --display-letter-spacing: -0.02em; --display-margin-bottom: 0rem;
   --h1-font-weight: 600; --h1-line-height: 1.2; --h1-letter-spacing: -0.02em; --h1-margin-bottom: 0rem;
   --h2-font-weight: 700; --h2-line-height: 1.2; --h2-letter-spacing: -0.02em; --h2-margin-bottom: 0rem;
   --h3-font-weight: 600; --h3-line-height: 1.3; --h3-letter-spacing: 0em; --h3-margin-bottom: 0rem;
@@ -350,12 +350,12 @@
 }
 
 /* Reset font-sizes natively for tags first to establish baseline (neutralized if Studio classes are present) */
-#ybody h1 { font-size: clamp(var(--_typography---font-size--h1-min) * 1rem, var(--_typography---font-size--h1-min) * 1rem + (var(--_typography---font-size--h1-max) - var(--_typography---font-size--h1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h1-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
-#ybody h2 { font-size: clamp(var(--_typography---font-size--h2-min) * 1rem, var(--_typography---font-size--h2-min) * 1rem + (var(--_typography---font-size--h2-max) - var(--_typography---font-size--h2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h2-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
-#ybody h3 { font-size: clamp(var(--_typography---font-size--h3-min) * 1rem, var(--_typography---font-size--h3-min) * 1rem + (var(--_typography---font-size--h3-max) - var(--_typography---font-size--h3-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h3-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
-#ybody h4 { font-size: clamp(var(--_typography---font-size--h4-min) * 1rem, var(--_typography---font-size--h4-min) * 1rem + (var(--_typography---font-size--h4-max) - var(--_typography---font-size--h4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h4-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
-#ybody h5 { font-size: clamp(var(--_typography---font-size--h5-min) * 1rem, var(--_typography---font-size--h5-min) * 1rem + (var(--_typography---font-size--h5-max) - var(--_typography---font-size--h5-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h5-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
-#ybody h6 { font-size: clamp(var(--_typography---font-size--h6-min) * 1rem, var(--_typography---font-size--h6-min) * 1rem + (var(--_typography---font-size--h6-max) - var(--_typography---font-size--h6-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h6-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
+#ybody h1 { font-size: clamp(var(--_typography---font-size--h1-min) * 1rem, var(--_typography---font-size--h1-min) * 1rem + (var(--_typography---font-size--h1-max) - var(--_typography---font-size--h1-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h1-max) * 1rem) !important; }
+#ybody h2 { font-size: clamp(var(--_typography---font-size--h2-min) * 1rem, var(--_typography---font-size--h2-min) * 1rem + (var(--_typography---font-size--h2-max) - var(--_typography---font-size--h2-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h2-max) * 1rem) !important; }
+#ybody h3 { font-size: clamp(var(--_typography---font-size--h3-min) * 1rem, var(--_typography---font-size--h3-min) * 1rem + (var(--_typography---font-size--h3-max) - var(--_typography---font-size--h3-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h3-max) * 1rem) !important; }
+#ybody h4 { font-size: clamp(var(--_typography---font-size--h4-min) * 1rem, var(--_typography---font-size--h4-min) * 1rem + (var(--_typography---font-size--h4-max) - var(--_typography---font-size--h4-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h4-max) * 1rem) !important; }
+#ybody h5 { font-size: clamp(var(--_typography---font-size--h5-min) * 1rem, var(--_typography---font-size--h5-min) * 1rem + (var(--_typography---font-size--h5-max) - var(--_typography---font-size--h5-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h5-max) * 1rem) !important; }
+#ybody h6 { font-size: clamp(var(--_typography---font-size--h6-min) * 1rem, var(--_typography---font-size--h6-min) * 1rem + (var(--_typography---font-size--h6-max) - var(--_typography---font-size--h6-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--h6-max) * 1rem) !important; }
 
 /* --- 7.1 OPTICAL ALIGNMENT (POLISH) --- */
 
@@ -379,7 +379,7 @@
   /* On surcharge la variable pour cette police spécifique */
   --_text-style---optical-offset: -0.04em;
 }
-#ybody p { font-size: clamp(var(--_typography---font-size--text-main-min) * 1rem, var(--_typography---font-size--text-main-min) * 1rem + (var(--_typography---font-size--text-main-max) - var(--_typography---font-size--text-main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--text-main-max) * 1rem) !important; line-height: var(--_text-style---line-height) !important; }
+#ybody p { font-size: clamp(var(--_typography---font-size--text-main-min) * 1rem, var(--_typography---font-size--text-main-min) * 1rem + (var(--_typography---font-size--text-main-max) - var(--_typography---font-size--text-main-min)) * (100vw - var(--site--viewport-min) * 1rem) / (var(--site--viewport-max) - var(--site--viewport-min)), var(--_typography---font-size--text-main-max) * 1rem) !important; }
 
 /* --- 8. MAST STRUCTURE (Super Specific) --- */
 #ybody .u-row { display: flex !important; flex-wrap: wrap !important; margin-inline: calc(var(--site--gutter) * -1) !important; }
@@ -1193,7 +1193,7 @@ body.is-dev-mode .dev-grid_wrapper:not(#ycode-dev-grid) { display: none !importa
 
 /* Studio Runtime Typography Bridge v9.0 */
 :where(body) { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-:where(body) .u-text-display{font-weight:900!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
+:where(body) .u-text-display{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
 :where(body) h1{font-weight:600!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
 :where(body) h2{font-weight:700!important;line-height:1.2!important;letter-spacing:-0.02em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
 :where(body) h3{font-weight:600!important;line-height:1.3!important;letter-spacing:0em!important;margin-bottom:0rem!important;text-wrap:pretty!important}
