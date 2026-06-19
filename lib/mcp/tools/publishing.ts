@@ -86,8 +86,10 @@ export function registerPublishingTools(server: McpServer) {
       // Publish all draft pages
       try {
         const draftPages = await getAllDraftPages();
-        if (draftPages.length > 0) {
-          const result = await publishPages(draftPages.map((p) => p.id));
+        // Exclude draft-only pages from "publish all" (mirrors the HTTP publish route).
+        const publishable = draftPages.filter((p) => !p.settings?.draft_only);
+        if (publishable.length > 0) {
+          const result = await publishPages(publishable.map((p) => p.id));
           changes.pages = result.count;
         } else {
           changes.pages = 0;

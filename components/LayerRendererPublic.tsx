@@ -17,6 +17,7 @@ import React, { useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import dynamic from 'next/dynamic';
 import type { Layer, Locale, FormSettings, Component, DesignColorVariable, PasswordProtectionContext } from '@/types';
 import { getLayerHtmlTag, getClassesString, getText, resolveFieldValue, isTextContentLayer, getCollectionVariable, filterDisabledSliderLayers, applyCustomAttributes } from '@/lib/layer-utils';
+import { STYLE_RULE_ATTR } from '@/lib/conditional-styles';
 import { getMapIframeProps, DEFAULT_MAP_SETTINGS, resolveMarkerColor } from '@/lib/map-utils';
 import { HTML_TO_REACT_ATTRS } from '@/lib/parse-head-html';
 import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/slider-constants';
@@ -722,23 +723,21 @@ const LayerItem: React.FC<{
     ? getTextStyleClasses(layer.textStyles, 'paragraph')
     : '';
 
-  // `<button>` defaults to `display: inline-block` (shrink-wraps) and
-  // `text-align: center`, while `<a>` defaults to `display: inline` and inherits
-  // text-align (typically left). When a button-with-link is rendered as `<a>`,
-  // re-apply those button defaults so layout matches:
-  // - `w-fit`: only if no explicit width or block-level display class is set,
-  //   since those make the element block-level (full width) on purpose.
-  // - `text-center`: only if no explicit text-align class is set.
+  // Buttons shrink-wrap by default; in a grid/flex container an unsized button
+  // stretches. Mirror LayerRenderer (edit mode): apply `w-fit` to ALL buttons
+  // without an explicit width or block-level display class. `<a>`-rendered
+  // button-with-link also loses the centered text-align, so re-apply
+  // `text-center` for that case only.
   const BLOCK_DISPLAY_CLASSES = new Set([
     'flex', 'block', 'grid', 'table', 'flow-root',
   ]);
   const TEXT_ALIGN_CLASSES = new Set([
     'text-left', 'text-center', 'text-right', 'text-justify', 'text-start', 'text-end',
   ]);
-  const layerClassList = isButtonWithLink
+  const layerClassList = layer.name === 'button'
     ? (Array.isArray(layer.classes) ? layer.classes : (layer.classes || '').split(' '))
     : [];
-  const buttonNeedsFit = isButtonWithLink && (() => {
+  const buttonNeedsFit = layer.name === 'button' && (() => {
     const hasWidth = layerClassList.some((c: string) => /^w-/.test(c.split(':').pop() || ''));
     if (hasWidth) return false;
     const hasBlockDisplay = layerClassList.some((c: string) => BLOCK_DISPLAY_CLASSES.has(c.split(':').pop() || ''));
@@ -884,6 +883,12 @@ const LayerItem: React.FC<{
       ...normalizedAttributes,
       suppressHydrationWarning: true,
     };
+
+    // Conditional styles (App State): serialize rules for the RuntimeStyles
+    // runtime to toggle classes live. Classes are compiled via cssGenerator.
+    if (layer.variables?.conditionalStyles?.length) {
+      elementProps[STYLE_RULE_ATTR] = JSON.stringify(layer.variables.conditionalStyles);
+    }
 
     // Apply link attributes for elements rendered as <a> (buttons with links or <a> layers)
     if (htmlTag === 'a' && layer.variables?.link) {

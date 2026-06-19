@@ -144,9 +144,9 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
     try {
       await persist(connections, instanceUrl.trim());
       setSavedInstanceUrl(instanceUrl.trim());
-      toast.success('Instance URL sauvegardée');
+      toast.success('Instance URL saved');
     } catch {
-      toast.error('Échec de la sauvegarde');
+      toast.error('Failed to save');
     }
   };
 
@@ -181,7 +181,7 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
 
   const handleSave = async () => {
     if (!formFormId || !formWebhookUrl.trim()) {
-      toast.error('Formulaire et URL webhook requis');
+      toast.error('Form and webhook URL are required');
       return;
     }
     const connection: N8NConnection = {
@@ -204,9 +204,9 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
       setExpandedId(null);
       resetForm();
       onConnectionChange(updated.length > 0);
-      toast.success(editId ? 'Connexion mise à jour' : 'Connexion ajoutée');
+      toast.success(editId ? 'Connection updated' : 'Connection added');
     } catch {
-      toast.error('Échec de la sauvegarde');
+      toast.error('Failed to save');
     } finally {
       setIsSaving(false);
     }
@@ -218,7 +218,7 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
       await persist(updated);
       setConnections(updated);
     } catch {
-      toast.error('Échec de la mise à jour');
+      toast.error('Failed to update');
     }
   };
 
@@ -230,9 +230,9 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
       setConnections(updated);
       setConnectionToDelete(null);
       onConnectionChange(updated.length > 0);
-      toast.success('Connexion supprimée');
+      toast.success('Connection deleted');
     } catch {
-      toast.error('Échec de la suppression');
+      toast.error('Failed to delete');
     }
   };
 
@@ -243,9 +243,9 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
       setShowDisconnect(false);
       onConnectionChange(false);
       onDisconnect();
-      toast.success('n8n déconnecté');
+      toast.success('n8n disconnected');
     } catch {
-      toast.error('Échec de la déconnexion');
+      toast.error('Failed to disconnect');
     }
   };
 
@@ -265,16 +265,16 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
       const result = await response.json();
       const data = result.data;
       if (!data) {
-        toast.error(result.error || 'Test échoué');
+        toast.error(result.error || 'Test failed');
       } else if (data.ok) {
-        toast.success(`Webhook joignable — HTTP ${data.status}${data.message ? `: ${data.message}` : ''}`);
+        toast.success(`Webhook reachable — HTTP ${data.status}${data.message ? `: ${data.message}` : ''}`);
       } else if (data.status === 0) {
-        toast.error(data.error === 'timeout' ? 'Timeout (5s)' : 'Webhook injoignable');
+        toast.error(data.error === 'timeout' ? 'Timeout (5s)' : 'Webhook unreachable');
       } else {
-        toast.error(`HTTP ${data.status} depuis le webhook`);
+        toast.error(`HTTP ${data.status} from the webhook`);
       }
     } catch {
-      toast.error('Requête de test échouée');
+      toast.error('Test request failed');
     } finally {
       setIsTesting(false);
     }
@@ -304,7 +304,7 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
     try {
       await navigator.clipboard.writeText(JSON.stringify(workflow, null, 2));
     } catch {
-      toast.error('Impossible de copier dans le presse-papier');
+      toast.error('Could not copy to clipboard');
       return;
     }
 
@@ -313,7 +313,7 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
     }
 
     setGeneratedSteps(template.name);
-    toast.success('Workflow copié dans le presse-papier !');
+    toast.success('Workflow copied to clipboard!');
   };
 
   // =========================================================================
@@ -323,26 +323,26 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
   const renderConnectionForm = () => (
     <div className="space-y-4">
       <Field>
-        <FieldLabel>Nom</FieldLabel>
+        <FieldLabel>Name</FieldLabel>
         <Input
-          placeholder="ex : Formulaire contact → CRM" value={formName}
+          placeholder="e.g. Contact form → CRM" value={formName}
           onChange={(e) => setFormName(e.target.value)} className="text-xs"
         />
       </Field>
 
       <Field>
-        <FieldLabel>Formulaire Ycode</FieldLabel>
+        <FieldLabel>Ycode form</FieldLabel>
         {isLoadingForms ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground py-1"><Spinner /> Chargement…</div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground py-1"><Spinner /> Loading…</div>
         ) : forms.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-1">Aucun formulaire. Soumettez-en un d&apos;abord.</p>
+          <p className="text-xs text-muted-foreground py-1">No forms. Submit one first.</p>
         ) : (
           <Select value={formFormId} onValueChange={setFormFormId}>
-            <SelectTrigger className="text-xs"><SelectValue placeholder="Sélectionner un formulaire" /></SelectTrigger>
+            <SelectTrigger className="text-xs"><SelectValue placeholder="Select a form" /></SelectTrigger>
             <SelectContent>
               {forms.map(f => (
                 <SelectItem key={f.form_id} value={f.form_id}>
-                  {f.form_id} ({f.submission_count} soumissions)
+                  {f.form_id} ({f.submission_count} submissions)
                 </SelectItem>
               ))}
             </SelectContent>
@@ -352,24 +352,24 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
 
       <Field>
         <FieldLabel>Webhook URL</FieldLabel>
-        <FieldDescription>L&apos;URL du trigger webhook n8n.</FieldDescription>
+        <FieldDescription>The n8n webhook trigger URL.</FieldDescription>
         <Input
-          placeholder="https://votre-instance.n8n.io/webhook/..."
+          placeholder="https://your-instance.n8n.io/webhook/..."
           value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)}
           className="text-xs font-mono"
         />
       </Field>
 
       <Field>
-        <FieldLabel>Header d&apos;auth <span className="text-muted-foreground font-normal">(optionnel)</span></FieldLabel>
-        <FieldDescription>Header personnalis&eacute; pour l&apos;authentification webhook n8n.</FieldDescription>
+        <FieldLabel>Auth header <span className="text-muted-foreground font-normal">(optional)</span></FieldLabel>
+        <FieldDescription>Custom header for n8n webhook authentication.</FieldDescription>
         <div className="grid grid-cols-2 gap-2">
           <Input
-            placeholder="Nom (ex: Authorization)" value={formAuthHeaderName}
+            placeholder="Name (e.g. Authorization)" value={formAuthHeaderName}
             onChange={(e) => setFormAuthHeaderName(e.target.value)} className="text-xs"
           />
           <Input
-            type="password" placeholder="Valeur"
+            type="password" placeholder="Value"
             value={formAuthHeaderValue}
             onChange={(e) => setFormAuthHeaderValue(e.target.value)} className="text-xs font-mono"
           />
@@ -382,7 +382,7 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
           onClick={handleTest}
           disabled={!formWebhookUrl.trim() || isTesting}
         >
-          {isTesting ? 'Test…' : 'Tester la connexion'}
+          {isTesting ? 'Testing…' : 'Test connection'}
         </Button>
       </div>
     </div>
@@ -391,12 +391,12 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
   const renderConnectionsTab = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <FieldLegend>Connexions</FieldLegend>
+        <FieldLegend>Connections</FieldLegend>
         <Button
           variant="secondary" size="xs"
           onClick={openNew}
         >
-          <Icon name="plus" className="size-3 mr-1" /> Ajouter
+          <Icon name="plus" className="size-3 mr-1" /> Add
         </Button>
       </div>
 
@@ -444,13 +444,13 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
                         className="text-destructive hover:text-destructive"
                         onClick={() => setConnectionToDelete(connection)}
                       >
-                        Supprimer
+                        Delete
                       </Button>
                       <Button
                         size="sm" onClick={handleSave}
                         disabled={!formFormId || !formWebhookUrl.trim() || isSaving}
                       >
-                        {isSaving ? 'Sauvegarde…' : 'Enregistrer'}
+                        {isSaving ? 'Saving…' : 'Save'}
                       </Button>
                     </div>
                   </div>
@@ -461,14 +461,14 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
         </div>
       ) : expandedId ? null : (
         <div className="py-6 text-center text-muted-foreground text-xs border border-dashed rounded-lg">
-          Aucune connexion. Ajoutez-en une pour envoyer les soumissions vers n8n.
+          No connections. Add one to send submissions to n8n.
         </div>
       )}
 
       {expandedId?.startsWith('new-') && (
         <div className="border rounded-lg overflow-hidden">
           <div className="p-3 bg-secondary/20">
-            <Label className="font-medium text-xs">Nouvelle connexion</Label>
+            <Label className="font-medium text-xs">New connection</Label>
           </div>
           <div className="border-t px-3 pb-3 pt-3 space-y-4">
             {renderConnectionForm()}
@@ -477,13 +477,13 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
                 variant="ghost" size="sm"
                 onClick={() => { setExpandedId(null); resetForm(); }}
               >
-                Annuler
+                Cancel
               </Button>
               <Button
                 size="sm" onClick={handleSave}
                 disabled={!formFormId || !formWebhookUrl.trim() || isSaving}
               >
-                {isSaving ? 'Sauvegarde…' : 'Ajouter'}
+                {isSaving ? 'Saving…' : 'Add'}
               </Button>
             </div>
           </div>
@@ -496,13 +496,13 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
     <div className="space-y-6">
       {/* Instance URL */}
       <Field>
-        <FieldLabel>URL de ton instance n8n</FieldLabel>
+        <FieldLabel>Your n8n instance URL</FieldLabel>
         <FieldDescription>
-          Nécessaire pour ouvrir n8n automatiquement après la génération.
+          Required to open n8n automatically after generation.
         </FieldDescription>
         <div className="flex gap-2">
           <Input
-            placeholder="https://votre-instance.n8n.io"
+            placeholder="https://your-instance.n8n.io"
             value={instanceUrl}
             onChange={(e) => setInstanceUrl(e.target.value)}
             className="text-xs font-mono flex-1"
@@ -512,16 +512,16 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
             disabled={!instanceUrl.trim() || instanceUrl === savedInstanceUrl}
             onClick={saveInstanceUrl}
           >
-            Sauvegarder
+            Save
           </Button>
         </div>
       </Field>
 
       <div className="border-t pt-4">
-        <FieldLegend className="mb-3">Templates de workflow</FieldLegend>
+        <FieldLegend className="mb-3">Workflow templates</FieldLegend>
         <FieldDescription className="mb-4">
-          Génère un workflow n8n pré-câblé. Le JSON est copié dans ton presse-papier —
-          importe-le dans n8n via <span className="text-foreground">Workflows → Import from clipboard</span>.
+          Generates a pre-wired n8n workflow. The JSON is copied to your clipboard —
+          import it into n8n via <span className="text-foreground">Workflows → Import from clipboard</span>.
         </FieldDescription>
 
         <div className="space-y-2">
@@ -553,18 +553,18 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
                 {isSelected && (
                   <div className="border-t px-3 pb-3 pt-3 space-y-3 bg-secondary/10">
                     <Field>
-                      <FieldLabel>Formulaire source</FieldLabel>
+                      <FieldLabel>Source form</FieldLabel>
                       {isLoadingForms ? (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground py-1"><Spinner /> Chargement…</div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground py-1"><Spinner /> Loading…</div>
                       ) : forms.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">Aucun formulaire trouvé.</p>
+                        <p className="text-xs text-muted-foreground">No forms found.</p>
                       ) : (
                         <Select value={templateFormId} onValueChange={setTemplateFormId}>
-                          <SelectTrigger className="text-xs"><SelectValue placeholder="Sélectionner un formulaire" /></SelectTrigger>
+                          <SelectTrigger className="text-xs"><SelectValue placeholder="Select a form" /></SelectTrigger>
                           <SelectContent>
                             {forms.map(f => (
                               <SelectItem key={f.form_id} value={f.form_id}>
-                                {f.form_id} ({f.submission_count} soumissions)
+                                {f.form_id} ({f.submission_count} submissions)
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -578,20 +578,20 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
                       disabled={!templateFormId}
                       onClick={() => handleGenerate(template.id)}
                     >
-                      Générer & Ouvrir n8n →
+                      Generate & Open n8n →
                     </Button>
 
                     {/* Step-by-step guide shown after generation */}
                     {generatedSteps === template.name && (
                       <div className="rounded-md bg-primary/5 border border-primary/20 p-3 space-y-1.5 text-[11px] text-muted-foreground">
-                        <p className="font-medium text-foreground text-xs">Étapes dans n8n :</p>
+                        <p className="font-medium text-foreground text-xs">Steps in n8n:</p>
                         <ol className="space-y-1 pl-1">
-                          <li>1. Dans n8n → <span className="text-foreground font-medium">Workflows → Import from clipboard</span></li>
-                          <li>2. Le workflow &ldquo;{template.name}&rdquo; apparaît — vérifie les paramètres</li>
-                          <li>3. Configure tes credentials ({template.name})</li>
-                          <li>4. <span className="text-foreground font-medium">Active le workflow</span> (toggle en haut à droite)</li>
-                          <li>5. Copie l&apos;<span className="text-foreground font-medium">URL Production webhook</span> depuis le nœud &ldquo;Ycode Webhook&rdquo;</li>
-                          <li>6. Reviens ici → onglet <span className="text-foreground font-medium">Connexions</span> → Ajouter → colle l&apos;URL</li>
+                          <li>1. In n8n → <span className="text-foreground font-medium">Workflows → Import from clipboard</span></li>
+                          <li>2. The &ldquo;{template.name}&rdquo; workflow appears — check the settings</li>
+                          <li>3. Set up your credentials ({template.name})</li>
+                          <li>4. <span className="text-foreground font-medium">Activate the workflow</span> (toggle top-right)</li>
+                          <li>5. Copy the <span className="text-foreground font-medium">Production webhook URL</span> from the &ldquo;Ycode Webhook&rdquo; node</li>
+                          <li>6. Come back here → <span className="text-foreground font-medium">Connections</span> tab → Add → paste the URL</li>
                         </ol>
                       </div>
                     )}
@@ -618,7 +618,7 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
             variant="secondary" size="xs"
             onClick={() => setShowDisconnect(true)}
           >
-            Déconnecter
+            Disconnect
           </Button>
         )}
         <SheetDescription className="sr-only">n8n integration settings</SheetDescription>
@@ -631,7 +631,7 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
           {/* Tabs */}
           <div className="flex gap-1 p-1 bg-secondary/40 rounded-lg">
             {([
-              { id: 'connections', label: 'Connexions' },
+              { id: 'connections', label: 'Connections' },
               { id: 'templates',   label: '✨ Templates' },
             ] as { id: Tab; label: string }[]).map(t => (
               <button
@@ -652,9 +652,9 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
 
       <ConfirmDialog
         open={showDisconnect} onOpenChange={setShowDisconnect}
-        title="Déconnecter n8n ?"
-        description="Toutes les connexions webhook seront supprimées."
-        confirmLabel="Déconnecter" cancelLabel="Annuler"
+        title="Disconnect n8n?"
+        description="All webhook connections will be removed."
+        confirmLabel="Disconnect" cancelLabel="Cancel"
         confirmVariant="destructive"
         onConfirm={handleDisconnect} onCancel={() => setShowDisconnect(false)}
       />
@@ -662,9 +662,9 @@ export default function N8NSettings({ onConnectionChange, onDisconnect }: N8NSet
       <ConfirmDialog
         open={!!connectionToDelete}
         onOpenChange={(open: boolean) => { if (!open) setConnectionToDelete(null); }}
-        title="Supprimer la connexion ?"
-        description={`Supprimer la connexion entre "${connectionToDelete?.formId}" et n8n ?`}
-        confirmLabel="Supprimer" cancelLabel="Annuler"
+        title="Delete connection?"
+        description={`Delete the connection between "${connectionToDelete?.formId}" and n8n?`}
+        confirmLabel="Delete" cancelLabel="Cancel"
         confirmVariant="destructive"
         onConfirm={handleDelete} onCancel={() => setConnectionToDelete(null)}
       />

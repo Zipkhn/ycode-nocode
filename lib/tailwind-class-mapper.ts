@@ -625,14 +625,6 @@ export function propertyToClass(
       case 'gridTemplateRows':
         // Replace spaces with underscores for Tailwind arbitrary value syntax
         return `grid-rows-[${value.replace(/\s+/g, '_')}]`;
-      case 'gridColumnSpan':
-        // Studio native: always emit u-col-span-{N}. "full" collapses to the 12-column max.
-        if (value === 'full') return 'u-col-span-12';
-        return `u-col-span-${value}`;
-      case 'gridRowSpan':
-        // Studio native: always emit u-row-span-{N}. "full" collapses to the 12-row max.
-        if (value === 'full') return 'u-row-span-12';
-        return `u-row-span-${value}`;
     }
   }
 
@@ -1584,17 +1576,17 @@ export function classesToDesign(classes: string | string[]): Layer['design'] {
       }
     }
 
-    // Grid Column Span
-    if (cls.startsWith('col-span-')) {
-      const match = cls.match(/^col-span-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/);
+    // Grid Column Span — Studio native prefix (matches what propertyToClass emits)
+    if (cls.startsWith('u-col-span-')) {
+      const match = cls.match(/^u-col-span-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/);
       if (match) {
         design.sizing!.gridColumnSpan = match[1];
       }
     }
 
-    // Grid Row Span
-    if (cls.startsWith('row-span-')) {
-      const match = cls.match(/^row-span-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/);
+    // Grid Row Span — Studio native prefix
+    if (cls.startsWith('u-row-span-')) {
+      const match = cls.match(/^u-row-span-(1|2|3|4|5|6|7|8|9|10|11|12|auto|full)$/);
       if (match) {
         design.sizing!.gridRowSpan = match[1];
       }

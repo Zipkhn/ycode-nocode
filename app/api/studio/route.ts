@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { loadCurrentTheme, writeThemeFile, saveStudioTheme } from '@/lib/studio-theme-store';
+import { RESERVED_LOCAL_PROPS } from '@/lib/studio-css';
 import type { CustomVarsConfig } from '@/components/Studio/utils/bridge-generators';
 
 /**
@@ -15,7 +16,8 @@ export async function GET() {
       return NextResponse.json({ error: 'Studio core section not found' }, { status: 404 });
     }
     return NextResponse.json(theme);
-  } catch {
+  } catch (e) {
+    console.error('Studio GET: failed to read theme', e);
     return NextResponse.json({ error: 'Failed to read theme' }, { status: 500 });
   }
 }
@@ -29,6 +31,9 @@ export async function POST(request: Request) {
     const variables = { ...current.variables };
     if (updates && typeof updates === 'object') {
       for (const [key, value] of Object.entries(updates)) {
+        // §14 utility-rule local aliases must never enter the token map (would
+        // corrupt typographic levels at render — see RESERVED_LOCAL_PROPS).
+        if (RESERVED_LOCAL_PROPS.has(key)) continue;
         if (value === '__remove__') delete variables[key];
         else variables[key] = String(value);
       }
@@ -43,7 +48,8 @@ export async function POST(request: Request) {
 
     // Don't hard-fail when Supabase is absent (local-without-Supabase keeps working via file).
     return NextResponse.json(saved ? { success: true } : { success: true, persisted: 'file' });
-  } catch {
+  } catch (e) {
+    console.error('Studio POST: failed to update theme', e);
     return NextResponse.json({ error: 'Failed to update theme' }, { status: 500 });
   }
 }

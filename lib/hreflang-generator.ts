@@ -37,16 +37,12 @@ export function buildHreflangCluster(
  *
  * Returns [] for mono-locale sites (no hreflang needed).
  *
- * Symmetry guarantee:
- *   This function is the single source of truth for hreflang clusters on
- *   static pages. Both generateMetadata (page <head>) and generateSitemapUrls
- *   (sitemap.xml) call this function, ensuring <head> and sitemap clusters
- *   are always identical.
- *
- *   Dynamic/CMS pages in sitemap-utils compute their per-locale URLs inline
- *   (because the item slug is not in the Page object) but then pass them through
- *   buildHreflangCluster — the same assembly function used here — so the cluster
- *   shape cannot diverge between static and dynamic paths.
+ * Scope:
+ *   Builds the hreflang cluster for static pages' <head> (generateMetadata).
+ *   The sitemap (lib/sitemap-utils) builds its alternates independently via
+ *   buildPageHreflangAlternates (lib/hreflang-utils) — a SEPARATE code path,
+ *   not this function. The two are therefore not guaranteed identical by a
+ *   shared assembly function; keep their cluster rules in sync manually.
  */
 export function generateHreflangEntries(
   page: Page,

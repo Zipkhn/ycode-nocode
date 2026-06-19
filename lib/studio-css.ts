@@ -27,6 +27,16 @@ export interface StudioThemeData {
 
 // ── Parsing ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Local custom-property aliases declared INSIDE utility rules (skeleton §14:
+ * `.u-text-* { --min: …; --max: …; --v-min/--v-max }`). They sit within the
+ * parsed CORE region but are NOT theme tokens. Harvesting them stores the
+ * last-seen value (`.u-text-small`) under bare keys `min`/`max`, and the global
+ * replace in applyStudioMutations then rewrites EVERY level's `--min`/`--max`
+ * to text-small → all typographic levels collapse to ~13px. Never treat as vars.
+ */
+export const RESERVED_LOCAL_PROPS = new Set(['min', 'max', 'v-min', 'v-max']);
+
 /** Parse the Studio-managed variable map from the STUDIO_CORE section. Null if markers absent. */
 export function parseStudioVariablesFromCss(css: string): Record<string, string> | null {
   const startIdx = css.indexOf('/* STUDIO_CORE_START */');
@@ -41,6 +51,7 @@ export function parseStudioVariablesFromCss(css: string): Record<string, string>
     // Skip scoped/responsive overrides (always `!important`) so the canonical
     // :root token wins — e.g. --site--column-count reads 12, not the @media 4.
     if (match[2].includes('!important')) continue;
+    if (RESERVED_LOCAL_PROPS.has(match[1])) continue; // §14 utility-rule locals, not theme tokens
     variables[match[1]] = match[2];
   }
   return variables;
@@ -121,6 +132,9 @@ export function applyStudioMutations(
   // 1. Variable updates
   if (updates && typeof updates === 'object') {
     for (const [key, value] of Object.entries(updates)) {
+      // Never let §14 utility-rule local aliases mutate the CSS: a bare `--min`/
+      // `--max` replace is global and would collapse every typographic level.
+      if (RESERVED_LOCAL_PROPS.has(key)) continue;
       if (value === '__remove__') {
         css = css.replace(new RegExp(`\\s*--${key}:[^;]+;`, 'g'), '');
       } else if (new RegExp(`--${key}:`).test(css)) {
@@ -205,7 +219,9 @@ export function renderStudioDynamicCss(theme: StudioThemeData): string {
   const vars = theme.variables;
   const parts: string[] = [];
 
-  const varLines = Object.entries(vars).map(([k, v]) => `  --${k}: ${v};`);
+  const varLines = Object.entries(vars)
+    .filter(([k]) => !RESERVED_LOCAL_PROPS.has(k))
+    .map(([k, v]) => `  --${k}: ${v};`);
   if (varLines.length) parts.push(`/* Studio Theme Variables (DB) */\n:root {\n${varLines.join('\n')}\n}`);
 
   const customVars = theme.customVarsConfig ? generateCustomVarsBridgeCSS(theme.customVarsConfig) : '';

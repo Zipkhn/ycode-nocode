@@ -5,13 +5,10 @@ import type { StudioVariablesHook } from '../hooks/useStudioVariables';
 
 interface Props { hook: StudioVariablesHook }
 
+// Viewport + Site Margin live in the General tab; Layout owns the grid only.
 const LAYOUT_VARS = [
-  { group: 'Viewport',    key: 'site--viewport-max', label: 'Max Width (unitless)'  },
-  { group: 'Viewport',    key: 'site--viewport-min', label: 'Min Width (unitless)'  },
-  { group: 'Grid',        key: 'site--column-count', label: 'Columns'               },
-  { group: 'Grid',        key: 'site--gutter',       label: 'Gutter'                },
-  { group: 'Site Margin', key: 'site--margin-min',   label: 'Min (rem)'             },
-  { group: 'Site Margin', key: 'site--margin-max',   label: 'Max (rem)'             },
+  { group: 'Grid', key: 'site--column-count', label: 'Columns' },
+  { group: 'Grid', key: 'site--gutter',       label: 'Gutter'  },
 ] as const;
 
 export function LayoutSection({ hook }: Props) {

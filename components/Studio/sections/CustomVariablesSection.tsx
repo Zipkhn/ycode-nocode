@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useId } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { StudioVariablesHook, CustomVarsConfig } from '../hooks/useStudioVariables';
 import type { CustomMode, CustomVariable } from '../utils/bridge-generators';
 
@@ -190,7 +190,7 @@ export function CustomVariablesSection({ hook }: Props) {
 
         {variables.length === 0 && (
           <p className="text-[11px] text-white/30 italic py-2">
-            Aucune variable. Clique sur + Variable pour commencer.
+            No variables. Click + Variable to start.
           </p>
         )}
 
@@ -262,7 +262,7 @@ export function CustomVariablesSection({ hook }: Props) {
       {variables.length > 0 && (
         <details className="mt-2">
           <summary className="text-[10px] text-white/30 cursor-pointer hover:text-white/50">
-            CSS généré
+            Generated CSS
           </summary>
           <pre className="mt-2 text-[9px] text-white/40 bg-white/5 rounded p-2 overflow-x-auto whitespace-pre-wrap">
             {modes.map(mode => {

@@ -10,7 +10,7 @@ import { enrichItemsWithCountValues } from '@/lib/repositories/collectionCountRe
 import { getLocaleScaffoldTranslations, getCmsTranslationsForItems } from '@/lib/repositories/translationRepository';
 import { getTranslatableKey } from '@/lib/locale-runtime';
 import type { Page, PageFolder, PageLayers, Component, ComponentVariable, CollectionItemWithValues, CollectionField, Layer, CollectionPaginationMeta, Translation, Locale } from '@/types';
-import { getCollectionVariable, resolveFieldValue, evaluateVisibility, evaluateCollectionFilters, evaluateCondition, getLayerHtmlTag, filterDisabledSliderLayers } from '@/lib/layer-utils';
+import { getCollectionVariable, resolveFieldValue, evaluateVisibility, evaluateCollectionFilters, evaluateCondition, getLayerHtmlTag, filterDisabledSliderLayers, type VisibilityContext } from '@/lib/layer-utils';
 import { isFieldVariable, isAssetVariable, createDynamicTextVariable, createDynamicRichTextVariable, createAssetVariable, getDynamicTextContent, getVariableStringValue, getAssetId, resolveDesignStyles } from '@/lib/variable-utils';
 import { buildImageSizes, generateImageSrcset, getOptimizedImageUrl, getAssetProxyUrl, DEFAULT_ASSETS, collectLayerAssetIds, buildSvgDataUrl, parseImageDimension, getSvgAspectRatioStyle } from '@/lib/asset-utils';
 import { resolveComponents, applyComponentOverrides } from '@/lib/resolve-components';
@@ -43,7 +43,8 @@ import { getMapIframeProps, DEFAULT_MAP_SETTINGS } from '@/lib/map-utils';
 import { getMapboxAccessToken, getGoogleMapsEmbedApiKey } from '@/lib/map-server';
 import { getAssetsByIds } from '@/lib/repositories/assetRepository';
 import { isVirtualAssetField, findDisplayField, hasDynamicDateRule, isDynamicDateCondition } from '@/lib/collection-field-utils';
-import type { DynamicVisibilityCondition, FieldVariable, AssetVariable, DynamicTextVariable, LinkSettings } from '@/types';
+import type { DynamicVisibilityCondition, FieldVariable, AssetVariable, DynamicTextVariable, LinkSettings, ConditionalVisibility } from '@/types';
+import { hasClientRuntimeSource, RUNTIME_STATE_ATTR, type ClientVisibilityRule, type ClientVisibilityGroup } from '@/lib/runtime-visibility';
 import type { DesignColorVariable } from '@/types';
 
 // Cached map provider tokens for synchronous use inside layerToHtml.
@@ -3109,6 +3110,29 @@ function getFilterableCollectionTarget(
  * @param pageCollectionItemId - ID of the dynamic page's collection item, when on a dynamic page
  * @returns Filtered layer tree with hidden layers removed
  */
+/**
+ * Build a serializable client visibility rule: keep `runtime_var` conditions
+ * whole (re-evaluated live in the browser) and bake every server-knowable
+ * condition to a boolean via the canonical `evaluateCondition`. Mirrors the
+ * date-preset baking but for client-runtime sources.
+ */
+function buildClientVisibilityRule(
+  cv: ConditionalVisibility,
+  context: VisibilityContext,
+): ClientVisibilityRule {
+  return {
+    defaultVisibility: cv.defaultVisibility,
+    groups: (cv.groups || []).map((group): ClientVisibilityGroup => ({
+      action: group.action,
+      conditions: (group.conditions || []).map(condition =>
+        condition.source === 'runtime_var'
+          ? { kind: 'runtime' as const, condition }
+          : { kind: 'static' as const, result: evaluateCondition(condition, context) },
+      ),
+    })),
+  };
+}
+
 function filterByVisibility(
   layers: Layer[],
   collectionLayerData?: Record<string, string>,
@@ -3160,6 +3184,38 @@ function filterByVisibility(
             display: isVisible ? '' : 'none',
           },
           attributes,
+          children: layer.children
+            ? layer.children
+              .map(child => filterLayer(child, effectiveCollectionLayerData, effectiveCurrentItemId))
+              .filter((child): child is Layer => child !== null)
+            : undefined,
+        };
+      }
+      // Layers whose visibility depends on a CLIENT-runtime value (a form field
+      // or user-set variable) are kept in the tree — their value only exists in
+      // the browser. Bake the server-knowable conditions to booleans, serialize
+      // the rule onto data-ycode-state-rule, and let the RuntimeVisibility runtime
+      // toggle display live. `isVisible` is computed with empty runtime state, so
+      // SSR display matches the client's first paint (no flash).
+      if (hasClientRuntimeSource(conditionalVisibility)) {
+        return {
+          ...layer,
+          attributes: {
+            ...(layer.attributes || {}),
+            [RUNTIME_STATE_ATTR]: JSON.stringify(buildClientVisibilityRule(conditionalVisibility, {
+              collectionLayerData: effectiveCollectionLayerData,
+              pageCollectionData,
+              pageCollectionCounts,
+              currentPageData,
+              currentItemId: effectiveCurrentItemId,
+              pageCollectionItemId,
+              timezone,
+            })),
+          },
+          _dynamicStyles: {
+            ...(layer._dynamicStyles || {}),
+            display: isVisible ? '' : 'none',
+          },
           children: layer.children
             ? layer.children
               .map(child => filterLayer(child, effectiveCollectionLayerData, effectiveCurrentItemId))

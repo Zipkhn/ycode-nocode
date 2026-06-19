@@ -13,7 +13,6 @@ import Icon from '@/components/ui/icon';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useControlledInput } from '@/hooks/use-controlled-input';
 import { useDesignSync } from '@/hooks/use-design-sync';
-import { extractMeasurementValue } from '@/lib/measurement-utils';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useFontsStore } from '@/stores/useFontsStore';
 import { removeSpaces } from '@/lib/utils';
@@ -80,29 +79,7 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
   // Detect if line clamp is active
   const hasLineClamp = lineClamp !== '' && lineClamp !== 'none';
 
-  // Custom extractor for letter spacing (strips 'em' as default unit, like fontSize strips 'px')
-  const extractLetterSpacingValue = (value: string): string => {
-    if (!value) return '';
-
-    // Special values that don't need processing
-    const specialValues = ['auto', 'normal'];
-    if (specialValues.includes(value)) return value;
-
-    // Strip 'em' unit (default for letter spacing)
-    // Keep all other units like px, rem, %, etc.
-    if (value.endsWith('em')) {
-      return value.slice(0, -2);
-    }
-
-    return value;
-  };
-
-  // Local controlled inputs (prevents repopulation bug)
-  const [fontSizeInput, setFontSizeInput] = useControlledInput(fontSize, extractMeasurementValue);
-  const [letterSpacingInput, setLetterSpacingInput] = useControlledInput(letterSpacing, extractLetterSpacingValue);
-  const [lineHeightInput, setLineHeightInput] = useControlledInput(lineHeight);
-  const [decorationThicknessInput, setDecorationThicknessInput] = useControlledInput(textDecorationThickness, extractMeasurementValue);
-  const [underlineOffsetInput, setUnderlineOffsetInput] = useControlledInput(underlineOffset, extractMeasurementValue);
+  // Local controlled input (prevents repopulation bug)
   const [lineClampInput, setLineClampInput] = useControlledInput(lineClamp);
 
   // Map numeric font weights to named values

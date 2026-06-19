@@ -34,6 +34,7 @@ import ActiveUsersInHeader from './ActiveUsersInHeader';
 import InviteUserButton from './InviteUserButton';
 import PublishPopover from './PublishPopover';
 import { useStudioStore } from '@/components/Studio/StudioModal';
+import { useVariablesStore } from './VariablesModal';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { Separator } from '@/components/ui/separator';
@@ -116,6 +117,7 @@ export default function HeaderBar({
   const loadTranslations = useLocalisationStore((s) => s.loadTranslations);
   const { navigateToLayers, navigateToCollection, navigateToCollections, updateQueryParams, routeType } = useEditorUrl();
   const openStudio = useStudioStore(s => s.open);
+  const openVariables = useVariablesStore(s => s.open);
 
   // Optimistic nav button state - set immediately on click, cleared when URL catches up
   type NavButton = 'design' | 'cms' | 'forms';
@@ -624,6 +626,13 @@ export default function HeaderBar({
           >
             <Icon name="slider" />
             Studio
+          </Button>
+          <Button
+            variant="ghost" size="sm"
+            onClick={openVariables} title="Variables (App State)"
+          >
+            <Icon name="zap" />
+            Variables
           </Button>
         </div>
       </div>

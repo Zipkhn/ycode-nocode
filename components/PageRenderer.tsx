@@ -5,10 +5,19 @@ import CustomCodeInjector from '@/components/CustomCodeInjector';
 import LayerRendererPublic from '@/components/LayerRendererPublic';
 import SliderInitializer from '@/components/SliderInitializer';
 import LightboxInitializer from '@/components/LightboxInitializer';
+import RuntimeVisibility from '@/components/runtime/RuntimeVisibility';
+import FormStateWriter from '@/components/runtime/FormStateWriter';
+import VariableTriggers from '@/components/runtime/VariableTriggers';
+import RuntimeStateProvider from '@/components/runtime/RuntimeStateProvider';
+import RuntimeStyles from '@/components/runtime/RuntimeStyles';
 import PasswordForm from '@/components/PasswordForm';
 import YcodeBadge from '@/components/YcodeBadge';
 import { unstable_cache } from 'next/cache';
 import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables';
+import { pageHasRuntimeState } from '@/lib/runtime-visibility';
+import { collectStateActionLayers } from '@/components/runtime/setVariableAction';
+import { buildStateDefaults } from '@/lib/project-variables';
+import { pageHasConditionalStyles } from '@/lib/conditional-styles';
 import { renderRootLayoutHeadCode } from '@/lib/parse-head-html';
 import { generateInitialAnimationCSS, type HiddenLayerInfo } from '@/lib/animation-utils';
 import { buildCustomFontsCss, buildFontClassesCss, fetchGoogleFontsCss, getGoogleFontLinks } from '@/lib/font-utils';
@@ -26,7 +35,7 @@ import { getClassesString, hasPasswordFormLayer } from '@/lib/layer-utils';
 import { buildLocalizedPageUrls, type LocalizedDynamicSlug } from '@/lib/page-utils';
 import { getTranslatableKey } from '@/lib/locale-runtime';
 import { getSlugTranslationsByLocale } from '@/lib/repositories/translationRepository';
-import type { Layer, Component, Page, CollectionItemWithValues, CollectionField, Locale, PageFolder, PasswordProtectionContext, Translation } from '@/types';
+import type { Layer, Component, Page, CollectionItemWithValues, CollectionField, Locale, PageFolder, PasswordProtectionContext, Translation, VariableDefinition } from '@/types';
 
 interface PageLinkRef { collection_item_id: string; page_id: string }
 
@@ -511,6 +520,10 @@ export default async function PageRenderer({
   // and _layerDataMap are redundant — removing them can cut the payload by 10x+.
   const childLayers = usePublishedData ? stripSSROnlyData(rawChildLayers) : rawChildLayers;
   const animationLayers = usePublishedData ? extractAnimationLayers(resolvedLayers) : resolvedLayers;
+  const stateActionLayers = collectStateActionLayers(resolvedLayers);
+  const stateDefaults = buildStateDefaults(
+    (await getSettingByKey('project_variables').catch(() => null)) as VariableDefinition[] | null,
+  );
 
   // Load installed fonts and generate CSS + link URLs
   let fontsCss = '';
@@ -836,6 +849,22 @@ export default async function PageRenderer({
 
       {/* Initialize lightbox modals */}
       {hasLightboxLayers(resolvedLayers) && <LightboxInitializer />}
+
+      {/* Seed runtime variables with their project defaults (before the
+          visibility runtime so the first re-eval sees them). */}
+      {Object.keys(stateDefaults).length > 0 && <RuntimeStateProvider defaults={stateDefaults} />}
+
+      {/* Client-reactive conditional visibility — re-evaluate runtime_var rules live. */}
+      {pageHasRuntimeState(resolvedLayers) && <RuntimeVisibility />}
+
+      {/* Conditional styles (App State): toggle classes by runtime variable. */}
+      {pageHasConditionalStyles(resolvedLayers) && <RuntimeStyles />}
+
+      {/* Mirror live form-field values into the store for any runtime consumer. */}
+      {(pageHasRuntimeState(resolvedLayers) || pageHasConditionalStyles(resolvedLayers)) && <FormStateWriter />}
+
+      {/* Behavior triggers (click/hover/load) that mutate runtime variables. */}
+      {stateActionLayers.length > 0 && <VariableTriggers triggers={stateActionLayers} />}
 
       {/* Report content height to parent for zoom calculations (preview only) */}
       {!page.is_published && <ContentHeightReporter />}

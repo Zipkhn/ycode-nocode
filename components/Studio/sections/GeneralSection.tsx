@@ -5,28 +5,28 @@ import type { StudioVariablesHook } from '../hooks/useStudioVariables';
 
 interface Props { hook: StudioVariablesHook }
 
-function Field({ label, varKey, vars, setVar, step = 'any' }: {
-  label: string; varKey: string; vars: Record<string, string>;
-  setVar: (k: string, v: string) => void; step?: string;
-}) {
-  return (
-    <div className="flex items-center border-b border-white/5 hover:bg-white/[0.04] transition-colors group">
-      <span className="w-[200px] shrink-0 px-3 py-1.5 text-[11px] text-white/70 truncate">{label}</span>
-      <span className="border-l border-white/5 flex-1 px-2 py-0.5">
-        <input
-          type="text"
-          value={vars[varKey] ?? ''}
-          onChange={e => setVar(varKey, e.target.value)}
-          className="w-full bg-transparent text-white text-[11px] font-mono outline-none focus:bg-white/5 rounded px-1 py-0.5"
-          spellCheck={false}
-        />
-      </span>
-    </div>
-  );
-}
-
 export function GeneralSection({ hook }: Props) {
   const { variables, setVar } = hook;
+
+  const textRows = (rows: { label: string; key: string }[]) =>
+    rows.map(({ label, key }) => (
+      <tr key={key} className="border-b border-white/5 hover:bg-white/[0.04] transition-colors">
+        <td className="px-3 py-1 text-[11px] text-white/70">{label}</td>
+        <td className="border-l border-white/5 px-2 py-0.5">
+          <input
+            type="text" value={variables[key] ?? ''}
+            onChange={e => setVar(key, e.target.value)}
+            className="w-full bg-transparent text-white text-[11px] font-mono outline-none focus:bg-white/5 rounded px-1 py-0.5"
+          />
+        </td>
+      </tr>
+    ));
+
+  const sectionRow = (title: string) => (
+    <tr className="bg-white/[0.03]">
+      <td colSpan={2} className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">{title}</td>
+    </tr>
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -39,65 +39,32 @@ export function GeneralSection({ hook }: Props) {
             </tr>
           </thead>
           <tbody>
-            {/* Viewport */}
-            <tr className="bg-white/[0.03]">
-              <td colSpan={2} className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">Viewport (Unitless)</td>
-            </tr>
-            {[
+            {sectionRow('Viewport (Unitless)')}
+            {textRows([
               { label: 'Max Width', key: 'site--viewport-max' },
               { label: 'Min Width', key: 'site--viewport-min' },
-            ].map(({ label, key }) => (
-              <tr key={key} className="border-b border-white/5 hover:bg-white/[0.04] transition-colors">
-                <td className="px-3 py-1 text-[11px] text-white/70">{label}</td>
-                <td className="border-l border-white/5 px-2 py-0.5">
-                  <input
-                    type="text" value={variables[key] ?? ''}
-                    onChange={e => setVar(key, e.target.value)}
-                    className="w-full bg-transparent text-white text-[11px] font-mono outline-none focus:bg-white/5 rounded px-1 py-0.5"
-                  />
-                </td>
-              </tr>
-            ))}
+            ])}
 
-            {/* Grid & Layout */}
-            <tr className="bg-white/[0.03]">
-              <td colSpan={2} className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">Grid & Layout</td>
-            </tr>
-            {[
-              { label: 'Columns', key: 'site--column-count' },
-              { label: 'Gutter',  key: 'site--gutter'       },
-            ].map(({ label, key }) => (
-              <tr key={key} className="border-b border-white/5 hover:bg-white/[0.04] transition-colors">
-                <td className="px-3 py-1 text-[11px] text-white/70">{label}</td>
-                <td className="border-l border-white/5 px-2 py-0.5">
-                  <input
-                    type="text" value={variables[key] ?? ''}
-                    onChange={e => setVar(key, e.target.value)}
-                    className="w-full bg-transparent text-white text-[11px] font-mono outline-none focus:bg-white/5 rounded px-1 py-0.5"
-                  />
-                </td>
-              </tr>
-            ))}
-
-            {/* Site Margin */}
-            <tr className="bg-white/[0.03]">
-              <td colSpan={2} className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">Site Margin (REM)</td>
-            </tr>
-            {[
+            {sectionRow('Site Margin (REM)')}
+            {textRows([
               { label: 'Min', key: 'site--margin-min' },
               { label: 'Max', key: 'site--margin-max' },
-            ].map(({ label, key }) => (
-              <tr key={key} className="border-b border-white/5 hover:bg-white/[0.04] transition-colors">
-                <td className="px-3 py-1 text-[11px] text-white/70">{label}</td>
-                <td className="border-l border-white/5 px-2 py-0.5">
-                  <input
-                    type="text" value={variables[key] ?? ''}
-                    onChange={e => setVar(key, e.target.value)}
-                    className="w-full bg-transparent text-white text-[11px] font-mono outline-none focus:bg-white/5 rounded px-1 py-0.5"
-                  />
-                </td>
-              </tr>
-            ))}
+            ])}
+
+            {sectionRow('Rendering')}
+            <tr className="border-b border-white/5 hover:bg-white/[0.04] transition-colors">
+              <td className="px-3 py-1 text-[11px] text-white/70">Font Smoothing</td>
+              <td className="border-l border-white/5 px-2 py-0.5">
+                <select
+                  value={variables['font-smoothing'] ?? ''}
+                  onChange={e => setVar('font-smoothing', e.target.value)}
+                  className="w-full bg-transparent text-white text-[11px] font-mono outline-none focus:bg-white/5 rounded px-1 py-0.5"
+                >
+                  <option value="">Default</option>
+                  <option value="antialiased">Antialiased</option>
+                </select>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
