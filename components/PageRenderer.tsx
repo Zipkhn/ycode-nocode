@@ -7,11 +7,13 @@ import SliderInitializer from '@/components/SliderInitializer';
 import LightboxInitializer from '@/components/LightboxInitializer';
 import RuntimeVisibility from '@/components/runtime/RuntimeVisibility';
 import FormStateWriter from '@/components/runtime/FormStateWriter';
+import VariableTriggers from '@/components/runtime/VariableTriggers';
 import PasswordForm from '@/components/PasswordForm';
 import YcodeBadge from '@/components/YcodeBadge';
 import { unstable_cache } from 'next/cache';
 import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables';
 import { pageHasRuntimeState } from '@/lib/runtime-visibility';
+import { collectStateActionLayers } from '@/components/runtime/setVariableAction';
 import { renderRootLayoutHeadCode } from '@/lib/parse-head-html';
 import { generateInitialAnimationCSS, type HiddenLayerInfo } from '@/lib/animation-utils';
 import { buildCustomFontsCss, buildFontClassesCss, fetchGoogleFontsCss, getGoogleFontLinks } from '@/lib/font-utils';
@@ -514,6 +516,7 @@ export default async function PageRenderer({
   // and _layerDataMap are redundant — removing them can cut the payload by 10x+.
   const childLayers = usePublishedData ? stripSSROnlyData(rawChildLayers) : rawChildLayers;
   const animationLayers = usePublishedData ? extractAnimationLayers(resolvedLayers) : resolvedLayers;
+  const stateActionLayers = collectStateActionLayers(resolvedLayers);
 
   // Load installed fonts and generate CSS + link URLs
   let fontsCss = '';
@@ -849,6 +852,9 @@ export default async function PageRenderer({
           <FormStateWriter />
         </>
       )}
+
+      {/* Behavior triggers (click/hover/load) that mutate runtime variables. */}
+      {stateActionLayers.length > 0 && <VariableTriggers triggers={stateActionLayers} />}
 
       {/* Report content height to parent for zoom calculations (preview only) */}
       {!page.is_published && <ContentHeightReporter />}

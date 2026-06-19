@@ -316,6 +316,33 @@ export interface LayerInteraction {
   tweens: InteractionTween[];
 }
 
+// ── Conditionals: runtime variables ("App State") ───────────────────────────
+// A user-behavior trigger that mutates client runtime variables (kept separate
+// from animation LayerInteraction so it needs no timeline/tweens). Executed by
+// components/runtime/VariableTriggers; the vars drive runtime_var visibility.
+
+/** One mutation applied to a runtime variable when a trigger fires. */
+export interface SetVariableAction {
+  varPath: string;                                   // dot-path, e.g. "state.menuOpen"
+  op: 'set' | 'toggle' | 'increment' | 'decrement';
+  value?: string;                                    // used by set/increment/decrement
+}
+
+/** A behavior trigger on a layer that runs one or more variable mutations. */
+export interface StateActionTrigger {
+  id: string;
+  trigger: 'click' | 'hover' | 'load';
+  actions: SetVariableAction[];
+}
+
+/** A page/site-level runtime variable definition. Seeds the store with its default. */
+export interface VariableDefinition {
+  id: string;
+  name: string;                                      // referenced as state.<name>
+  type: 'boolean' | 'string' | 'number';
+  defaultValue?: string;
+}
+
 export interface InteractionTimeline {
   breakpoints: Breakpoint[];
   repeat: number; // -1 = infinite, 0 = none, n = repeat n times
@@ -468,6 +495,8 @@ export interface Layer {
 
   // Interactions / Animations (new structured approach)
   interactions?: LayerInteraction[];
+  // Conditionals (App State): user-behavior triggers that mutate runtime variables
+  stateActions?: StateActionTrigger[];
 
   // SSR-only property for resolved collection items
   _collectionItems?: CollectionItemWithValues[];

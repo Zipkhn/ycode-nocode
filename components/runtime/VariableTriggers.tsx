@@ -1,0 +1,48 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRuntimeVarStore } from '@/stores/useRuntimeVarStore';
+import { applySetVariableActions, type StateActionLayer } from '@/components/runtime/setVariableAction';
+import { ITEMS_INJECTED_EVENT } from '@/components/FilterableCollection';
+
+/**
+ * Binds user-behavior triggers (click / hover / load) to their "set variable"
+ * actions, mutating the runtime var store. Separate from AnimationInitializer so
+ * a behavior trigger needs no animation. Binds by `data-layer-id` (mirrors the
+ * animation runtime) and re-binds on ITEMS_INJECTED_EVENT for injected clones.
+ */
+export default function VariableTriggers({ triggers }: { triggers: StateActionLayer[] }) {
+  useEffect(() => {
+    if (!triggers.length) return;
+    let cleanups: Array<() => void> = [];
+
+    const bind = () => {
+      cleanups.forEach(c => c());
+      cleanups = [];
+      for (const { layerId, stateActions } of triggers) {
+        const els = document.querySelectorAll<HTMLElement>(`[data-layer-id="${CSS.escape(layerId)}"]`);
+        els.forEach((el) => {
+          for (const t of stateActions) {
+            if (t.trigger === 'load') {
+              applySetVariableActions(t.actions, useRuntimeVarStore.getState());
+              continue;
+            }
+            const evt = t.trigger === 'hover' ? 'mouseenter' : 'click';
+            const handler = () => applySetVariableActions(t.actions, useRuntimeVarStore.getState());
+            el.addEventListener(evt, handler);
+            cleanups.push(() => el.removeEventListener(evt, handler));
+          }
+        });
+      }
+    };
+
+    bind();
+    window.addEventListener(ITEMS_INJECTED_EVENT, bind);
+    return () => {
+      cleanups.forEach(c => c());
+      window.removeEventListener(ITEMS_INJECTED_EVENT, bind);
+    };
+  }, [triggers]);
+
+  return null;
+}
