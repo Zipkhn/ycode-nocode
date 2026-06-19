@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SettingsPanel from './SettingsPanel';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
+import { useProjectVariablePaths } from './VariablesModal';
 import type { Layer, StateActionTrigger, SetVariableAction } from '@/types';
 
 interface Props {
@@ -39,6 +40,7 @@ const emptyAction = (): SetVariableAction => ({ varPath: '', op: 'toggle' });
 
 export default function StateActionsSettings({ layer, onLayerUpdate }: Props) {
   const rows = layer?.stateActions ?? [];
+  const paths = useProjectVariablePaths();
   const [isOpen, setIsOpen] = useState(rows.length > 0);
 
   const commit = useCallback((next: StateActionTrigger[]) => {
@@ -82,6 +84,9 @@ export default function StateActionsSettings({ layer, onLayerUpdate }: Props) {
         </Button>
       }
     >
+      <datalist id="ycode-state-paths">
+        {paths.map(p => <option key={p} value={p} />)}
+      </datalist>
       {rows.length === 0 ? (
         <p className="text-[11px] text-muted-foreground px-0.5">
           Set a runtime variable on click / hover / load, then show or hide elements with a
@@ -114,6 +119,7 @@ export default function StateActionsSettings({ layer, onLayerUpdate }: Props) {
                 <Input
                   className="h-7 text-xs flex-1 font-mono"
                   placeholder="state.menuOpen"
+                  list="ycode-state-paths"
                   value={action.varPath}
                   onChange={(e) => updateRow(row.id, {}, { varPath: e.target.value })}
                 />
