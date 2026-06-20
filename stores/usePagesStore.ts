@@ -759,19 +759,23 @@ export const usePagesStore = create<PagesStore>((set, get) => ({
       newLayer = updateForAttributes(newLayer);
     }
 
-    // Clean Slate: strip opinionated sizing/spacing/typography defaults
+    // Clean Slate: strip opinionated defaults. Flex structure blocks keep only `flex`.
     if (useEditorStore.getState().cleanSlate) {
-      const CLEAN_SLATE: Record<string, { classes: string[]; designKeys?: string[] }> = {
-        container: { classes: ['max-w-[1280px]', 'w-[100%]', 'pl-[32px]', 'pr-[32px]'], designKeys: ['sizing', 'spacing'] },
-        heading:   { classes: ['text-[48px]', 'font-[700]', 'leading-[1.1]', 'tracking-[-0.01em]'], designKeys: ['typography'] },
-      };
-      const strip = CLEAN_SLATE[templateId];
-      if (strip) {
+      // Flex-based structure containers → keep `flex`, drop direction/spacing/sizing/alignment.
+      const FLEX_STRUCTURE = new Set(['div', 'section', 'container', 'columns', 'rows']);
+      if (FLEX_STRUCTURE.has(templateId)) {
+        newLayer = {
+          ...newLayer,
+          classes: 'flex',
+          design: { layout: { isActive: true, display: 'Flex' } },
+        };
+      } else if (templateId === 'heading') {
+        const HEADING_CLASSES = ['text-[48px]', 'font-[700]', 'leading-[1.1]', 'tracking-[-0.01em]'];
         const classes = typeof newLayer.classes === 'string'
-          ? newLayer.classes.split(' ').filter(c => !strip.classes.includes(c)).join(' ')
+          ? newLayer.classes.split(' ').filter(c => !HEADING_CLASSES.includes(c)).join(' ')
           : newLayer.classes;
-        const design = strip.designKeys && newLayer.design
-          ? Object.fromEntries(Object.entries(newLayer.design).filter(([k]) => !strip.designKeys!.includes(k)))
+        const design = newLayer.design
+          ? Object.fromEntries(Object.entries(newLayer.design).filter(([k]) => k !== 'typography'))
           : newLayer.design;
         newLayer = { ...newLayer, classes, design };
       }
