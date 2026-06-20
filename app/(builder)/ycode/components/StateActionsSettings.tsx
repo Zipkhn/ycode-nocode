@@ -2,7 +2,7 @@
 
 /**
  * App State actions — author user-behavior triggers that mutate runtime
- * variables (Conditionals / Webflow-style "set variable"). Each row binds a
+ * variables (Conditionals — "set variable"). Each row binds a
  * trigger (click/hover/load) to one variable mutation. The vars drive
  * "Runtime variable" visibility conditions (and, later, conditional styles).
  *

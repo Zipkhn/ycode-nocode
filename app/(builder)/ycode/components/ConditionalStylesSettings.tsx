@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Conditional styles (App State / Webflow-style states): apply Tailwind classes
+ * Conditional styles (App State): apply Tailwind classes
  * to an element while a runtime-variable condition holds. Persists to
  * `layer.variables.conditionalStyles`; classes are compiled by cssGenerator and
  * toggled at runtime by components/runtime/RuntimeStyles.
@@ -73,7 +73,7 @@ export default function ConditionalStylesSettings({ layer, onLayerUpdate }: Prop
       </datalist>
       {rows.length === 0 ? (
         <p className="text-[11px] text-muted-foreground px-0.5">
-          Apply Tailwind classes while a runtime variable condition holds (Webflow-style states).
+          Apply Tailwind classes while a runtime variable condition holds.
         </p>
       ) : (
         rows.map((r) => {

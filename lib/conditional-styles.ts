@@ -1,5 +1,5 @@
 /**
- * Conditional styles (Conditionals — Webflow-style "states"): add Tailwind
+ * Conditional styles (Conditionals — "states"): add Tailwind
  * classes to an element while a runtime condition holds. Client-safe (reuses
  * the runtime_var operator logic, no server evaluator).
  *

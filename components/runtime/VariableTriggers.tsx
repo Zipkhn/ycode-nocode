@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRuntimeVarStore } from '@/stores/useRuntimeVarStore';
 import { applySetVariableActions, type StateActionLayer } from '@/components/runtime/setVariableAction';
 import { ITEMS_INJECTED_EVENT } from '@/components/FilterableCollection';
@@ -12,9 +12,16 @@ import { ITEMS_INJECTED_EVENT } from '@/components/FilterableCollection';
  * animation runtime) and re-binds on ITEMS_INJECTED_EVENT for injected clones.
  */
 export default function VariableTriggers({ triggers, doc = document }: { triggers: StateActionLayer[]; doc?: Document }) {
+  // Elements whose `load` actions already fired — keyed by node so they fire
+  // once per element, never again on rebind (ITEMS_INJECTED) or effect re-run
+  // (canvas layer edits). Persists for the component's lifetime; toggling Live
+  // preview off/on remounts the component, giving a fresh set.
+  const loadFiredRef = useRef<WeakSet<HTMLElement>>(new WeakSet());
+
   useEffect(() => {
     if (!triggers.length) return;
     const win = doc.defaultView ?? window;
+    const loadFired = loadFiredRef.current;
     let cleanups: Array<() => void> = [];
 
     const bind = () => {
@@ -25,7 +32,7 @@ export default function VariableTriggers({ triggers, doc = document }: { trigger
         els.forEach((el) => {
           for (const t of stateActions) {
             if (t.trigger === 'load') {
-              applySetVariableActions(t.actions, useRuntimeVarStore.getState());
+              if (!loadFired.has(el)) applySetVariableActions(t.actions, useRuntimeVarStore.getState());
               continue;
             }
             const evt = t.trigger === 'hover' ? 'mouseenter' : 'click';
@@ -33,6 +40,7 @@ export default function VariableTriggers({ triggers, doc = document }: { trigger
             el.addEventListener(evt, handler);
             cleanups.push(() => el.removeEventListener(evt, handler));
           }
+          loadFired.add(el);
         });
       }
     };

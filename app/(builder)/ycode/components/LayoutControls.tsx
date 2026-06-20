@@ -329,12 +329,14 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                   <Label variant="muted" className="h-8">Gap</Label>
                   <div className="col-span-2 flex flex-col gap-2">
                       <div className="flex items-center gap-2">
-                          <MeasurementInput
-                            className="flex-1"
-                            disabled={gapModeToggle.mode === 'individual'}
-                            value={gap}
-                            onChange={handleGapChange}
-                          />
+                          <InputGroup className="flex-1">
+                              <MeasurementInput
+                                className="flex-1 min-w-0"
+                                disabled={gapModeToggle.mode === 'individual'}
+                                value={gap}
+                                onChange={handleGapChange}
+                              />
+                          </InputGroup>
                           <Button
                             variant={gapModeToggle.mode === 'individual' ? 'secondary' : 'ghost'}
                             size="sm"
@@ -360,7 +362,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                                </InputGroupAddon>
                                <MeasurementInput
                                  value={columnGap} onChange={handleColumnGapChange}
-                                 className="flex-1"
+                                 className="flex-1 min-w-0"
                                />
                            </InputGroup>
                            <InputGroup>
@@ -378,7 +380,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                                </InputGroupAddon>
                                <MeasurementInput
                                  value={rowGap} onChange={handleRowGapChange}
-                                 className="flex-1"
+                                 className="flex-1 min-w-0"
                                />
                            </InputGroup>
                        </div>
