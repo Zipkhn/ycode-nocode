@@ -109,6 +109,8 @@ interface EditorActions {
   setCleanSlate: (value: boolean) => void;
   isDevMode: boolean;
   toggleDevMode: () => void;
+  isCanvasPreview: boolean;
+  toggleCanvasPreview: () => void;
   defaultUnit: string;
   setDefaultUnit: (unit: string) => void;
   // Canvas drag-and-drop actions (pointer-based)
@@ -271,6 +273,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
   isDevMode: false,
   toggleDevMode: () => set((state) => ({ isDevMode: !state.isDevMode })),
+  isCanvasPreview: false,
+  toggleCanvasPreview: () => set((state) => ({ isCanvasPreview: !state.isCanvasPreview })),
   defaultUnit: (() => {
     const saved = typeof window !== 'undefined' ? (localStorage.getItem('ycode_default_unit') || 'px') : 'px';
     setDefaultMeasurementUnit(saved);

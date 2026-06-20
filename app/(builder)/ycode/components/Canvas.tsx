@@ -29,10 +29,18 @@ import { useFontsStore } from '@/stores/useFontsStore';
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
 import { usePagesStore } from '@/stores/usePagesStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useRuntimeVarStore } from '@/stores/useRuntimeVarStore';
+import RuntimeStateProvider from '@/components/runtime/RuntimeStateProvider';
+import FormStateWriter from '@/components/runtime/FormStateWriter';
+import VariableTriggers from '@/components/runtime/VariableTriggers';
+import { collectStateActionLayers } from '@/components/runtime/setVariableAction';
+import { buildStateDefaults } from '@/lib/project-variables';
+import { pageHasRuntimeState } from '@/lib/runtime-visibility';
+import { pageHasConditionalStyles } from '@/lib/conditional-styles';
 
 import { applyCmsTranslations, injectTranslatedText, translateComponentOverrides } from '@/lib/localisation-utils';
 
-import type { Layer, Component, CollectionItemWithValues, CollectionField, Breakpoint, Asset, ComponentVariable, Locale, Translation } from '@/types';
+import type { Layer, Component, CollectionItemWithValues, CollectionField, Breakpoint, Asset, ComponentVariable, Locale, Translation, VariableDefinition } from '@/types';
 import type { UseLiveLayerUpdatesReturn } from '@/hooks/use-live-layer-updates';
 import type { UseLiveComponentUpdatesReturn } from '@/hooks/use-live-component-updates';
 
@@ -169,6 +177,7 @@ function CanvasContent({
 }: CanvasContentProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+  const isCanvasPreview = useEditorStore((state) => state.isCanvasPreview);
 
   // Seed ancestor set with the component being edited so its own rich-text
   // collection data cannot re-embed itself (prevents infinite loops)
@@ -192,6 +201,8 @@ function CanvasContent({
 
     setPortalContainer(iframeBody);
 
+    if (isCanvasPreview) return; // preview: empty-space clicks must not select Body
+
     const handleBodyClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
       if (!target) return;
@@ -207,7 +218,7 @@ function CanvasContent({
 
     iframeDoc.addEventListener('click', handleBodyClick);
     return () => iframeDoc.removeEventListener('click', handleBodyClick);
-  }, [onLayerClick]);
+  }, [onLayerClick, isCanvasPreview]);
 
   const bodyLayer = layers.find(l => l.id === 'body');
   const bodyClasses = bodyLayer ? getClassesString(bodyLayer) : '';
@@ -271,6 +282,29 @@ function CanvasContent({
     [portalContainer, zoom]
   );
 
+  // Live canvas preview (App State): mount the runtime writers inside the iframe
+  // so conditions/styles react to real interaction. LayerRenderer evaluates
+  // visibility + conditional styles directly off the runtime store, so we only
+  // need the writers here (no RuntimeVisibility/RuntimeStyles — those toggle DOM
+  // on published pages; in the canvas the renderer owns that).
+  const projectVariables = useSettingsStore(
+    (state) => state.settingsByKey.project_variables
+  ) as VariableDefinition[] | null | undefined;
+  const iframeDoc = portalContainer?.ownerDocument ?? null;
+  const stateDefaults = useMemo(() => buildStateDefaults(projectVariables ?? null), [projectVariables]);
+  const stateActionLayers = useMemo(() => collectStateActionLayers(layers), [layers]);
+  const hasRuntimeState = useMemo(() => pageHasRuntimeState(layers), [layers]);
+  const hasConditionalStyles = useMemo(() => pageHasConditionalStyles(layers), [layers]);
+
+  // Outside preview the canvas reflects authored defaults, not interaction state —
+  // reset the runtime store so toggling Live off clears any mutated vars.
+  useEffect(() => {
+    if (isCanvasPreview) return;
+    useRuntimeVarStore.setState({
+      vars: Object.keys(stateDefaults).length ? { state: stateDefaults } : {},
+    });
+  }, [isCanvasPreview, stateDefaults]);
+
   return (
     <CanvasPortalProvider value={portalValue}>
       <div
@@ -303,6 +337,13 @@ function CanvasContent({
           translations={translations}
         />
       </div>
+      {isCanvasPreview && iframeDoc && (
+        <>
+          {Object.keys(stateDefaults).length > 0 && <RuntimeStateProvider defaults={stateDefaults} />}
+          {(hasRuntimeState || hasConditionalStyles) && <FormStateWriter doc={iframeDoc} />}
+          {stateActionLayers.length > 0 && <VariableTriggers triggers={stateActionLayers} doc={iframeDoc} />}
+        </>
+      )}
     </CanvasPortalProvider>
   );
 }
@@ -451,7 +492,12 @@ const Canvas = React.memo(function Canvas({
   }, [resolvedLayers, forceVisibleLayerIds]);
 
   // Handle layer click with component resolution
+  // In live preview, clicks/hover drive App State triggers (native element
+  // listeners), not editor selection — so gate the selection handlers off.
+  const isCanvasPreview = useEditorStore((state) => state.isCanvasPreview);
+
   const handleLayerClick = useCallback((layerId: string, event?: React.MouseEvent) => {
+    if (isCanvasPreview) return;
     // Suppress stale left-clicks that fire on the canvas when a context menu
     // item is clicked and the menu dismisses (Radix click-through).
     // Only block when an event is present — onLayerSelect from handleOpenChange
@@ -468,13 +514,14 @@ const Canvas = React.memo(function Canvas({
     }
 
     onLayerClick?.(targetLayerId, event);
-  }, [componentMap, editingComponentId, onLayerClick]);
+  }, [componentMap, editingComponentId, onLayerClick, isCanvasPreview]);
 
   // Handle hover. We only forward the resolved id to the parent, which writes
   // it into the editor store. `SelectionOverlay` reads the store directly to
   // paint the outline, so we don't need any React state here — avoiding a
   // Canvas re-render on every hover.
   const handleLayerHover = useCallback((layerId: string | null) => {
+    if (isCanvasPreview) return;
     // Resolve component root for hover (same logic as click)
     let resolvedLayerId = layerId;
     if (layerId) {
@@ -488,7 +535,7 @@ const Canvas = React.memo(function Canvas({
     }
 
     onLayerHover?.(resolvedLayerId);
-  }, [componentMap, editingComponentId, onLayerHover]);
+  }, [componentMap, editingComponentId, onLayerHover, isCanvasPreview]);
 
   // Initialize iframe with Tailwind Browser CDN (only once)
   useEffect(() => {
@@ -821,7 +868,7 @@ const Canvas = React.memo(function Canvas({
 
   // Handle any click inside the iframe (capture phase to run before stopPropagation)
   useEffect(() => {
-    if (!iframeReady || !iframeRef.current) return;
+    if (!iframeReady || !iframeRef.current || isCanvasPreview) return;
 
     const doc = iframeRef.current.contentDocument;
     if (!doc) return;
@@ -833,7 +880,7 @@ const Canvas = React.memo(function Canvas({
     // Use capture phase to ensure we catch clicks before stopPropagation
     doc.addEventListener('click', handleClick, true);
     return () => doc.removeEventListener('click', handleClick, true);
-  }, [iframeReady, onCanvasClick]);
+  }, [iframeReady, onCanvasClick, isCanvasPreview]);
 
   // Content size reporting (height always, width when callback provided)
   // Uses a stabilization delay for height decreases to prevent transient

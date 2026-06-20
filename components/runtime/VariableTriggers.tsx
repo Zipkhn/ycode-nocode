@@ -11,16 +11,17 @@ import { ITEMS_INJECTED_EVENT } from '@/components/FilterableCollection';
  * a behavior trigger needs no animation. Binds by `data-layer-id` (mirrors the
  * animation runtime) and re-binds on ITEMS_INJECTED_EVENT for injected clones.
  */
-export default function VariableTriggers({ triggers }: { triggers: StateActionLayer[] }) {
+export default function VariableTriggers({ triggers, doc = document }: { triggers: StateActionLayer[]; doc?: Document }) {
   useEffect(() => {
     if (!triggers.length) return;
+    const win = doc.defaultView ?? window;
     let cleanups: Array<() => void> = [];
 
     const bind = () => {
       cleanups.forEach(c => c());
       cleanups = [];
       for (const { layerId, stateActions } of triggers) {
-        const els = document.querySelectorAll<HTMLElement>(`[data-layer-id="${CSS.escape(layerId)}"]`);
+        const els = doc.querySelectorAll<HTMLElement>(`[data-layer-id="${CSS.escape(layerId)}"]`);
         els.forEach((el) => {
           for (const t of stateActions) {
             if (t.trigger === 'load') {
@@ -37,12 +38,12 @@ export default function VariableTriggers({ triggers }: { triggers: StateActionLa
     };
 
     bind();
-    window.addEventListener(ITEMS_INJECTED_EVENT, bind);
+    win.addEventListener(ITEMS_INJECTED_EVENT, bind);
     return () => {
       cleanups.forEach(c => c());
-      window.removeEventListener(ITEMS_INJECTED_EVENT, bind);
+      win.removeEventListener(ITEMS_INJECTED_EVENT, bind);
     };
-  }, [triggers]);
+  }, [triggers, doc]);
 
   return null;
 }

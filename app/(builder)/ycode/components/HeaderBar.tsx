@@ -118,6 +118,8 @@ export default function HeaderBar({
   const { navigateToLayers, navigateToCollection, navigateToCollections, updateQueryParams, routeType } = useEditorUrl();
   const openStudio = useStudioStore(s => s.open);
   const openVariables = useVariablesStore(s => s.open);
+  const isCanvasPreview = useEditorStore((s) => s.isCanvasPreview);
+  const toggleCanvasPreview = useEditorStore((s) => s.toggleCanvasPreview);
 
   // Optimistic nav button state - set immediately on click, cleared when URL catches up
   type NavButton = 'design' | 'cms' | 'forms';
@@ -633,6 +635,14 @@ export default function HeaderBar({
           >
             <Icon name="zap" />
             Variables
+          </Button>
+          <Button
+            variant="ghost" size="sm"
+            onClick={toggleCanvasPreview} title="Live preview (App State) — interact with the canvas"
+            className={isCanvasPreview ? 'bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90' : ''}
+          >
+            <Icon name="play" />
+            Live
           </Button>
         </div>
       </div>

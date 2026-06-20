@@ -26,7 +26,7 @@ const valueOf = (el: Field): unknown => {
   return el.value;
 };
 
-export default function FormStateWriter() {
+export default function FormStateWriter({ doc = document }: { doc?: Document } = {}) {
   useEffect(() => {
     const onChange = (e: Event) => {
       const t = e.target;
@@ -40,15 +40,15 @@ export default function FormStateWriter() {
       if (!(e.target instanceof HTMLFormElement)) return;
       useRuntimeVarStore.getState().setVar(`forms.${formIdOf(e.target)}`, {});
     };
-    document.addEventListener('input', onChange, true);
-    document.addEventListener('change', onChange, true);
-    document.addEventListener('reset', onReset, true);
+    doc.addEventListener('input', onChange, true);
+    doc.addEventListener('change', onChange, true);
+    doc.addEventListener('reset', onReset, true);
     return () => {
-      document.removeEventListener('input', onChange, true);
-      document.removeEventListener('change', onChange, true);
-      document.removeEventListener('reset', onReset, true);
+      doc.removeEventListener('input', onChange, true);
+      doc.removeEventListener('change', onChange, true);
+      doc.removeEventListener('reset', onReset, true);
     };
-  }, []);
+  }, [doc]);
 
   return null;
 }
