@@ -31,6 +31,12 @@ export async function up(knex: Knex): Promise<void> {
     )
   `);
 
+  // Service-role only (server-side). Lock anon/authenticated out: enable RLS
+  // with no policy + revoke the default-privilege grants from 20260527000002.
+  // service_role bypasses RLS, so the app is unaffected.
+  await knex.schema.raw('ALTER TABLE studio_theme ENABLE ROW LEVEL SECURITY');
+  await knex.schema.raw('REVOKE ALL ON studio_theme FROM anon, authenticated');
+
   try {
     const css = await fs.readFile(path.join(process.cwd(), 'public', 'global-theme.css'), 'utf-8');
     // Reuse the guarded parser so the seed never stores §14 utility-rule locals
