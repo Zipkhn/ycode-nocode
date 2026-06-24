@@ -709,30 +709,51 @@ const LayerItem: React.FC<{
     return filterDisabledSliderLayers(children, layer.settings);
   }, [layer.name, layer.settings, children]);
 
-  const subtreeHasInteractiveDescendants = useMemo(() => {
-    const interactiveTags = new Set(['a', 'button', 'input', 'select', 'textarea']);
+  // Detect descendants that can't live inside an <a> and can't be safely
+  // downgraded: real anchors, form controls, or anything with its own link.
+  // Plain <button>s are excluded — styling is class-driven, so inside a link we
+  // render them as <div> (see the isInsideLink downgrade below) instead of
+  // breaking the wrapping link.
+  const subtreeHasHardInteractive = useMemo(() => {
+    const hardTags = new Set(['a', 'input', 'select', 'textarea']);
 
     const visit = (nodes?: Layer[]): boolean => {
       if (!nodes?.length) return false;
-
       return nodes.some((node) => {
         if (!node) return false;
-
         const childTag = node.settings?.tag || node.name || 'div';
         const childHasLink = isValidLinkSettings(node.variables?.link);
-
-        return interactiveTags.has(childTag) || childHasLink || visit(node.children);
+        return hardTags.has(childTag) || childHasLink || visit(node.children);
       });
     };
 
     return visit(effectiveChildren);
   }, [effectiveChildren]);
 
-  // Browsers repair invalid interactive nesting (<a><button>, <a><a>, etc.)
-  // differently during SSR, which can cause hydration mismatches.
-  if (htmlTag === 'a' && subtreeHasInteractiveDescendants) {
+  // <a><button>/<a><a>/etc. is invalid HTML; browsers repair it differently
+  // during SSR, causing hydration mismatches. Plain buttons are downgraded to
+  // <div> (below), so we only fall back to a non-link <div> when the subtree
+  // contains hard interactive content that can't be downgraded.
+  if (htmlTag === 'a' && subtreeHasHardInteractive) {
     htmlTag = 'div';
   }
+
+  // Inside a link, render <button> as a styled <div> to keep the wrapping <a>
+  // valid (its appearance is driven by classes, not the button element).
+  if (isInsideLink && htmlTag === 'button') {
+    htmlTag = 'div';
+  }
+
+  // Container layers that aren't a div/button/<a> (e.g. an <article> or <section>
+  // with a link) wrap their content in <a class="contents">. Soft buttons inside
+  // are downgraded (children receive isInsideLink), so only hard interactive
+  // content blocks the wrap. Computed early so children render as inside-a-link.
+  const willWrapWithLink = !isButtonWithLink
+    && !isDivWithLink
+    && !isInsideLink
+    && htmlTag !== 'a'
+    && !subtreeHasHardInteractive
+    && isValidLinkSettings(layer.variables?.link);
 
   // Public renderer never needs the canvas slider hook; live sliders are
   // initialized by SliderInitializer (loaded only when slider layers exist).
@@ -1751,7 +1772,7 @@ const LayerItem: React.FC<{
               {...sharedRendererProps}
               localeSelectorFormat={format}
               isInsideForm={isInsideForm || htmlTag === 'form'}
-              isInsideLink={isInsideLink || htmlTag === 'a'}
+              isInsideLink={isInsideLink || htmlTag === 'a' || willWrapWithLink}
               parentFormSettings={htmlTag === 'form' ? layer.settings?.form : parentFormSettings}
               ancestorComponentIds={effectiveAncestorIds}
             />
@@ -1779,7 +1800,7 @@ const LayerItem: React.FC<{
             layers={effectiveChildren}
             {...sharedRendererProps}
             isInsideForm={isInsideForm || htmlTag === 'form'}
-            isInsideLink={isInsideLink || htmlTag === 'a'}
+            isInsideLink={isInsideLink || htmlTag === 'a' || willWrapWithLink}
             parentFormSettings={htmlTag === 'form' ? layer.settings?.form : parentFormSettings}
             ancestorComponentIds={effectiveAncestorIds}
             isSlideChild={layer.name === 'slides'}
@@ -1811,12 +1832,7 @@ const LayerItem: React.FC<{
   // Skip for buttons/divs — they render as <a> directly (see isButtonWithLink, isDivWithLink)
   // Skip for <a> layers — they already render as <a> and nesting <a> inside <a> is invalid HTML
   const linkSettings = layer.variables?.link;
-  const shouldWrapWithLink = !isButtonWithLink
-    && !isDivWithLink
-    && !isInsideLink
-    && htmlTag !== 'a'
-    && !subtreeHasInteractiveDescendants
-    && isValidLinkSettings(linkSettings);
+  const shouldWrapWithLink = willWrapWithLink;
 
   if (shouldWrapWithLink && linkSettings) {
     const linkAttrs = resolveLinkAttrs(linkSettings, layerLinkContext);
