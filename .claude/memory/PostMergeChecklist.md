@@ -51,6 +51,15 @@ grep -n "'link-block'" lib/layer-utils.ts "app/(builder)/ycode/components/Elemen
 
 # JSON-LD / Hreflang / SEO
 grep -n "generatePageJsonLd\|generateHreflangEntries" "app/(site)/page.tsx"
+
+# SEO governance (depuis v1.21.x — conflits récurrents dans generate-page-metadata)
+grep -n "getCanonicalUrl\|getRobotsDirectives\|SeoGovernanceContext" lib/generate-page-metadata.ts
+grep -n "canonicalUrl ?? pageUrl" lib/generate-page-metadata.ts   # og:url upstream intégré dans notre gouvernance (v1.26.0)
+
+# Studio bridges — prefix u- conservé, NE PAS reprendre les natifs col-span-/row-span- d'upstream
+grep -n "u-col-span-\|u-row-span-" lib/tailwind-class-mapper.ts
+grep -n "removeConflictingClassesForBreakpoint" lib/tailwind-class-mapper.ts  # scoping fork (ne pas régresser vers removeConflictingClasses)
+grep -n "space-\[a-z0-9-\]" lib/tailwind-class-mapper.ts                      # tokens spacing Studio dans les regex padding/margin
 ```
 
 Tous les `grep` doivent retourner du contenu — sinon une mutation a été perdue au merge.
@@ -110,6 +119,9 @@ npm run build                     # Doit compiler, pas d'erreur réelle (les "er
 | Link block ne rend pas un `<a>` | `lib/layer-utils.ts:LAYER_NAME_TO_HTML_TAG` | Ajouter `'link-block': 'a',` |
 | Imports JSON refusés | `lib/asset-constants.ts` | Ajouter `'application/json'` aux MIME documents |
 | OKLCH ne preview pas | Voir `project_oklch_support.md` | Conversion inline sans dépendance |
+| Grille effondrée + upstream a mis `col-span-`/`row-span-` natifs | `lib/tailwind-class-mapper.ts` | Remettre les regex `u-col-span-`/`u-row-span-` (prefix Studio) + handler `gridColumnSpan` qui émet `u-col-span-` |
+| Shorthand spacing n'écrase plus les classes longues | `lib/tailwind-class-mapper.ts` | Garder le bloc `SPACING_OVERRIDES[property]?.forEach(... removeConflictingClassesForBreakpoint ...)` (scoped breakpoint, pas `removeConflictingClasses`) |
+| og:url absent / canonical perdu | `lib/generate-page-metadata.ts` | Garder gouvernance (`getCanonicalUrl`/`getRobotsDirectives`), og:url = `canonicalUrl ?? pageUrl` ; ne PAS reprendre le bloc upstream qui reconstruit `metadata.openGraph` |
 
 ---
 
@@ -162,7 +174,24 @@ app/(builder)/ycode/components/RightSidebar.tsx     ← LottieSettings, isDevMod
 app/(builder)/ycode/components/ElementLibrary.tsx   ← cleanSlate, lottie media
 app/(site)/page.tsx                   ← JSON-LD, Hreflang imports
 lib/asset-constants.ts                ← application/json MIME
+lib/generate-page-metadata.ts         ← gouvernance SEO (canonical/robots) + og:url ; CONFLIT récurrent
+lib/page-fetcher.ts                   ← imports runtime-visibility (ConditionalVisibility, hasClientRuntimeSource)
+app/(builder)/ycode/components/Canvas.tsx  ← injectStudioTheme (import canvas-utils)
+lib/runtime-visibility.ts             ← App State runtime_var (visibilité réactive)
 ```
+
+---
+
+## 9. Notes spécifiques par version
+
+### v1.26.0 (merge 2026-06-28) — 1.23.1 → 1.26.0, 50 commits, 0 migration, 0 fix sécurité
+7 conflits : `Canvas.tsx` (import), `page-fetcher.ts` (import), `LayerRenderer.tsx` (import + `containsLayerId`), `tailwind-class-mapper.ts` (4 hunks), `generate-page-metadata.ts` (4 hunks SEO), `RightSidebar.tsx` (2 hunks), `package-lock.json` (régénéré via `npm install`).
+
+- **`tailwind-class-mapper.ts`** : garder `space-` tokens dans regex padding/margin + `u-col-span-`/`u-row-span-` Studio + scoping `removeConflictingClassesForBreakpoint` ; ADOPTER d'upstream les shorthands `px-/py-/mx-/my-`, `objectPosition`, et `SPACING_OVERRIDES` (mais en version breakpoint-scoped).
+- **`generate-page-metadata.ts`** : notre gouvernance SEO gagne sur le canonical simple d'upstream ; feature `og:url` upstream intégrée comme `canonicalUrl ?? pageUrl`.
+- **⚠️ `RightSidebar.tsx` — "editable class pills" = collision de feature** : fork ET upstream l'avaient codée. **On a ADOPTÉ la version upstream** (`editClass` copie la classe dans l'input avancé) et **SUPPRIMÉ notre implémentation** (état `editingClass`/`editingClassValue`/`editingCommittedRef` + fn `commitClassEdit` + input inline swap). → Aux prochains merges, NE PAS réintroduire notre version ; suivre upstream.
+
+Validation : `tsc` 0 err, `npm test` 170/170, smoke HTTP (/ , /ycode, /sitemap.xml, /robots.txt tous 200, og:url + grille `u-col-span` rendus). Tags `backup/pre-v1.26.0`, `merge/upstream-v1.26.0-tested`.
 
 ---
 
