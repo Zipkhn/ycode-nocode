@@ -95,7 +95,7 @@ import { useLocalisationStore } from '@/stores/useLocalisationStore';
 import { useLayerLocks } from '@/hooks/use-layer-locks';
 
 // 6. Utils, APIs, lib
-import { classesToDesign, mergeDesign, removeConflictsForClass } from '@/lib/tailwind-class-mapper';
+import { classesToDesign, mergeDesign, removeConflictsForClass, removeRedundantSpacingShorthands } from '@/lib/tailwind-class-mapper';
 import { getStyleIds } from '@/lib/layer-style-utils';
 import { resolveLayerClasses, chipClasses } from '@/lib/layer-style-resolve';
 import { buildDesign } from '@/lib/import/design';
@@ -104,6 +104,7 @@ import { sanitizeHtmlId } from '@/lib/html-utils';
 import { isFieldVariable, getCollectionVariable, findParentCollectionLayer, findAllParentCollectionLayers, isTextEditable, isTextContentLayer, isRichTextLayer, isHeadingLayer, findLayerWithParent, resetBindingsOnCollectionSourceChange, isInputInsideFilter, resolveFilterInputId, getLayerIndexes, indexedFindLayerById, indexedFindLayerWithParent, indexedFindParentCollectionLayer } from '@/lib/layer-utils';
 import { detachSpecificLayerFromComponent } from '@/lib/component-utils';
 import { convertContentToValue, parseValueToContent } from '@/lib/cms-variables-utils';
+import { defaultPaginationCountDoc, defaultPaginationInfoDoc } from '@/lib/pagination-text-utils';
 import { createTextComponentVariableValue } from '@/lib/variable-utils';
 import { getRichTextValue, extractPlainTextFromTiptap, getSoleCmsFieldBinding } from '@/lib/tiptap-utils';
 import { DEFAULT_TEXT_STYLES, getTextStyle, getTiptapTextContent } from '@/lib/text-format-utils';
@@ -203,9 +204,7 @@ const RightSidebar = React.memo(function RightSidebar({
   }, [urlState.rightTab, activeTab]);
 
   const [currentClassInput, setCurrentClassInput] = useState<string>('');
-  const [editingClass, setEditingClass] = useState<string | null>(null);
-  const [editingClassValue, setEditingClassValue] = useState<string>('');
-  const editingCommittedRef = useRef(false);
+  const classInputRef = useRef<HTMLInputElement>(null);
   const [customId, setCustomId] = useState<string>('');
   const [containerTag, setContainerTag] = useState<string>('div');
   const [textTag, setTextTag] = useState<string>('p');
@@ -883,7 +882,7 @@ const RightSidebar = React.memo(function RightSidebar({
     if (showTextStyleControls && activeTextStyleKey) {
       if (classesArray.includes(trimmedClass)) return;
       const classesWithoutConflicts = removeConflictsForClass(classesArray, trimmedClass);
-      const newClasses = [...classesWithoutConflicts, trimmedClass].join(' ');
+      const newClasses = removeRedundantSpacingShorthands([...classesWithoutConflicts, trimmedClass]).join(' ');
       const parsedDesign = classesToDesign([trimmedClass]);
       const currentTextStyles = selectedLayer.textStyles ?? { ...DEFAULT_TEXT_STYLES };
       const currentTextStyle = currentTextStyles[activeTextStyleKey] || { design: {}, classes: '' };
@@ -905,7 +904,7 @@ const RightSidebar = React.memo(function RightSidebar({
     if (chip) {
       if (activeChipClassTokens.includes(trimmedClass)) return;
       const withoutConflicts = removeConflictsForClass(activeChipClassTokens, trimmedClass);
-      applyChipClasses(chip, [...withoutConflicts, trimmedClass].join(' '));
+      applyChipClasses(chip, removeRedundantSpacingShorthands([...withoutConflicts, trimmedClass]).join(' '));
       setCurrentClassInput('');
       return;
     }
@@ -913,7 +912,7 @@ const RightSidebar = React.memo(function RightSidebar({
     // Style-less layer: update the layer's own classes.
     if (classesArray.includes(trimmedClass)) return;
     const classesWithoutConflicts = removeConflictsForClass(classesArray, trimmedClass);
-    const newClasses = [...classesWithoutConflicts, trimmedClass].join(' ');
+    const newClasses = removeRedundantSpacingShorthands([...classesWithoutConflicts, trimmedClass]).join(' ');
     const parsedDesign = classesToDesign([trimmedClass]);
     const updatedDesign = mergeDesign(selectedLayer.design, parsedDesign);
     handleLayerUpdate(selectedLayer.id, { classes: newClasses, design: updatedDesign });
@@ -954,6 +953,12 @@ const RightSidebar = React.memo(function RightSidebar({
     applyChipClasses(chip, activeChipClassTokens.filter(cls => cls !== classToRemove).join(' '));
   }, [selectedLayer, activeChipClassTokens, applyChipClasses]);
 
+  // Copy a class into the input so it can be edited and re-added.
+  const editClass = useCallback((classToEdit: string) => {
+    setCurrentClassInput(classToEdit);
+    classInputRef.current?.focus();
+  }, []);
+
   // Handle key press for adding classes
   const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -961,37 +966,6 @@ const RightSidebar = React.memo(function RightSidebar({
       addClass(currentClassInput);
     }
   }, [addClass, currentClassInput]);
-
-  const commitClassEdit = useCallback((oldClass: string, newValue: string) => {
-    if (editingCommittedRef.current) return;
-    editingCommittedRef.current = true;
-    const trimmed = newValue.trim();
-    setEditingClass(null);
-    setEditingClassValue('');
-    if (!trimmed || trimmed === oldClass || !selectedLayer) return;
-
-    // Single atomic swap — avoids the removeClass+addClass race on shared classesArray state
-    const newClasses = classesArray
-      .map(cls => cls === oldClass ? trimmed : cls)
-      .join(' ');
-
-    setClassesInput(newClasses);
-
-    if (showTextStyleControls && activeTextStyleKey) {
-      const currentTextStyles = selectedLayer.textStyles ?? { ...DEFAULT_TEXT_STYLES };
-      const currentTextStyle = currentTextStyles[activeTextStyleKey] || { design: {}, classes: '' };
-      handleLayerUpdate(selectedLayer.id, {
-        textStyles: {
-          ...currentTextStyles,
-          [activeTextStyleKey]: { ...currentTextStyle, classes: newClasses },
-        },
-      });
-    } else {
-      const parsedDesign = classesToDesign([trimmed]);
-      const updatedDesign = mergeDesign(selectedLayer.design, parsedDesign);
-      handleLayerUpdate(selectedLayer.id, { classes: newClasses, design: updatedDesign });
-    }
-  }, [classesArray, selectedLayer, handleLayerUpdate, showTextStyleControls, activeTextStyleKey]);
 
   // Handle custom ID change - store in settings.id (takes priority over attributes.id in renderer)
   const handleIdChange = (value: string) => {
@@ -1456,9 +1430,11 @@ const RightSidebar = React.memo(function RightSidebar({
         children: [
           {
             id: `${collectionLayerId}-pagination-prev-text`,
-            name: 'span',
+            name: 'text',
             customName: 'Previous Text',
+            settings: { tag: 'span' },
             classes: '',
+            restrictions: { editText: true },
             variables: {
               text: {
                 type: 'dynamic_text',
@@ -1470,13 +1446,15 @@ const RightSidebar = React.memo(function RightSidebar({
       } as Layer,
       {
         id: `${collectionLayerId}-pagination-info`,
-        name: 'span',
+        name: 'text',
         customName: 'Page Info',
+        settings: { tag: 'span' },
         classes: 'text-sm text-[#4b5563]',
+        restrictions: { editText: true },
         variables: {
           text: {
-            type: 'dynamic_text',
-            data: { content: 'Page 1 of 1' }
+            type: 'dynamic_rich_text',
+            data: { content: defaultPaginationInfoDoc() }
           }
         }
       } as Layer,
@@ -1493,9 +1471,11 @@ const RightSidebar = React.memo(function RightSidebar({
         children: [
           {
             id: `${collectionLayerId}-pagination-next-text`,
-            name: 'span',
+            name: 'text',
             customName: 'Next Text',
+            settings: { tag: 'span' },
             classes: '',
+            restrictions: { editText: true },
             variables: {
               text: {
                 type: 'dynamic_text',
@@ -1532,9 +1512,11 @@ const RightSidebar = React.memo(function RightSidebar({
         children: [
           {
             id: `${collectionLayerId}-pagination-loadmore-text`,
-            name: 'span',
+            name: 'text',
             customName: 'Load More Text',
+            settings: { tag: 'span' },
             classes: '',
+            restrictions: { editText: true },
             variables: {
               text: {
                 type: 'dynamic_text',
@@ -1546,13 +1528,15 @@ const RightSidebar = React.memo(function RightSidebar({
       } as Layer,
       {
         id: `${collectionLayerId}-pagination-count`,
-        name: 'span',
+        name: 'text',
         customName: 'Items Count',
+        settings: { tag: 'span' },
         classes: 'text-sm text-[#4b5563]',
+        restrictions: { editText: true },
         variables: {
           text: {
-            type: 'dynamic_text',
-            data: { content: 'Showing items' }
+            type: 'dynamic_rich_text',
+            data: { content: defaultPaginationCountDoc() }
           }
         }
       } as Layer,
@@ -2064,65 +2048,57 @@ const RightSidebar = React.memo(function RightSidebar({
             onToggle={() => setClassesOpen(!classesOpen)}
           >
             <div className="flex flex-col gap-3">
-              <Input
-                value={currentClassInput}
-                onChange={(e) => setCurrentClassInput(e.target.value)}
-                onKeyDown={handleKeyPress}
-                placeholder="Type class and press Enter..."
-                disabled={isLockedByOther}
-                className={isLockedByOther ? 'opacity-50 cursor-not-allowed' : ''}
-              />
+              <div className="relative">
+                <Input
+                  ref={classInputRef}
+                  value={currentClassInput}
+                  onChange={(e) => setCurrentClassInput(e.target.value)}
+                  onKeyDown={handleKeyPress}
+                  placeholder="Type class and press Enter..."
+                  disabled={isLockedByOther}
+                  className={cn('pr-8', isLockedByOther && 'opacity-50 cursor-not-allowed')}
+                />
+                {currentClassInput && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 size-6 p-0"
+                    onClick={() => setCurrentClassInput('')}
+                    disabled={isLockedByOther}
+                    aria-label="Clear class input"
+                  >
+                    <Icon name="x" className="size-3" />
+                  </Button>
+                )}
+              </div>
 
               {layerOnlyClasses.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {/* Layer's own classes (excluding style classes) */}
                   {layerOnlyClasses.map((cls, index) => (
-                    editingClass === cls ? (
-                      <input
-                        key={`edit-${index}`}
-                        autoFocus
-                        value={editingClassValue}
-                        onChange={e => setEditingClassValue(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            editingCommittedRef.current = false;
-                            commitClassEdit(cls, editingClassValue);
-                          }
-                          if (e.key === 'Escape') {
-                            editingCommittedRef.current = true;
-                            setEditingClass(null);
-                            setEditingClassValue('');
-                          }
-                        }}
-                        onBlur={() => {
-                          editingCommittedRef.current = false;
-                          commitClassEdit(cls, editingClassValue);
-                        }}
-                        className="h-6 px-2 rounded-md border border-ring bg-background text-xs outline-none font-mono min-w-0"
-                        style={{ width: `${Math.max(editingClassValue.length, 4) + 2}ch` }}
-                      />
-                    ) : (
-                      <Badge
-                        variant="secondary"
-                        className="truncate max-w-50"
-                        key={`layer-${index}`}
+                    <Badge
+                      variant="secondary"
+                      className="truncate max-w-50"
+                      key={`layer-${index}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => editClass(cls)}
+                        disabled={isLockedByOther}
+                        className="truncate cursor-pointer select-none disabled:cursor-not-allowed"
+                        title="Edit class"
                       >
-                        <span
-                          className="truncate cursor-text hover:text-foreground transition-colors"
-                          title="Click to edit"
-                          onClick={() => { if (!isLockedByOther) { setEditingClass(cls); setEditingClassValue(cls); } }}
-                        >{cls}</span>
-                        <Button
-                          onClick={() => removeClass(cls)}
-                          className="size-4! p-0! -mr-1"
-                          variant="outline"
-                          disabled={isLockedByOther}
-                        >
-                          <Icon name="x" className="size-2" />
-                        </Button>
-                      </Badge>
-                    )
+                        {cls}
+                      </button>
+                      <Button
+                        onClick={() => removeClass(cls)}
+                        className="size-4! p-0! -mr-1"
+                        variant="outline"
+                        disabled={isLockedByOther}
+                      >
+                        <Icon name="x" className="size-2" />
+                      </Button>
+                    </Badge>
                   ))}
                 </div>
               )}
@@ -2145,7 +2121,15 @@ const RightSidebar = React.memo(function RightSidebar({
                         key={`style-${index}`}
                         className="truncate max-w-50"
                       >
-                        <span className="truncate">{cls}</span>
+                        <button
+                          type="button"
+                          onClick={() => editClass(cls)}
+                          disabled={isLockedByOther}
+                          className="truncate cursor-pointer select-none disabled:cursor-not-allowed"
+                          title="Edit class"
+                        >
+                          {cls}
+                        </button>
                         <Button
                           onClick={() => removeStyleClass(cls)}
                           className="size-4! p-0! -mr-1"
@@ -2444,6 +2428,7 @@ const RightSidebar = React.memo(function RightSidebar({
                           fieldGroups={fieldGroups}
                           allFields={fields}
                           collections={collections}
+                          layer={selectedLayer}
                           allowedFieldTypes={SIMPLE_TEXT_FIELD_TYPES}
                         />
                       ) : (
@@ -2728,6 +2713,10 @@ const RightSidebar = React.memo(function RightSidebar({
                   {/* Sort By - only show if a real collection source is selected */}
                   {hasBoundCollectionSource(getCollectionVariable(selectedLayer)) && (
                     <>
+                      {/* Sort by/order are hidden for multi-asset: order is the
+                          image order in the field and there are no fields to sort by. */}
+                      {getCollectionVariable(selectedLayer)?.source_field_type !== 'multi_asset' && (
+                      <>
                       <div className="grid grid-cols-3">
                         <Label variant="muted">Sort by</Label>
                         <div className="col-span-2 *:w-full flex">
@@ -2834,6 +2823,8 @@ const RightSidebar = React.memo(function RightSidebar({
                               )}
                             </div>
                           </div>
+                      )}
+                      </>
                       )}
 
                       {/* Total Limit */}

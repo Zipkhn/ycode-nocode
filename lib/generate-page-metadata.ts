@@ -20,7 +20,7 @@ import { buildSvgDataUrl, getAssetProxyUrl } from '@/lib/asset-utils';
 import { generateColorVariablesCss } from '@/lib/repositories/colorVariableRepository';
 import { buildPageHreflangAlternates } from '@/lib/hreflang-utils';
 import { getTranslatableKey } from '@/lib/locale-runtime';
-import { getSiteBaseUrl } from '@/lib/url-utils';
+import { buildAbsolutePageUrl, getSiteBaseUrl } from '@/lib/url-utils';
 import {
   getCanonicalUrl,
   getRobotsDirectives,
@@ -401,6 +401,17 @@ export async function generatePageMetadata(
     }
   }
 
+  // URL of the current page for og:url. Prefer an absolute URL built from the
+  // resolved base (canonical / primary domain / Vercel env) so it's correct on
+  // Vercel and cloud even when the route doesn't set `metadataBase`. Falls back
+  // to the relative path locally (no base configured), which Next.js resolves
+  // against `metadataBase` when available.
+  const pageUrl = pagePath === undefined
+    ? undefined
+    : siteBaseUrl
+      ? buildAbsolutePageUrl(siteBaseUrl, pagePath)
+      : pagePath;
+
   // ── OG image resolution ────────────────────────────────────────────────────
   let imageUrl: string | null = null;
   if (seo?.image && !isErrorPage) {
@@ -431,16 +442,17 @@ export async function generatePageMetadata(
       type: ogType,
       ...(ogSiteName ? { siteName: ogSiteName } : {}),
       ...(ogLocale ? { locale: ogLocale } : {}),
-      ...(canonicalUrl ? { url: canonicalUrl } : {}),
+      // og:url — prefer the governance canonical, else this page's own URL (upstream og:url feature).
+      ...((canonicalUrl ?? pageUrl) ? { url: canonicalUrl ?? pageUrl } : {}),
     };
 
     if (imageUrl) {
       metadata.openGraph.images = [{ url: imageUrl, width: 1200, height: 630 }];
       metadata.twitter = {
-        card: 'summary_large_image',
+        card: imageUrl ? 'summary_large_image' : 'summary',
         title,
         description,
-        images: [imageUrl],
+        ...(imageUrl ? { images: [imageUrl] } : {}),
       };
     }
   }
