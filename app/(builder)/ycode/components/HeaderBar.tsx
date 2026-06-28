@@ -34,7 +34,6 @@ import ActiveUsersInHeader from './ActiveUsersInHeader';
 import InviteUserButton from './InviteUserButton';
 import PublishPopover from './PublishPopover';
 import { useStudioStore } from '@/components/Studio/StudioModal';
-import { useVariablesStore } from './VariablesModal';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
 import { Separator } from '@/components/ui/separator';
@@ -117,7 +116,6 @@ export default function HeaderBar({
   const loadTranslations = useLocalisationStore((s) => s.loadTranslations);
   const { navigateToLayers, navigateToCollection, navigateToCollections, updateQueryParams, routeType } = useEditorUrl();
   const openStudio = useStudioStore(s => s.open);
-  const openVariables = useVariablesStore(s => s.open);
   const isCanvasPreview = useEditorStore((s) => s.isCanvasPreview);
   const toggleCanvasPreview = useEditorStore((s) => s.toggleCanvasPreview);
 
@@ -361,6 +359,18 @@ export default function HeaderBar({
     window.addEventListener('togglePreview', handleTogglePreviewEvent);
     return () => window.removeEventListener('togglePreview', handleTogglePreviewEvent);
   }, [handleTogglePreview]);
+
+  // Canvas mode segment (Edit / Interactive / Preview). `interactive` is the
+  // App State live canvas (isCanvasPreview); `preview` is the full preview route
+  // (handleTogglePreview owns its navigation). Mutually exclusive.
+  const canvasMode: 'edit' | 'interactive' | 'preview' =
+    isPreviewMode ? 'preview' : isCanvasPreview ? 'interactive' : 'edit';
+  const setCanvasMode = useCallback((mode: 'edit' | 'interactive' | 'preview') => {
+    if (mode === canvasMode) return;
+    if (isPreviewMode && mode !== 'preview') handleTogglePreview(); // exit preview route
+    if (isCanvasPreview !== (mode === 'interactive')) toggleCanvasPreview();
+    if (mode === 'preview' && !isPreviewMode) handleTogglePreview(); // enter preview route
+  }, [canvasMode, isPreviewMode, isCanvasPreview, handleTogglePreview, toggleCanvasPreview]);
 
   // Apply theme to HTML element
   useEffect(() => {
@@ -629,21 +639,6 @@ export default function HeaderBar({
             <Icon name="slider" />
             Studio
           </Button>
-          <Button
-            variant="ghost" size="sm"
-            onClick={openVariables} title="Variables (App State)"
-          >
-            <Icon name="zap" />
-            Variables
-          </Button>
-          <Button
-            variant="ghost" size="sm"
-            onClick={toggleCanvasPreview} title="Live preview (App State) — interact with the canvas"
-            className={isCanvasPreview ? 'bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90' : ''}
-          >
-            <Icon name="play" />
-            Live
-          </Button>
         </div>
       </div>
 
@@ -756,16 +751,27 @@ export default function HeaderBar({
           )}
         </div>
 
-        {/* Preview button */}
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={handleTogglePreview}
-          disabled={!currentPage || isSaving}
-          className={isPreviewMode ? 'bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90' : ''}
-        >
-          <Icon name="preview" />
-        </Button>
+        {/* Mode segment: Edit / Interactive (App State live) / Preview.
+            Replaces the former separate "Live" + "Preview" buttons. */}
+        <div className="flex items-center gap-0.5 rounded-md border p-0.5">
+          {([
+            { mode: 'edit' as const, icon: 'cursor-default' as const, title: 'Edit' },
+            { mode: 'interactive' as const, icon: 'play' as const, title: 'Interactive — interact with the canvas (App State)' },
+            { mode: 'preview' as const, icon: 'preview' as const, title: 'Preview' },
+          ]).map(({ mode, icon, title }) => (
+            <Button
+              key={mode}
+              size="xs"
+              variant="ghost"
+              title={title}
+              disabled={!currentPage || isSaving}
+              onClick={() => setCanvasMode(mode)}
+              className={canvasMode === mode ? 'bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90' : ''}
+            >
+              <Icon name={icon} />
+            </Button>
+          ))}
+        </div>
 
         <PublishPopover
           isPublishing={isPublishing}

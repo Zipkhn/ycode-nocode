@@ -85,7 +85,6 @@ import { getStyleIds } from '@/lib/layer-style-resolve';
 import { findLayerById, getClassesString, removeLayerById, canCopyLayer, canDeleteLayer, regenerateIdsWithInteractionRemapping, findParentAndIndex, insertLayerAfter, updateLayerProps, getLayerIndexes, removeRichTextSublayer, canPasteIntoParent, canHaveChildren, LINK_NESTING_ERROR } from '@/lib/layer-utils';
 import { cloneDeep } from 'lodash';
 import { StudioModal } from '@/components/Studio/StudioModal';
-import VariablesModal from './VariablesModal';
 
 // 5. Types
 import type { Layer, Asset } from '@/types';
@@ -2304,9 +2303,6 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
 
     {/* Studio Design Modal */}
     <StudioModal />
-
-    {/* Variables (App State) Modal */}
-    <VariablesModal />
 
     {/* Collection Item Sheet - renders globally (lazy loaded) */}
     {collectionItemSheet && (

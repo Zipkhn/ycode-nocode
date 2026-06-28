@@ -2,7 +2,8 @@
  * Project-level runtime variable defaults (Conditionals — App State).
  * Pure helpers shared by the server (PageRenderer seeds the published page) and
  * tests. The variable definitions themselves are stored in the settings table
- * under `project_variables` and edited via the builder VariablesModal.
+ * under `project_variables` and edited via the builder VariablesPanel (right
+ * sidebar, Page context).
  */
 import type { VariableDefinition } from '@/types';
 

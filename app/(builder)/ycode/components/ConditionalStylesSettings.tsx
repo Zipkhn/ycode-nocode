@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import SettingsPanel from './SettingsPanel';
 import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
-import { useProjectVariablePaths } from './VariablesModal';
+import { useProjectVariablePaths } from './VariablesPanel';
 import type { Layer, ConditionalStyleRule, VisibilityOperator } from '@/types';
 
 interface Props {

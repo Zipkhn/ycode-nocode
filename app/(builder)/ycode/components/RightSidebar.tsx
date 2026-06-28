@@ -42,6 +42,7 @@ import CollectionFiltersSettings from './CollectionFiltersSettings';
 import ConditionalVisibilitySettings from './ConditionalVisibilitySettings';
 import StateActionsSettings from './StateActionsSettings';
 import ConditionalStylesSettings from './ConditionalStylesSettings';
+import VariablesPanel from './VariablesPanel';
 import ImageSettings, { type ImageSettingsValue } from './ImageSettings';
 import VideoSettings, { type VideoSettingsValue } from './VideoSettings';
 import AudioSettings, { type AudioSettingsValue } from './AudioSettings';
@@ -1899,9 +1900,11 @@ const RightSidebar = React.memo(function RightSidebar({
   };
 
   if (!selectedLayerId || !selectedLayer) {
+    // No layer selected → Page context. Surface project-level App State
+    // variables here (formerly a topbar modal).
     return (
-      <div className="w-64 shrink-0 bg-background border-l flex items-center justify-center h-screen">
-        <span className="text-xs text-muted-foreground">Select layer</span>
+      <div className="w-64 shrink-0 bg-background border-l flex flex-col h-full overflow-y-auto no-scrollbar divide-y">
+        <VariablesPanel />
       </div>
     );
   }
