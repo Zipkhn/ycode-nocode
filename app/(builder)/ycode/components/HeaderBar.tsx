@@ -116,8 +116,6 @@ export default function HeaderBar({
   const loadTranslations = useLocalisationStore((s) => s.loadTranslations);
   const { navigateToLayers, navigateToCollection, navigateToCollections, updateQueryParams, routeType } = useEditorUrl();
   const openStudio = useStudioStore(s => s.open);
-  const isCanvasPreview = useEditorStore((s) => s.isCanvasPreview);
-  const toggleCanvasPreview = useEditorStore((s) => s.toggleCanvasPreview);
 
   // Optimistic nav button state - set immediately on click, cleared when URL catches up
   type NavButton = 'design' | 'cms' | 'forms';
@@ -360,17 +358,14 @@ export default function HeaderBar({
     return () => window.removeEventListener('togglePreview', handleTogglePreviewEvent);
   }, [handleTogglePreview]);
 
-  // Canvas mode segment (Edit / Interactive / Preview). `interactive` is the
-  // App State live canvas (isCanvasPreview); `preview` is the full preview route
-  // (handleTogglePreview owns its navigation). Mutually exclusive.
-  const canvasMode: 'edit' | 'interactive' | 'preview' =
-    isPreviewMode ? 'preview' : isCanvasPreview ? 'interactive' : 'edit';
-  const setCanvasMode = useCallback((mode: 'edit' | 'interactive' | 'preview') => {
+  // Canvas mode segment (Edit / Preview). `preview` is the full preview route
+  // (handleTogglePreview owns its navigation), which is already interactive
+  // (real runtime: App State, conditionals, triggers). Mutually exclusive.
+  const canvasMode: 'edit' | 'preview' = isPreviewMode ? 'preview' : 'edit';
+  const setCanvasMode = useCallback((mode: 'edit' | 'preview') => {
     if (mode === canvasMode) return;
-    if (isPreviewMode && mode !== 'preview') handleTogglePreview(); // exit preview route
-    if (isCanvasPreview !== (mode === 'interactive')) toggleCanvasPreview();
-    if (mode === 'preview' && !isPreviewMode) handleTogglePreview(); // enter preview route
-  }, [canvasMode, isPreviewMode, isCanvasPreview, handleTogglePreview, toggleCanvasPreview]);
+    handleTogglePreview(); // toggle between edit and preview route
+  }, [canvasMode, handleTogglePreview]);
 
   // Apply theme to HTML element
   useEffect(() => {
@@ -751,13 +746,12 @@ export default function HeaderBar({
           )}
         </div>
 
-        {/* Mode segment: Edit / Interactive (App State live) / Preview.
-            Replaces the former separate "Live" + "Preview" buttons. */}
+        {/* Mode segment: Edit / Preview. Preview is the full runtime render
+            (already interactive: App State, conditionals, triggers). */}
         <div className="flex items-center gap-0.5 rounded-md border p-0.5">
           {([
             { mode: 'edit' as const, icon: 'cursor-default' as const, title: 'Edit' },
-            { mode: 'interactive' as const, icon: 'play' as const, title: 'Interactive — interact with the canvas (App State)' },
-            { mode: 'preview' as const, icon: 'preview' as const, title: 'Preview' },
+            { mode: 'preview' as const, icon: 'preview' as const, title: 'Preview — interactive runtime render' },
           ]).map(({ mode, icon, title }) => (
             <Button
               key={mode}
