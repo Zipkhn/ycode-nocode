@@ -102,30 +102,40 @@ export function resolveFieldFromSources(
   layerDataMap?: Record<string, Record<string, string>>,
   globalsData?: Record<string, string>
 ): string | undefined {
-  // Global source - site-wide variable, independent of collection/page context.
-  // Renderers merge globals into collectionItemData, so fall back to it when an
-  // explicit globalsData map isn't threaded.
-  if (source === 'global') {
-    return globalsData?.[fieldId] ?? collectionItemData?.[fieldId] ?? pageCollectionItemData?.[fieldId] ?? undefined;
-  }
+  // object/array field values (amélioration #1) arrive parsed (castValue) despite the
+  // Record<string,string> typing. Stringify so the string contract holds and no raw
+  // object leaks to a React child (nested binding is a separate, future increment).
+  const coerce = (v: unknown): string | undefined =>
+    v !== null && typeof v === 'object' ? JSON.stringify(v) : (v as string | undefined);
 
-  // Page source - use page data only
-  if (source === 'page') {
-    return pageCollectionItemData?.[fieldId];
-  }
+  const raw = ((): unknown => {
+    // Global source - site-wide variable, independent of collection/page context.
+    // Renderers merge globals into collectionItemData, so fall back to it when an
+    // explicit globalsData map isn't threaded.
+    if (source === 'global') {
+      return globalsData?.[fieldId] ?? collectionItemData?.[fieldId] ?? pageCollectionItemData?.[fieldId] ?? undefined;
+    }
 
-  // If specific layer ID is provided and exists in layerDataMap, use that layer's data
-  if (collectionLayerId && layerDataMap?.[collectionLayerId]) {
-    return layerDataMap[collectionLayerId][fieldId];
-  }
+    // Page source - use page data only
+    if (source === 'page') {
+      return pageCollectionItemData?.[fieldId];
+    }
 
-  // Collection source - use merged collection data
-  if (source === 'collection') {
-    return collectionItemData?.[fieldId];
-  }
+    // If specific layer ID is provided and exists in layerDataMap, use that layer's data
+    if (collectionLayerId && layerDataMap?.[collectionLayerId]) {
+      return layerDataMap[collectionLayerId][fieldId];
+    }
 
-  // No explicit source - check collection first, then page (backwards compatibility)
-  return collectionItemData?.[fieldId] ?? pageCollectionItemData?.[fieldId];
+    // Collection source - use merged collection data
+    if (source === 'collection') {
+      return collectionItemData?.[fieldId];
+    }
+
+    // No explicit source - check collection first, then page (backwards compatibility)
+    return collectionItemData?.[fieldId] ?? pageCollectionItemData?.[fieldId];
+  })();
+
+  return coerce(raw);
 }
 
 /**

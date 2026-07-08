@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {

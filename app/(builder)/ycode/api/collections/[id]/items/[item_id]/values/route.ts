@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getValuesByItemId } from '@/lib/repositories/collectionItemValueRepository';
 import { setValuesByFieldName } from '@/lib/repositories/collectionItemValueRepository';
+import { recordItemVersion } from '@/lib/services/collectionItemVersionService';
 import { noCache } from '@/lib/api-response';
 
 // Disable caching for this route
@@ -55,6 +56,8 @@ export async function PUT(
       {},
       false // Update draft values
     );
+
+    await recordItemVersion(item_id, 'update');
 
     // Get updated draft values
     const values = await getValuesByItemId(item_id, false);

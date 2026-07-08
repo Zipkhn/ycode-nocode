@@ -43,6 +43,7 @@ import {
 } from '@/components/ui/select';
 import RichTextEditor from './RichTextEditor';
 import RichTextEditorSheet from './RichTextEditorSheet';
+import ItemHistoryPopover from './ItemHistoryPopover';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { useCollectionLayerStore } from '@/stores/useCollectionLayerStore';
 import { usePagesStore } from '@/stores/usePagesStore';
@@ -53,7 +54,7 @@ import { useLocalizationMode } from '@/hooks/use-localization-mode';
 import { useLiveCollectionUpdates } from '@/hooks/use-live-collection-updates';
 import { useResourceLock } from '@/hooks/use-resource-lock';
 import { slugify, normalizeBooleanValue, parseMultiReferenceValue } from '@/lib/collection-utils';
-import { isAssetFieldType, isMultipleAssetField, getFileManagerCategory, getAssetFieldLabel, getAssetFieldTypeLabel, isValidAssetForField, findStatusFieldId } from '@/lib/collection-field-utils';
+import { isAssetFieldType, isMultipleAssetField, getFileManagerCategory, getAssetFieldLabel, getAssetFieldTypeLabel, isValidAssetForField, findStatusFieldId, validateField } from '@/lib/collection-field-utils';
 import type { StatusAction } from '@/lib/collection-field-utils';
 import { CollectionStatusPill, parseStatusValue } from './CollectionStatusPill';
 import { formatDateInTimezone, localDatetimeToUTC, clampDateInputValue } from '@/lib/date-format-utils';
@@ -64,6 +65,7 @@ import ReferenceFieldCombobox from './ReferenceFieldCombobox';
 import CollectionLinkFieldInput from './CollectionLinkFieldInput';
 import ColorFieldInput from './ColorFieldInput';
 import AssetFieldCard, { SortableAssetFieldCard } from './AssetFieldCard';
+import NestedFieldInput from './NestedFieldInput';
 import { DndContext, closestCenter, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable';
@@ -88,7 +90,7 @@ export default function CollectionItemSheet({
   itemId,
   onSuccess,
 }: CollectionItemSheetProps) {
-  const { collections, fields, items, updateItem, createItem, setItemStatus } = useCollectionsStore();
+  const { collections, fields, items, updateItem, createItem, setItemStatus, replaceItem } = useCollectionsStore();
   const { updateItemInLayerData, invalidateLayerData, refetchLayersForCollection } = useCollectionLayerStore();
   const { updatePageCollectionItem, refetchPageCollectionItem, pages } = usePagesStore();
   const currentPageId = useEditorStore((state) => state.currentPageId);
@@ -503,6 +505,22 @@ export default function CollectionItemSheet({
       }
     }
 
+    // Per-field validation rules (amélioration #2). Name/slug keep their bespoke
+    // checks above; unique is enforced server-side (not re-checked here).
+    collectionFields.forEach(field => {
+      if (!field.fillable) return;
+      if (field.id === nameField?.id || field.id === slugField?.id) return;
+      const isStructured = field.type === 'object' || field.type === 'array';
+      if (!field.data?.validation && !isStructured) return;
+      const raw = values[field.id];
+      const str = raw == null ? '' : typeof raw === 'string' ? raw : JSON.stringify(raw);
+      const result = validateField(field, str);
+      if (!result.valid) {
+        form.setError(field.id, { type: 'manual', message: result.errors[0] });
+        hasErrors = true;
+      }
+    });
+
     if (hasErrors) return;
 
     // Store editingItem reference before closing (needed for API call below)
@@ -649,6 +667,20 @@ export default function CollectionItemSheet({
             )}
           </SheetTitle>
           <SheetActions>
+            {/* Version history — draft-only, hidden while translating. */}
+            {editingItem && !isTempId(editingItem.id) && !isLocalizing && (
+              <ItemHistoryPopover
+                itemId={editingItem.id}
+                onRestored={(item) => {
+                  replaceItem(collectionId, item);
+                  refetchLayersForCollection(collectionId);
+                  if (isPageLevelItem && currentPageId) {
+                    refetchPageCollectionItem(currentPageId);
+                  }
+                }}
+              />
+            )}
+
             {/* More options dropdown — hidden while translating, the only
                 action there is Delete which doesn't apply to translations. */}
             {editingItem && !isTempId(editingItem.id) && !isLocalizing && (
@@ -1094,6 +1126,13 @@ export default function CollectionItemSheet({
                                 </Select>
                               );
                             })()
+                          ) : (field.type === 'object' || field.type === 'array') ? (
+                            <NestedFieldInput
+                              subFields={field.data?.objectFields ?? []}
+                              isArray={field.type === 'array'}
+                              value={formField.value}
+                              onChange={formField.onChange}
+                            />
                           ) : field.key === 'name' ? (
                             <Input
                               ref={nameInputRef}

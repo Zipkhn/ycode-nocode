@@ -16,7 +16,7 @@ import { buildImageSizes, generateImageSrcset, getOptimizedImageUrl, getAssetPro
 import { resolveComponents, applyComponentOverrides } from '@/lib/resolve-components';
 import { getComponentVariantLayers } from '@/lib/component-variant-utils';
 import { isTiptapDoc, hasBlockElementsWithResolver } from '@/lib/tiptap-utils';
-import { castValue, parseMultiReferenceValue, remapLayerIdsForCollectionItem } from '@/lib/collection-utils';
+import { castValue, parseMultiReferenceValue, remapLayerIdsForCollectionItem, flattenObjectFields } from '@/lib/collection-utils';
 import { DEFAULT_TEXT_STYLES } from '@/lib/text-format-utils';
 
 // Pagination context passed through to resolveCollectionLayers
@@ -44,7 +44,7 @@ import { generateInitialAnimationCSS } from '@/lib/animation-utils';
 import { getMapIframeProps, DEFAULT_MAP_SETTINGS } from '@/lib/map-utils';
 import { getMapboxAccessToken, getGoogleMapsEmbedApiKey } from '@/lib/map-server';
 import { getAssetsByIds } from '@/lib/repositories/assetRepository';
-import { isVirtualAssetField, findDisplayField, hasDynamicDateRule, isDynamicDateCondition, buildGlobalsMetaMap, buildGlobalsValueMap, mergeGlobalsIntoFieldData, MULTI_ASSET_COLLECTION_ID, type GlobalFieldMeta } from '@/lib/collection-field-utils';
+import { isVirtualAssetField, findDisplayField, hasDynamicDateRule, isDynamicDateCondition, buildGlobalsMetaMap, buildGlobalsValueMap, mergeGlobalsIntoFieldData, MULTI_ASSET_COLLECTION_ID, ARRAY_FIELD_COLLECTION_ID, type GlobalFieldMeta } from '@/lib/collection-field-utils';
 import { getDefaultFormatId, isFormatValidForFieldType } from '@/lib/variable-format-utils';
 import type { DynamicVisibilityCondition, FieldVariable, AssetVariable, DynamicTextVariable, DynamicRichTextVariable, LinkSettings, ConditionalVisibility } from '@/types';
 import { hasClientRuntimeSource, RUNTIME_STATE_ATTR, type ClientVisibilityRule, type ClientVisibilityGroup } from '@/lib/runtime-visibility';
@@ -1128,6 +1128,9 @@ async function resolveReferenceFields(
     }
   }
 
+  // amélioration #1 — flatten object sub-fields into `objId.subKey` keys for binding
+  Object.assign(enhancedValues, flattenObjectFields(itemValues, fields));
+
   return enhancedValues;
 }
 
@@ -1149,6 +1152,14 @@ async function batchResolveReferenceFields(
   boundFieldPaths?: Set<string>,
   translations?: Record<string, Translation> | null,
 ): Promise<Record<string, string>[]> {
+  // amélioration #1 — flatten object sub-fields into `objId.subKey` keys for every item
+  // (must survive the reference early-returns below since a collection may have object
+  // fields but no reference fields).
+  const withObjects = itemsValues.map(v => {
+    const flat = flattenObjectFields(v, fields);
+    return Object.keys(flat).length ? { ...v, ...flat } : v;
+  });
+
   let referenceFields = fields.filter(
     f => f.type === 'reference' && f.reference_collection_id
   );
@@ -1160,7 +1171,7 @@ async function batchResolveReferenceFields(
     );
   }
 
-  if (referenceFields.length === 0) return itemsValues;
+  if (referenceFields.length === 0) return withObjects;
 
   const allRefItemIds = new Set<string>();
   const refCollectionIds = new Set<string>();
@@ -1175,7 +1186,7 @@ async function batchResolveReferenceFields(
     }
   }
 
-  if (allRefItemIds.size === 0) return itemsValues;
+  if (allRefItemIds.size === 0) return withObjects;
 
   let refItemsMap: Record<string, CollectionItemWithValues>;
   let refFieldsMap: Map<string, CollectionField[]>;
@@ -1217,7 +1228,7 @@ async function batchResolveReferenceFields(
     return cached;
   };
 
-  return itemsValues.map(values => {
+  return withObjects.map(values => {
     const enhanced = { ...values };
 
     for (const field of referenceFields) {
@@ -2077,7 +2088,7 @@ function collectAllCollectionIds(layers: Layer[]): Set<string> {
     // and querying it (invalid UUID) errors the whole batch item fetch, which
     // would leave every real collection on the page with no items.
     const collectionId = layer.variables?.collection?.id;
-    if (collectionId && collectionId !== MULTI_ASSET_COLLECTION_ID) ids.add(collectionId);
+    if (collectionId && collectionId !== MULTI_ASSET_COLLECTION_ID && collectionId !== ARRAY_FIELD_COLLECTION_ID) ids.add(collectionId);
     if (layer.settings?.optionsSource?.collectionId) ids.add(layer.settings.optionsSource.collectionId);
     if (layer.children) layer.children.forEach(scan);
   };
@@ -2603,6 +2614,83 @@ export async function resolveCollectionLayers(
                 collection: undefined,
               },
               _paginationMeta: multiAssetPaginationMeta,
+            };
+          }
+
+          // Handle array-field iteration (amélioration #1) - clone the layer per JSON element
+          if (sourceFieldType === 'array' && sourceFieldId && itemValues) {
+            const rawArrayValue = itemValues[sourceFieldId];
+            let elements: unknown[] = [];
+            if (typeof rawArrayValue === 'string' && rawArrayValue) {
+              try { const p = JSON.parse(rawArrayValue); if (Array.isArray(p)) elements = p; } catch { elements = []; }
+            } else if (Array.isArray(rawArrayValue)) {
+              elements = rawArrayValue;
+            }
+
+            // Basic limit/offset (arrays are built here, not DB-paginated)
+            const aOffset = collectionVariable.offset || 0;
+            const aLimit = collectionVariable.limit;
+            let pageElements = elements;
+            if (aOffset || aLimit) {
+              pageElements = elements.slice(aOffset, aLimit ? aOffset + aLimit : undefined);
+            }
+
+            if (pageElements.length === 0) {
+              return { ...layer, children: [] };
+            }
+
+            const clonedLayers: Layer[] = (await Promise.all(
+              pageElements.map(async (el, i) => {
+                const element = (el && typeof el === 'object') ? el as Record<string, unknown> : {};
+                // Element sub-fields become the virtual item's values (keyed by sub-key)
+                const values: Record<string, string> = {};
+                for (const [k, v] of Object.entries(element)) {
+                  if (k === '_key' || v === undefined || v === null) continue;
+                  values[k] = typeof v === 'string' ? v : typeof v === 'object' ? JSON.stringify(v) : String(v);
+                }
+                const itemId = (typeof element._key === 'string' && element._key) ? element._key : `${sourceFieldId}-${i}`;
+
+                const updatedLayerDataMap = { ...layerDataMap, [layer.id]: values };
+
+                const resolvedChildren = layer.children?.length
+                  ? await Promise.all(layer.children.map(child => resolveLayer(child, values, updatedLayerDataMap)))
+                  : [];
+                const injectedChildren = await Promise.all(
+                  resolvedChildren.map(child =>
+                    injectCollectionData(child, values, undefined, isPublished, updatedLayerDataMap, undefined, timezone, globalsData, globalsMeta)
+                  )
+                );
+
+                const layerWithOwnData = await injectCollectionData(
+                  { ...layer, variables: { ...layer.variables, collection: undefined }, children: [] },
+                  values, undefined, isPublished, updatedLayerDataMap, undefined, timezone, globalsData, globalsMeta
+                );
+
+                const clonedLayer: Layer = {
+                  ...layerWithOwnData,
+                  attributes: {
+                    ...layer.attributes,
+                    'data-collection-item-id': itemId,
+                  } as Record<string, any>,
+                  children: injectedChildren,
+                  _collectionItemValues: values,
+                  _collectionItemId: itemId,
+                  _layerDataMap: updatedLayerDataMap,
+                };
+
+                return remapLayerIdsForCollectionItem(clonedLayer, `-item-${itemId}`);
+              })
+            )).filter((item): item is Layer => item !== null);
+
+            return {
+              ...layer,
+              id: `${layer.id}-fragment`,
+              name: '_fragment',
+              classes: [],
+              design: undefined,
+              attributes: {} as Record<string, any>,
+              children: clonedLayers,
+              variables: { ...layer.variables, collection: undefined },
             };
           }
 

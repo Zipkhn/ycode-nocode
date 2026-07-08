@@ -28,17 +28,18 @@ import {
 import Icon from '@/components/ui/icon';
 import { Spinner } from '@/components/ui/spinner';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FIELD_TYPES_BY_CATEGORY, ASSET_FIELD_TYPES, supportsDefaultValue, isAssetFieldType, getFileManagerCategory, getAssetFieldLabel, type FieldType } from '@/lib/collection-field-utils';
-import { parseMultiReferenceValue } from '@/lib/collection-utils';
+import { FIELD_TYPES_BY_CATEGORY, ASSET_FIELD_TYPES, OBJECT_SUBFIELD_TYPES, supportsDefaultValue, isAssetFieldType, getFileManagerCategory, getAssetFieldLabel, getFieldTypeLabel, type FieldType } from '@/lib/collection-field-utils';
+import { parseMultiReferenceValue, slugify } from '@/lib/collection-utils';
 import { clampDateInputValue } from '@/lib/date-format-utils';
 import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
+import { useObjectTypesStore } from '@/stores/useObjectTypesStore';
 import RichTextEditor from './RichTextEditor';
 import CollectionLinkFieldInput from './CollectionLinkFieldInput';
 import ColorFieldInput from './ColorFieldInput';
 import AssetFieldCard from './AssetFieldCard';
-import type { Asset, AssetCategoryFilter, CollectionField, CollectionFieldData, CollectionFieldType } from '@/types';
+import type { Asset, AssetCategoryFilter, CollectionField, CollectionFieldData, CollectionFieldType, FieldValidation, ObjectSubField } from '@/types';
 
 export interface FieldFormData {
   name: string;
@@ -84,6 +85,10 @@ export default function FieldFormDialog({
   const [fieldOptions, setFieldOptions] = useState<{ id: string; name: string }[]>([]);
   const [countCollectionId, setCountCollectionId] = useState<string | null>(null);
   const [countFieldId, setCountFieldId] = useState<string | null>(null);
+  const [validation, setValidation] = useState<FieldValidation>({});
+  const [objectSubFields, setObjectSubFields] = useState<ObjectSubField[]>([]);
+  const [objectTypeId, setObjectTypeId] = useState<string | null>(null);
+  const [isEditingType, setIsEditingType] = useState(false);
   const [hasChangedType, setHasChangedType] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -116,6 +121,81 @@ export default function FieldFormDialog({
   const isOptionType = fieldType === 'option';
   const isCountType = fieldType === 'count';
   const hasDefault = supportsDefaultValue(fieldType);
+
+  // Validation controls (amélioration #2)
+  const isNumericField = fieldType === 'number' || fieldType === 'count';
+  const isTextLikeField = ['text', 'email', 'phone', 'link'].includes(fieldType);
+  const supportsValidation = !isAssetType && !['boolean', 'rich_text', 'status', 'object', 'array'].includes(fieldType);
+
+  // Nested object/array sub-schema (amélioration #1)
+  const isStructuredType = fieldType === 'object' || fieldType === 'array';
+  const { objectTypes, load: loadObjectTypes, save: saveObjectType } = useObjectTypesStore();
+  const isLinkedToType = !!objectTypeId;
+  const subFieldsEditable = !isLinkedToType || isEditingType;
+  const addSubField = () =>
+    setObjectSubFields(prev => [...prev, { key: '', name: '', type: 'text' }]);
+  const removeSubField = (index: number) =>
+    setObjectSubFields(prev => prev.filter((_, i) => i !== index));
+  const updateSubField = (index: number, patch: Partial<ObjectSubField>) =>
+    setObjectSubFields(prev => prev.map((s, i) => {
+      if (i !== index) return s;
+      const next = { ...s, ...patch };
+      // Derive stable key from the name unless the user set one explicitly.
+      if (patch.name !== undefined) next.key = slugify(patch.name) || '';
+      return next;
+    }));
+  // Link to a saved type: copy its fields (denormalized) + mark the link.
+  const linkToType = (typeId: string) => {
+    const type = objectTypes.find(t => t.id === typeId);
+    if (!type) return;
+    setObjectTypeId(typeId);
+    setObjectSubFields(type.fields.map(f => ({ ...f })));
+    setIsEditingType(false);
+  };
+  // Detach → custom: keep the current fields but drop the link (become editable).
+  const unlinkType = () => { setObjectTypeId(null); setIsEditingType(false); };
+  // Save edits back to the shared type (propagates server-side to all linked fields).
+  const saveChangesToType = async () => {
+    if (!objectTypeId) return;
+    const name = objectTypes.find(t => t.id === objectTypeId)?.name;
+    if (!name) return;
+    const fields = objectSubFields
+      .map(s => ({ key: s.key.trim(), name: s.name.trim(), type: s.type, ...(s.validation?.required ? { validation: { required: true } } : {}) }))
+      .filter(s => s.key && s.name);
+    const saved = await saveObjectType({ id: objectTypeId, name, fields });
+    if (saved) setObjectSubFields(saved.fields.map(f => ({ ...f })));
+    setIsEditingType(false);
+  };
+  const cancelEditType = () => {
+    const type = objectTypes.find(t => t.id === objectTypeId);
+    if (type) setObjectSubFields(type.fields.map(f => ({ ...f })));
+    setIsEditingType(false);
+  };
+  // Save the current custom fields as a new named type and link to it.
+  const saveAsType = async () => {
+    const name = window.prompt('Name this object type (e.g. SEO, Address):')?.trim();
+    if (!name) return;
+    const fields = objectSubFields
+      .map(s => ({ key: s.key.trim(), name: s.name.trim(), type: s.type, ...(s.validation?.required ? { validation: { required: true } } : {}) }))
+      .filter(s => s.key && s.name);
+    const saved = await saveObjectType({ name, fields });
+    if (saved) setObjectTypeId(saved.id);
+  };
+  const hasInvalidSubFields = isStructuredType && subFieldsEditable && (() => {
+    if (objectSubFields.length === 0) return true;
+    if (objectSubFields.some(s => !s.name.trim() || !s.key.trim())) return true;
+    const keys = objectSubFields.map(s => s.key.trim());
+    return new Set(keys).size !== keys.length;
+  })();
+  const updateValidation = (patch: Partial<FieldValidation>) =>
+    setValidation((prev) => ({ ...prev, ...patch }));
+  const numToStr = (n?: number) => (n === undefined || Number.isNaN(n) ? '' : String(n));
+  const strToNum = (s: string): number | undefined => {
+    const t = s.trim();
+    if (!t) return undefined;
+    const n = Number(t);
+    return Number.isNaN(n) ? undefined : n;
+  };
 
   const hasInvalidOptions = isOptionType && (() => {
     if (fieldOptions.length === 0) return true;
@@ -155,11 +235,14 @@ export default function FieldFormDialog({
     !fieldName.trim() ||
     (isReferenceType && !referenceCollectionId) ||
     (isCountType && (!countCollectionId || !countFieldId)) ||
-    hasInvalidOptions;
+    hasInvalidOptions ||
+    hasInvalidSubFields ||
+    (isStructuredType && isEditingType); // finish editing the shared type first
 
   // Reset form when dialog opens
   useEffect(() => {
     if (!open) return;
+    loadObjectTypes();
 
     if (field) {
       setFieldName(field.name);
@@ -174,6 +257,13 @@ export default function FieldFormDialog({
       );
       setCountCollectionId(field.data?.count?.collectionId ?? null);
       setCountFieldId(field.data?.count?.fieldId ?? null);
+      setValidation(field.data?.validation ?? {});
+      setObjectSubFields(
+        Array.isArray(field.data?.objectFields)
+          ? field.data.objectFields.map(s => ({ key: s.key, name: s.name, type: s.type, validation: s.validation }))
+          : []
+      );
+      setObjectTypeId(field.data?.objectTypeId ?? null);
     } else {
       setFieldName('');
       setFieldType('text');
@@ -183,9 +273,13 @@ export default function FieldFormDialog({
       setFieldOptions([]);
       setCountCollectionId(null);
       setCountFieldId(null);
+      setValidation({});
+      setObjectSubFields([]);
+      setObjectTypeId(null);
     }
     setHasChangedType(false);
     setIsSubmitting(false);
+    setIsEditingType(false);
   }, [open, field]);
 
   // Clear reference collection when switching away from reference types
@@ -244,6 +338,7 @@ export default function FieldFormDialog({
     if (isReferenceType && !referenceCollectionId) return;
     if (isCountType && (!countCollectionId || !countFieldId)) return;
     if (hasInvalidOptions) return;
+    if (hasInvalidSubFields) return;
     if (isSubmitting) return;
 
     let data: CollectionFieldData | undefined;
@@ -255,6 +350,42 @@ export default function FieldFormDialog({
       };
     } else if (isCountType && countCollectionId && countFieldId) {
       data = { count: { collectionId: countCollectionId, fieldId: countFieldId } };
+    } else if (isStructuredType) {
+      data = {
+        objectFields: objectSubFields.map(s => ({
+          key: s.key.trim(),
+          name: s.name.trim(),
+          type: s.type,
+          ...(s.validation?.required ? { validation: { required: true } } : {}),
+        })),
+        // Link to a named reusable type (objectFields above is the denormalized copy)
+        ...(objectTypeId ? { objectTypeId } : {}),
+      };
+    }
+
+    // Attach validation rules (amélioration #2), keeping only type-relevant, non-empty ones.
+    let validationRules: FieldValidation | undefined;
+    if (supportsValidation) {
+      const out: FieldValidation = {};
+      if (validation.required) out.required = true;
+      if (validation.unique) out.unique = true;
+      if (isNumericField) {
+        if (validation.min !== undefined) out.min = validation.min;
+        if (validation.max !== undefined) out.max = validation.max;
+        if (validation.integer) out.integer = true;
+      }
+      if (isTextLikeField) {
+        if (validation.minLength !== undefined) out.minLength = validation.minLength;
+        if (validation.maxLength !== undefined) out.maxLength = validation.maxLength;
+        if (validation.regex?.trim()) out.regex = validation.regex.trim();
+      }
+      validationRules = Object.keys(out).length ? out : undefined;
+    }
+    if (validationRules) {
+      data = { ...(data ?? {}), validation: validationRules };
+    } else if (mode === 'edit' && stableField?.data?.validation) {
+      // Rules were present and are now cleared → unset so the store merge drops them.
+      data = { ...(data ?? {}), validation: undefined };
     }
 
     try {
@@ -527,6 +658,143 @@ export default function FieldFormDialog({
             </div>
           )}
 
+          {/* Object/array sub-field schema (amélioration #1) */}
+          {isStructuredType && (
+            <div className="grid grid-cols-5 items-start gap-4">
+              <Label className="text-right mt-2">Fields</Label>
+              <div className="col-span-4 flex flex-col gap-2">
+                {/* Reusable type selector (amélioration #1 registry) */}
+                <Select
+                  value={objectTypeId ?? '__custom__'}
+                  onValueChange={(v) => (v === '__custom__' ? unlinkType() : linkToType(v))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Custom" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__custom__">Custom (define below)</SelectItem>
+                    {objectTypes.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {isLinkedToType
+                    ? 'Linked to a reusable type. Editing the type updates every field that uses it.'
+                    : fieldType === 'array'
+                      ? 'Each item in the array has these fields.'
+                      : 'This object contains these fields.'}
+                </p>
+                {objectSubFields.map((sub, index) => (
+                  <div key={index} className="flex items-center gap-1">
+                    <Input
+                      value={sub.name}
+                      onChange={(e) => updateSubField(index, { name: e.target.value })}
+                      placeholder="Field name"
+                      autoComplete="off"
+                      className="flex-1"
+                      disabled={!subFieldsEditable}
+                    />
+                    <Select
+                      value={sub.type}
+                      onValueChange={(v) => updateSubField(index, { type: v as CollectionFieldType })}
+                      disabled={!subFieldsEditable}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {OBJECT_SUBFIELD_TYPES.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {getFieldTypeLabel(t)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex items-center gap-1 px-1">
+                      <Checkbox
+                        checked={!!sub.validation?.required}
+                        disabled={!subFieldsEditable}
+                        onCheckedChange={(c) =>
+                          updateSubField(index, { validation: c === true ? { required: true } : undefined })
+                        }
+                      />
+                      <Label className="text-xs text-muted-foreground font-normal">Req</Label>
+                    </div>
+                    {subFieldsEditable && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeSubField(index)}
+                        aria-label="Remove field"
+                      >
+                        <Icon name="x" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                {subFieldsEditable && (
+                  <Button
+                    type="button" variant="secondary"
+                    size="sm" className="w-fit"
+                    onClick={addSubField}
+                  >
+                    <Icon name="plus" className="size-3" />
+                    Add field
+                  </Button>
+                )}
+                {/* Footer actions per mode */}
+                {!isLinkedToType ? (
+                  !hasInvalidSubFields && objectSubFields.length > 0 && (
+                    <Button
+                      type="button" variant="success"
+                      size="sm" className="w-fit"
+                      onClick={saveAsType}
+                    >
+                      <Icon name="plus" className="size-3" />
+                      Save as reusable type
+                    </Button>
+                  )
+                ) : isEditingType ? (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button" variant="secondary"
+                      size="sm" className="w-fit"
+                      onClick={saveChangesToType} disabled={hasInvalidSubFields}
+                    >
+                      Save changes to type
+                    </Button>
+                    <Button
+                      type="button" variant="ghost"
+                      size="sm" className="w-fit"
+                      onClick={cancelEditType}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button" variant="secondary"
+                      size="sm" className="w-fit"
+                      onClick={() => setIsEditingType(true)}
+                    >
+                      Edit type
+                    </Button>
+                    <Button
+                      type="button" variant="ghost"
+                      size="sm" className="w-fit"
+                      onClick={unlinkType}
+                    >
+                      Detach
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Default value */}
           {hasDefault && (
             <div className="grid grid-cols-5 items-start gap-4">
@@ -655,6 +923,89 @@ export default function FieldFormDialog({
                     placeholder="Default value"
                     autoComplete="off"
                   />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Validation rules (amélioration #2) */}
+          {supportsValidation && (
+            <div className="grid grid-cols-5 items-start gap-4">
+              <Label className="text-right mt-2">Validation</Label>
+              <div className="col-span-4 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="v-required"
+                    checked={!!validation.required}
+                    onCheckedChange={(c) => updateValidation({ required: c === true })}
+                  />
+                  <Label htmlFor="v-required" className="text-xs text-muted-foreground font-normal cursor-pointer">
+                    Required
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="v-unique"
+                    checked={!!validation.unique}
+                    onCheckedChange={(c) => updateValidation({ unique: c === true })}
+                  />
+                  <Label htmlFor="v-unique" className="text-xs text-muted-foreground font-normal cursor-pointer">
+                    Must be unique
+                  </Label>
+                </div>
+                {isNumericField && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Min"
+                      value={numToStr(validation.min)}
+                      onChange={(e) => updateValidation({ min: strToNum(e.target.value) })}
+                      className="w-24"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Max"
+                      value={numToStr(validation.max)}
+                      onChange={(e) => updateValidation({ max: strToNum(e.target.value) })}
+                      className="w-24"
+                    />
+                    <div className="flex items-center gap-1">
+                      <Checkbox
+                        id="v-integer"
+                        checked={!!validation.integer}
+                        onCheckedChange={(c) => updateValidation({ integer: c === true })}
+                      />
+                      <Label htmlFor="v-integer" className="text-xs text-muted-foreground font-normal cursor-pointer">
+                        Integer
+                      </Label>
+                    </div>
+                  </div>
+                )}
+                {isTextLikeField && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Min length"
+                        value={numToStr(validation.minLength)}
+                        onChange={(e) => updateValidation({ minLength: strToNum(e.target.value) })}
+                        className="w-28"
+                      />
+                      <Input
+                        type="number"
+                        placeholder="Max length"
+                        value={numToStr(validation.maxLength)}
+                        onChange={(e) => updateValidation({ maxLength: strToNum(e.target.value) })}
+                        className="w-28"
+                      />
+                    </div>
+                    <Input
+                      placeholder="Pattern (regex)"
+                      value={validation.regex ?? ''}
+                      onChange={(e) => updateValidation({ regex: e.target.value || undefined })}
+                      autoComplete="off"
+                    />
+                  </>
                 )}
               </div>
             </div>

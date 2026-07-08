@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFieldsByCollectionId, createField, getFieldById } from '@/lib/repositories/collectionFieldRepository';
-import { isValidFieldType, VALID_FIELD_TYPES } from '@/lib/collection-field-utils';
+import { isValidFieldType, VALID_FIELD_TYPES, validateObjectFieldsSchema } from '@/lib/collection-field-utils';
 import { noCache } from '@/lib/api-response';
 
 // Disable caching for this route
@@ -95,6 +95,15 @@ export async function POST(
       isComputed = true;
       fillable = false;
       fieldData = { ...fieldData, count: { collectionId: cfg.collectionId, fieldId: cfg.fieldId } };
+    }
+
+    // Nested object/array (amélioration #1): validate the sub-field schema
+    if (body.type === 'object' || body.type === 'array') {
+      const schemaError = validateObjectFieldsSchema(body.data?.objectFields);
+      if (schemaError) {
+        return noCache({ error: schemaError }, 400);
+      }
+      fieldData = { ...fieldData, objectFields: body.data.objectFields };
     }
 
     const field = await createField({

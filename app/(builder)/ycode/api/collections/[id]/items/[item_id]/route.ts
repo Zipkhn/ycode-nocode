@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getItemWithValues, updateItem, deleteItem, enrichSingleItemWithStatus } from '@/lib/repositories/collectionItemRepository';
 import { setValuesByFieldName } from '@/lib/repositories/collectionItemValueRepository';
 import { deleteTranslationsInBulk } from '@/lib/repositories/translationRepository';
+import { recordItemVersion } from '@/lib/services/collectionItemVersionService';
 import { noCache } from '@/lib/api-response';
 
 // Disable caching for this route
@@ -85,6 +86,8 @@ export async function PUT(
     if (updatedItem) {
       await enrichSingleItemWithStatus(updatedItem, collectionId);
     }
+
+    await recordItemVersion(itemId, 'update');
 
     return noCache({ data: updatedItem });
   } catch (error) {

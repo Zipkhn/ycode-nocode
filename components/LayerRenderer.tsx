@@ -22,7 +22,7 @@ import { isValidLinkSettings } from '@/lib/link-utils';
 import { DEFAULT_ASSETS, ASSET_CATEGORIES, isAssetOfType } from '@/lib/asset-utils';
 import { parseMultiAssetFieldValue, buildAssetVirtualValues } from '@/lib/multi-asset-utils';
 import { parseMultiReferenceValue, resolveReferenceFieldsSync } from '@/lib/collection-utils';
-import { MULTI_ASSET_COLLECTION_ID, buildGlobalsMetaMap, buildGlobalsValueMap, mergeGlobalsIntoFieldData } from '@/lib/collection-field-utils';
+import { MULTI_ASSET_COLLECTION_ID, ARRAY_FIELD_COLLECTION_ID, buildGlobalsMetaMap, buildGlobalsValueMap, mergeGlobalsIntoFieldData } from '@/lib/collection-field-utils';
 import { buildImageSizes, generateImageSrcset, getOptimizedImageUrl, getSvgAspectRatioStyle, parseImageDimension } from '@/lib/asset-utils';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { toast } from 'sonner';
@@ -1445,6 +1445,13 @@ const LayerItemImpl: React.FC<{
     return allFields.find((f) => f.id === sourceFieldId) ?? null;
   }, [sourceFieldType, sourceFieldId, fieldsByCollectionId]);
 
+  // Resolve array source field (amélioration #1) to read its objectFields sub-schema
+  const arraySourceField = React.useMemo(() => {
+    if (sourceFieldType !== 'array' || !sourceFieldId) return null;
+    const allFields = Object.values(fieldsByCollectionId).flat();
+    return allFields.find((f) => f.id === sourceFieldId) ?? null;
+  }, [sourceFieldType, sourceFieldId, fieldsByCollectionId]);
+
   // Filter items by reference field if source_field_id is set
   // Single reference: get the one referenced item (no loop, just context)
   // Multi-reference: filter to items in the array (loops through all)
@@ -1483,6 +1490,42 @@ const LayerItemImpl: React.FC<{
           values: virtualValues,
         };
       });
+    } else if (sourceFieldType === 'array' && sourceFieldId) {
+      // Array field iteration (amélioration #1): build virtual items from the array's
+      // JSON elements, keyed by each element's `_key`, values keyed by sub-field key.
+      const rawValue: unknown = sourceFieldSource === 'page'
+        ? pageCollectionItemData?.[sourceFieldId]
+        : collectionLayerData?.[sourceFieldId];
+      let arr: unknown[] = [];
+      if (Array.isArray(rawValue)) {
+        arr = rawValue;
+      } else if (typeof rawValue === 'string' && rawValue) {
+        try { const p = JSON.parse(rawValue); if (Array.isArray(p)) arr = p; } catch { arr = []; }
+      }
+      if (arr.length === 0) return [];
+      const subFields = arraySourceField?.data?.objectFields ?? [];
+      items = arr.map((el, i) => {
+        const element = (el && typeof el === 'object') ? el as Record<string, unknown> : {};
+        const values: Record<string, string> = {};
+        for (const sub of subFields) {
+          const v = element[sub.key];
+          if (v !== undefined && v !== null) {
+            values[sub.key] = typeof v === 'string' ? v : typeof v === 'object' ? JSON.stringify(v) : String(v);
+          }
+        }
+        return {
+          id: (typeof element._key === 'string' && element._key) ? element._key : `${sourceFieldId}-${i}`,
+          collection_id: ARRAY_FIELD_COLLECTION_ID,
+          manual_order: i,
+          created_at: '',
+          updated_at: '',
+          deleted_at: null,
+          is_published: true,
+          is_publishable: true,
+          content_hash: null,
+          values,
+        };
+      });
     } else if (sourceFieldType === 'inverse_reference' && sourceFieldId) {
       // Inverse reference: filter items whose reference field value matches the parent item ID
       const parentId = collectionLayerItemId || pageCollectionItemId;
@@ -1497,8 +1540,8 @@ const LayerItemImpl: React.FC<{
         return ids.includes(parentId);
       });
     } else if (!sourceFieldId) {
-      // Multi-asset without a selected field has no items to render
-      items = sourceFieldType === 'multi_asset' ? [] : allCollectionItems;
+      // Virtual sources (multi-asset / array) without a selected field have no items
+      items = (sourceFieldType === 'multi_asset' || sourceFieldType === 'array') ? [] : allCollectionItems;
     } else {
       // Get the reference field value using source-aware resolution
       const refValue = resolveFieldFromSources(sourceFieldId, undefined, collectionLayerData, pageCollectionItemData);
@@ -1562,7 +1605,7 @@ const LayerItemImpl: React.FC<{
     if (isPaginated) {
       const itemsPerPage = pagination!.items_per_page || 10;
       items = items.slice(0, itemsPerPage);
-    } else if (hasStaticFilters || sourceFieldType === 'multi_asset') {
+    } else if (hasStaticFilters || sourceFieldType === 'multi_asset' || sourceFieldType === 'array') {
       const offset = collectionVariable?.offset ?? 0;
       const limit = collectionVariable?.limit;
       if (offset || limit) {
@@ -1571,7 +1614,7 @@ const LayerItemImpl: React.FC<{
     }
 
     return items;
-  }, [collectionId, allCollectionItems, sourceFieldId, sourceFieldType, sourceFieldSource, collectionLayerData, pageCollectionItemData, collectionLayerItemId, pageCollectionItemId, getAsset, collectionVariable?.filters, collectionVariable?.limit, collectionVariable?.offset, collectionVariable?.pagination, isEditMode, timezone]);
+  }, [collectionId, allCollectionItems, sourceFieldId, sourceFieldType, sourceFieldSource, collectionLayerData, pageCollectionItemData, collectionLayerItemId, pageCollectionItemId, getAsset, arraySourceField, collectionVariable?.filters, collectionVariable?.limit, collectionVariable?.offset, collectionVariable?.pagination, isEditMode, timezone]);
 
   const optionsSourceSort = layer.settings?.optionsSource;
 
@@ -1606,9 +1649,9 @@ const LayerItemImpl: React.FC<{
   useEffect(() => {
     if (!isEditMode) return;
     if (!collectionVariable?.id) return;
-    // Skip fetching for multi-asset collections (they don't have real collection data)
-    if (collectionVariable.source_field_type === 'multi_asset') return;
-    if (collectionVariable.id === MULTI_ASSET_COLLECTION_ID) return;
+    // Skip fetching for virtual collections (multi-asset / array — no real collection data)
+    if (collectionVariable.source_field_type === 'multi_asset' || collectionVariable.source_field_type === 'array') return;
+    if (collectionVariable.id === MULTI_ASSET_COLLECTION_ID || collectionVariable.id === ARRAY_FIELD_COLLECTION_ID) return;
     if (isLoadingLayerData) return;
 
     // Checkbox wrappers store sort config in settings.optionsSource, not in the collection variable

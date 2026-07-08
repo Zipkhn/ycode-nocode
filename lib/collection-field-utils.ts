@@ -16,6 +16,7 @@ import type {
   CollectionVariable,
   GlobalVariable,
   Layer,
+  ObjectSubField,
   VisibilityOperator,
 } from '@/types';
 import { ASSET_CATEGORIES, isAssetOfType } from '@/lib/asset-utils';
@@ -31,13 +32,14 @@ export function isDateFieldType(type: CollectionFieldType | string | null | unde
 }
 
 /** Field type category for grouping in the type selector */
-export type FieldTypeCategory = 'basic' | 'contact' | 'asset' | 'relation';
+export type FieldTypeCategory = 'basic' | 'contact' | 'asset' | 'relation' | 'advanced';
 
 export const FIELD_TYPE_CATEGORIES: { id: FieldTypeCategory; label: string }[] = [
   { id: 'basic', label: 'Basic' },
   { id: 'contact', label: 'Contact' },
   { id: 'asset', label: 'Assets' },
   { id: 'relation', label: 'Relations' },
+  { id: 'advanced', label: 'Advanced' },
 ];
 
 export const FIELD_TYPES = [
@@ -59,6 +61,8 @@ export const FIELD_TYPES = [
   { value: 'reference', label: 'Reference', icon: 'database', category: 'relation', hasDefault: false },
   { value: 'multi_reference', label: 'Multi-reference', icon: 'database', category: 'relation', hasDefault: false },
   { value: 'count', label: 'Count', icon: 'hash', category: 'relation', hasDefault: false },
+  { value: 'object', label: 'Object', icon: 'box', category: 'advanced', hasDefault: false },
+  { value: 'array', label: 'Array of objects', icon: 'layers', category: 'advanced', hasDefault: false },
 ] as const satisfies readonly { value: string; label: string; icon: string; category: FieldTypeCategory; hasDefault: boolean }[];
 
 export type FieldType = (typeof FIELD_TYPES)[number]['value'];
@@ -72,14 +76,46 @@ export const FIELD_TYPES_BY_CATEGORY = FIELD_TYPE_CATEGORIES.map(cat => ({
 /** Valid field type values for API validation (includes system types like 'status') */
 export const VALID_FIELD_TYPES: readonly string[] = [...FIELD_TYPES.map((t) => t.value), 'status'];
 
+/** Field types usable as sub-fields inside an object/array (primitives only, no nesting/refs). */
+export const OBJECT_SUBFIELD_TYPES: readonly CollectionFieldType[] = [
+  'text', 'number', 'boolean', 'date', 'date_only', 'color', 'option', 'email', 'phone', 'link', 'image',
+];
+
+export function isValidObjectSubFieldType(type: string): boolean {
+  return (OBJECT_SUBFIELD_TYPES as readonly string[]).includes(type);
+}
+
+/**
+ * Validate the `objectFields` sub-schema of an object/array field.
+ * Returns an error message, or null when valid.
+ */
+export function validateObjectFieldsSchema(objectFields: unknown): string | null {
+  if (!Array.isArray(objectFields) || objectFields.length === 0) {
+    return 'object/array fields require a non-empty data.objectFields array';
+  }
+  const seen = new Set<string>();
+  for (const sub of objectFields) {
+    if (!sub || typeof sub !== 'object') return 'Each sub-field must be an object';
+    const { key, name, type } = sub as Record<string, unknown>;
+    if (typeof key !== 'string' || !key.trim()) return 'Each sub-field needs a non-empty key';
+    if (typeof name !== 'string' || !name.trim()) return 'Each sub-field needs a non-empty name';
+    if (typeof type !== 'string' || !isValidObjectSubFieldType(type)) {
+      return `Sub-field "${key}" has an unsupported type (allowed: ${OBJECT_SUBFIELD_TYPES.join(', ')})`;
+    }
+    if (seen.has(key)) return `Duplicate sub-field key "${key}"`;
+    seen.add(key);
+  }
+  return null;
+}
+
 /** Check if a field type supports setting a default value */
 export function supportsDefaultValue(fieldType: CollectionFieldType | undefined): boolean {
   return FIELD_TYPES.some(t => t.value === fieldType && t.hasDefault);
 }
 
-/** Field types that can be displayed in variable selectors (excludes multi_reference) */
+/** Field types that can be displayed in variable selectors (excludes multi_reference + nested object/array) */
 export const DISPLAYABLE_FIELD_TYPES: CollectionFieldType[] = FIELD_TYPES
-  .filter(t => t.value !== 'multi_reference')
+  .filter(t => t.value !== 'multi_reference' && t.value !== 'object' && t.value !== 'array')
   .map(t => t.value) as CollectionFieldType[];
 
 /** Check if a string is a valid field type */
@@ -586,6 +622,144 @@ export function validateFieldValue(
 }
 
 // =============================================================================
+// Field Validation Engine (amélioration #2)
+// =============================================================================
+
+/** Structured result. `valid` = no errors; warnings never block. */
+export interface FieldValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/** Count decimal places of a numeric string (e.g. "12.50" → 2). */
+function decimalPlaces(trimmed: string): number {
+  const dot = trimmed.indexOf('.');
+  return dot === -1 ? 0 : trimmed.length - dot - 1;
+}
+
+/**
+ * Validate an object/array field's JSON value against its `data.objectFields` schema.
+ * Recurses one level via validateField on each primitive sub-field (no deeper nesting).
+ * `unique` is not enforced inside embedded structures.
+ */
+function validateStructuredValue(
+  field: Pick<CollectionField, 'type' | 'name' | 'data'>,
+  value: string,
+  label: string
+): FieldValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const subFields = field.data?.objectFields ?? [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return { valid: false, errors: [`${label} must be valid JSON`], warnings };
+  }
+
+  const validateOne = (obj: unknown, prefix: string) => {
+    if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) {
+      errors.push(`${prefix} must be an object`);
+      return;
+    }
+    const record = obj as Record<string, unknown>;
+    for (const sub of subFields) {
+      const raw = record[sub.key];
+      const str = raw == null ? '' : typeof raw === 'string' ? raw : String(raw);
+      const result = validateField(
+        { type: sub.type, name: `${prefix}.${sub.name}`, data: { validation: sub.validation } },
+        str
+      );
+      errors.push(...result.errors);
+      warnings.push(...result.warnings);
+    }
+  };
+
+  if (field.type === 'array') {
+    if (!Array.isArray(parsed)) {
+      return { valid: false, errors: [`${label} must be an array`], warnings };
+    }
+    parsed.forEach((el, i) => validateOne(el, `${label}[${i}]`));
+  } else {
+    validateOne(parsed, label);
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
+ * Validate a value against a field's type + its `data.validation` rules.
+ * Pure & synchronous — usable server-side (API v1) and in the UI.
+ * NOTE: `unique` is DB-backed and enforced at the write layer, not here.
+ */
+export function validateField(
+  field: Pick<CollectionField, 'type' | 'name' | 'data'>,
+  value: string
+): FieldValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const rules = field.data?.validation;
+  const label = field.name || 'Field';
+  const trimmed = (value ?? '').trim();
+
+  // required always blocks, regardless of constraint level
+  if (rules?.required && !trimmed) {
+    return { valid: false, errors: [`${label} is required`], warnings };
+  }
+  // empty optional value → nothing else to check
+  if (!trimmed) return { valid: true, errors, warnings };
+
+  // Nested object/array — validate the JSON structure + each sub-field (amélioration #1)
+  if (field.type === 'object' || field.type === 'array') {
+    return validateStructuredValue(field, value, label);
+  }
+
+  // type-intrinsic checks (email/phone) always error
+  const typeError = validateFieldValue(field.type, value);
+  if (typeError) errors.push(typeError);
+
+  if (!rules) return { valid: errors.length === 0, errors, warnings };
+
+  const push = (msg: string) =>
+    (rules.level === 'warning' ? warnings : errors).push(msg);
+
+  const isNumeric = field.type === 'number' || field.type === 'count';
+  if (isNumeric) {
+    const num = Number(trimmed);
+    if (Number.isNaN(num)) {
+      push(`${label} must be a number`);
+    } else {
+      if (rules.min !== undefined && num < rules.min) push(`${label} must be ≥ ${rules.min}`);
+      if (rules.max !== undefined && num > rules.max) push(`${label} must be ≤ ${rules.max}`);
+      if (rules.integer && !Number.isInteger(num)) push(`${label} must be a whole number`);
+      if (rules.precision !== undefined && decimalPlaces(trimmed) > rules.precision) {
+        push(`${label} must have at most ${rules.precision} decimal place(s)`);
+      }
+    }
+  }
+
+  if (rules.minLength !== undefined && trimmed.length < rules.minLength) {
+    push(`${label} must be at least ${rules.minLength} character(s)`);
+  }
+  if (rules.maxLength !== undefined && trimmed.length > rules.maxLength) {
+    push(`${label} must be at most ${rules.maxLength} character(s)`);
+  }
+  if (rules.regex) {
+    try {
+      if (!new RegExp(rules.regex, rules.regexFlags).test(value)) {
+        push(`${label} has an invalid format`);
+      }
+    } catch {
+      // invalid regex in config — ignore rather than crash validation
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+// =============================================================================
 // Display Field Utilities
 // =============================================================================
 
@@ -735,6 +909,8 @@ export interface BuildFieldGroupsConfig {
   collections: { id: string; name: string }[];
   /** Multi-asset collection context (when inside a multi-asset nested collection) */
   multiAssetContext?: { sourceFieldId: string; source: FieldSourceType } | null;
+  /** Array-field iteration context (when inside an array loop, amélioration #1) */
+  arrayContext?: { objectFields: ObjectSubField[]; arrayLayerId: string } | null;
   /** Site-wide global variables (always available regardless of layer context) */
   globals?: GlobalVariable[];
 }
@@ -744,7 +920,7 @@ export interface BuildFieldGroupsConfig {
  * Returns groups for collection layer fields and/or page collection fields.
  */
 export function buildFieldGroups(config: BuildFieldGroupsConfig): FieldGroup[] | undefined {
-  const { parentCollectionLayers, page, fieldsByCollectionId, collections, multiAssetContext, globals } = config;
+  const { parentCollectionLayers, page, fieldsByCollectionId, collections, multiAssetContext, arrayContext, globals } = config;
   const groups: FieldGroup[] = [];
   const addedCollectionIds = new Set<string>();
 
@@ -760,11 +936,23 @@ export function buildFieldGroups(config: BuildFieldGroupsConfig): FieldGroup[] |
     });
   }
 
+  // Add array-element sub-fields if inside an array-field loop (amélioration #1).
+  // Element values live only in the per-iteration item data, so use 'collection'
+  // source scoped to the array layer id (→ children encode collection_layer_id).
+  if (arrayContext && arrayContext.objectFields.length > 0) {
+    groups.push({
+      fields: objectSubFieldsToPseudoFields(arrayContext.objectFields),
+      label: 'Item fields',
+      source: 'collection',
+      layerId: arrayContext.arrayLayerId,
+    });
+  }
+
   // Add collection fields in order (closest first)
   for (let i = 0; i < parentCollectionLayers.length; i++) {
     const { layerId, collectionId } = parentCollectionLayers[i];
-    // Skip multi-asset virtual collection and duplicates
-    if (collectionId === MULTI_ASSET_COLLECTION_ID || addedCollectionIds.has(collectionId)) {
+    // Skip virtual collections (multi-asset / array) and duplicates
+    if (collectionId === MULTI_ASSET_COLLECTION_ID || collectionId === ARRAY_FIELD_COLLECTION_ID || addedCollectionIds.has(collectionId)) {
       continue;
     }
 
@@ -921,6 +1109,9 @@ export function getAssetFieldTypeLabel(fieldType: CollectionFieldType): string {
 /** Virtual collection ID marker for multi-asset collections */
 export const MULTI_ASSET_COLLECTION_ID = '__multi_asset__';
 
+/** Virtual collection ID marker for array-field iteration (amélioration #1) */
+export const ARRAY_FIELD_COLLECTION_ID = '__array_field__';
+
 /**
  * Whether a collection binding points to a real, selected source.
  * Field-sourced bindings (reference/multi-asset/inverse) require a `source_field_id`,
@@ -972,6 +1163,36 @@ export function isVirtualAssetField(fieldId: string): boolean {
 }
 
 /**
+ * Turn an array/object field's `objectFields` sub-schema into pseudo `CollectionField`s
+ * for the field picker (amélioration #1 array iteration). Each pseudo field's id/key is
+ * the sub-field `key`, so a child binds `field_id: subKey` resolved from the array
+ * layer's per-iteration data (`collection_layer_id`).
+ */
+export function objectSubFieldsToPseudoFields(subFields: ObjectSubField[]): CollectionField[] {
+  const base = {
+    collection_id: '__virtual__',
+    order: 0,
+    hidden: false,
+    is_computed: false,
+    is_published: true,
+    created_at: '',
+    updated_at: '',
+    deleted_at: null,
+    default: null,
+    reference_collection_id: null,
+    data: {},
+    fillable: false,
+  };
+  return subFields.map(sub => ({
+    ...base,
+    id: sub.key,
+    key: sub.key,
+    name: sub.name,
+    type: sub.type,
+  }));
+}
+
+/**
  * Checks recursively whether a reference field has at least one sub-field
  * matching the allowed types (directly or via nested references).
  */
@@ -992,6 +1213,14 @@ function referenceHasMatchingSubFields(
     if (f.type === 'reference') return referenceHasMatchingSubFields(f, allowedTypes, allFields, visited);
     return false;
   });
+}
+
+/** True when an object field has at least one sub-field of an allowed type (amélioration #1). */
+function objectHasMatchingSubFields(
+  field: CollectionField,
+  allowedTypes: CollectionFieldType[],
+): boolean {
+  return (field.data?.objectFields ?? []).some(sub => allowedTypes.includes(sub.type));
 }
 
 /**
@@ -1016,6 +1245,10 @@ export function filterFieldGroupsByType(
             return referenceHasMatchingSubFields(field, allowedTypes, options.allFields);
           }
           return true;
+        }
+        // Object fields (amélioration #1) appear as drill-in groups if any sub-field matches
+        if (field.type === 'object' && field.data?.objectFields?.length) {
+          return objectHasMatchingSubFields(field, allowedTypes);
         }
         if (!allowedTypes.includes(field.type)) return false;
         if (options?.excludeMultipleAsset && isMultipleAssetField(field)) return false;
@@ -1165,6 +1398,17 @@ export function buildFieldGroupsForLayer(
       source: (collectionVariable.source_field_source || 'collection') as FieldSourceType,
     }
     : null;
+
+  // Array-field loop context (amélioration #1): expose the array field's sub-fields
+  // as bindable "Item fields" scoped to the array layer.
+  const isArrayParent = collectionVariable?.source_field_type === 'array';
+  const arrayField = isArrayParent && collectionVariable.source_field_id
+    ? Object.values(fieldsByCollectionId).flat().find(f => f.id === collectionVariable.source_field_id)
+    : null;
+  const arrayContext = isArrayParent && arrayField?.data?.objectFields?.length && parentCollection
+    ? { objectFields: arrayField.data.objectFields, arrayLayerId: parentCollection.id }
+    : null;
+
   const parentCollectionLayers = parents
     .map(layer => ({ layerId: layer.id, collectionId: getCollectionVariable(layer)?.id }))
     .filter((item): item is ParentCollectionLayer => !!item.collectionId);
@@ -1175,6 +1419,7 @@ export function buildFieldGroupsForLayer(
     fieldsByCollectionId,
     collections,
     multiAssetContext,
+    arrayContext,
     globals,
   });
 }

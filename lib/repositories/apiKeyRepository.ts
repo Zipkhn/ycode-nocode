@@ -8,14 +8,24 @@ import { createHash, randomBytes } from 'crypto';
  * Keys are stored as SHA-256 hashes for security.
  */
 
+/** Permission scopes a key may hold. */
+export type ApiKeyScope = 'read' | 'write';
+
 export interface ApiKey {
   id: string;
   name: string;
   key_prefix: string;
+  scopes: ApiKeyScope[];
   last_used_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+/** Columns safe to expose (never the hash). */
+const PUBLIC_COLUMNS =
+  'id, name, key_prefix, scopes, last_used_at, expires_at, revoked_at, created_at, updated_at';
 
 export interface ApiKeyWithPlainKey extends ApiKey {
   api_key: string; // Only returned once during creation
@@ -48,7 +58,7 @@ export async function getAllApiKeys(): Promise<ApiKey[]> {
 
   const { data, error } = await client
     .from('api_keys')
-    .select('id, name, key_prefix, last_used_at, created_at, updated_at')
+    .select(PUBLIC_COLUMNS)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -62,7 +72,11 @@ export async function getAllApiKeys(): Promise<ApiKey[]> {
  * Create a new API key
  * Returns the key info including the plain key (shown only once)
  */
-export async function createApiKey(name: string): Promise<ApiKeyWithPlainKey> {
+export async function createApiKey(
+  name: string,
+  scopes: ApiKeyScope[] = ['read', 'write'],
+  expiresAt?: string | null
+): Promise<ApiKeyWithPlainKey> {
   const client = await getSupabaseAdmin();
 
   if (!client) {
@@ -80,10 +94,12 @@ export async function createApiKey(name: string): Promise<ApiKeyWithPlainKey> {
       name,
       key_hash: keyHash,
       key_prefix: keyPrefix,
+      scopes: scopes.length > 0 ? scopes : ['read'],
+      expires_at: expiresAt || null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .select('id, name, key_prefix, last_used_at, created_at, updated_at')
+    .select(PUBLIC_COLUMNS)
     .single();
 
   if (error) {
@@ -133,11 +149,19 @@ export async function validateApiKey(apiKey: string): Promise<ApiKey | null> {
   // Find the key by hash
   const { data, error } = await client
     .from('api_keys')
-    .select('id, name, key_prefix, last_used_at, created_at, updated_at')
+    .select(PUBLIC_COLUMNS)
     .eq('key_hash', keyHash)
     .single();
 
   if (error || !data) {
+    return null;
+  }
+
+  // Reject revoked or expired keys (sécu #2) — treated as invalid.
+  if (data.revoked_at) {
+    return null;
+  }
+  if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {
     return null;
   }
 
@@ -168,12 +192,37 @@ export async function getApiKeyById(id: string): Promise<ApiKey | null> {
 
   const { data, error } = await client
     .from('api_keys')
-    .select('id, name, key_prefix, last_used_at, created_at, updated_at')
+    .select(PUBLIC_COLUMNS)
     .eq('id', id)
     .single();
 
   if (error && error.code !== 'PGRST116') {
     throw new Error(`Failed to fetch API key: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Revoke an API key (sécu #2). Sets `revoked_at`; the row is kept for audit.
+ * A revoked key is rejected by validateApiKey.
+ */
+export async function revokeApiKey(id: string): Promise<ApiKey | null> {
+  const client = await getSupabaseAdmin();
+
+  if (!client) {
+    throw new Error('Supabase client not configured');
+  }
+
+  const { data, error } = await client
+    .from('api_keys')
+    .update({ revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select(PUBLIC_COLUMNS)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to revoke API key: ${error.message}`);
   }
 
   return data;

@@ -6,6 +6,7 @@ import { getItemsWithValues, createItem, getMaxIdValue } from '@/lib/repositorie
 import { setValues } from '@/lib/repositories/collectionItemValueRepository';
 import { invalidateForCollectionChange } from '@/lib/services/cacheService';
 import { transformItemToPublicWithRefs, parseFieldProjections } from '../../../reference-resolver';
+import { validateItemWrite, bodyTooLarge, serializeWriteValue } from '@/lib/collection-item-write-validation';
 
 // Disable caching for this route
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,7 @@ export async function GET(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {
@@ -203,7 +204,7 @@ export async function POST(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {
@@ -223,6 +224,14 @@ export async function POST(
       );
     }
 
+    // Reject oversized payloads early (finding sécu #4)
+    if (bodyTooLarge(request)) {
+      return NextResponse.json(
+        { error: 'Request body too large', code: 'PAYLOAD_TOO_LARGE' },
+        { status: 413 }
+      );
+    }
+
     // Parse request body - field values directly (no fieldData wrapper)
     const body = await request.json();
 
@@ -236,7 +245,7 @@ export async function POST(
     // Get published fields for mapping slugs to IDs (exclude computed like Status)
     const fields = await getFieldsByCollectionId(collection_id, true, { excludeComputed: true });
     const fieldSlugToId: Record<string, string> = {};
-    
+
     // Identify protected fields (cannot be set by user)
     const protectedFieldKeys = ['id', 'created_at', 'updated_at'];
     const protectedFieldIds = new Set(
@@ -254,8 +263,20 @@ export async function POST(
       const slug = key.toLowerCase().replace(/\s+/g, '-');
       const fieldId = fieldSlugToId[slug];
       if (fieldId && !protectedFieldIds.has(fieldId)) {
-        valuesToSet[fieldId] = value as string | null;
+        const field = fields.find(f => f.id === fieldId);
+        valuesToSet[fieldId] = field ? serializeWriteValue(field.type, value) : (value as string | null);
       }
+    }
+
+    // Server-side validation (amélioration #2) — enforce required on all fields for create
+    const validationErrors = await validateItemWrite(collection_id, fields, valuesToSet, {
+      requiredCheck: 'all',
+    });
+    if (validationErrors.length > 0) {
+      return NextResponse.json(
+        { error: 'Validation failed', code: 'VALIDATION_ERROR', details: validationErrors },
+        { status: 422 }
+      );
     }
 
     // Auto-generate ID field (always, user cannot override)

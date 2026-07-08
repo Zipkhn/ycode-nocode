@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { collectionsApi } from '@/lib/api';
-import { MULTI_ASSET_COLLECTION_ID } from '@/lib/collection-field-utils';
+import { MULTI_ASSET_COLLECTION_ID, ARRAY_FIELD_COLLECTION_ID } from '@/lib/collection-field-utils';
 import type { CollectionItemWithValues, CollectionPaginationMeta } from '@/types';
 
 /**
@@ -182,8 +182,8 @@ export const useCollectionLayerStore = create<CollectionLayerStore>((set, get) =
   ) => {
     const { loading, layerConfig } = get();
 
-    // Skip for virtual collections (multi-asset)
-    if (collectionId === MULTI_ASSET_COLLECTION_ID) {
+    // Skip for virtual collections (multi-asset / array)
+    if (collectionId === MULTI_ASSET_COLLECTION_ID || collectionId === ARRAY_FIELD_COLLECTION_ID) {
       return;
     }
 

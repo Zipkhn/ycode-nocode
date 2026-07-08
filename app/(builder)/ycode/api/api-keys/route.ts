@@ -49,7 +49,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name } = body;
+    const { name, scopes, expires_at } = body;
 
     if (!name || typeof name !== 'string' || name.trim() === '') {
       return noCache(
@@ -58,7 +58,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const key = await createApiKey(name.trim());
+    // Optional scopes: subset of ['read','write'], defaults to both.
+    const allowedScopes = ['read', 'write'] as const;
+    const parsedScopes = Array.isArray(scopes)
+      ? allowedScopes.filter((s) => scopes.includes(s))
+      : undefined;
+
+    // Optional expiry: ISO date string in the future.
+    let expiresAt: string | null = null;
+    if (typeof expires_at === 'string' && expires_at) {
+      const ts = new Date(expires_at).getTime();
+      if (Number.isNaN(ts)) {
+        return noCache({ error: 'Invalid expires_at (expected ISO date)' }, 400);
+      }
+      if (ts <= Date.now()) {
+        return noCache({ error: 'expires_at must be in the future' }, 400);
+      }
+      expiresAt = new Date(ts).toISOString();
+    }
+
+    const key = await createApiKey(name.trim(), parsedScopes, expiresAt);
 
     return noCache({
       data: key,

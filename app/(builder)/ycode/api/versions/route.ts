@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Validate entity type
-    if (!['page_layers', 'component', 'layer_style'].includes(entityType)) {
+    if (!['page_layers', 'component', 'layer_style', 'collection_item'].includes(entityType)) {
       return NextResponse.json(
         { error: 'Invalid entityType' },
         { status: 400 }
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate entity type
-    if (!['page_layers', 'component', 'layer_style'].includes(entity_type)) {
+    if (!['page_layers', 'component', 'layer_style', 'collection_item'].includes(entity_type)) {
       return NextResponse.json(
         { error: 'Invalid entity_type' },
         { status: 400 }

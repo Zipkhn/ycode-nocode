@@ -8,6 +8,7 @@ import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { invalidateForCollectionChange } from '@/lib/services/cacheService';
 import type { CollectionField, CollectionItemWithValues } from '@/types';
 import { transformItemToPublicWithRefs, parseFieldProjections } from '../../../../reference-resolver';
+import { validateItemWrite, bodyTooLarge, serializeWriteValue } from '@/lib/collection-item-write-validation';
 
 /**
  * Pull the current slug value off an item before mutation/delete, so we can
@@ -40,7 +41,7 @@ export async function GET(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {
@@ -107,7 +108,7 @@ export async function PUT(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {
@@ -133,6 +134,14 @@ export async function PUT(
       return NextResponse.json(
         { error: 'Item not found', code: 'NOT_FOUND' },
         { status: 404 }
+      );
+    }
+
+    // Reject oversized payloads early (finding sécu #4)
+    if (bodyTooLarge(request)) {
+      return NextResponse.json(
+        { error: 'Request body too large', code: 'PAYLOAD_TOO_LARGE' },
+        { status: 413 }
       );
     }
 
@@ -163,21 +172,34 @@ export async function PUT(
 
     // For PUT, we clear existing values and set new ones (except protected fields)
     const valuesToSet: Record<string, string | null> = {};
-    
+
     // First, set all NON-protected fields to null (to clear them)
     for (const field of fields) {
       if (!protectedFieldIds.has(field.id)) {
         valuesToSet[field.id] = null;
       }
     }
-    
+
     // Then set the provided values (case-insensitive matching, exclude protected fields)
     for (const [key, value] of Object.entries(body)) {
       const slug = key.toLowerCase().replace(/\s+/g, '-');
       const fieldId = fieldSlugToId[slug];
       if (fieldId && !protectedFieldIds.has(fieldId)) {
-        valuesToSet[fieldId] = value as string | null;
+        const field = fields.find(f => f.id === fieldId);
+        valuesToSet[fieldId] = field ? serializeWriteValue(field.type, value) : (value as string | null);
       }
+    }
+
+    // Server-side validation (amélioration #2) — full replace enforces required on all fields
+    const validationErrors = await validateItemWrite(collection_id, fields, valuesToSet, {
+      requiredCheck: 'all',
+      excludeItemId: item_id,
+    });
+    if (validationErrors.length > 0) {
+      return NextResponse.json(
+        { error: 'Validation failed', code: 'VALIDATION_ERROR', details: validationErrors },
+        { status: 422 }
+      );
     }
 
     // Auto-update updated_at timestamp if field exists
@@ -252,7 +274,7 @@ export async function PATCH(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {
@@ -278,6 +300,14 @@ export async function PATCH(
       return NextResponse.json(
         { error: 'Item not found', code: 'NOT_FOUND' },
         { status: 404 }
+      );
+    }
+
+    // Reject oversized payloads early (finding sécu #4)
+    if (bodyTooLarge(request)) {
+      return NextResponse.json(
+        { error: 'Request body too large', code: 'PAYLOAD_TOO_LARGE' },
+        { status: 413 }
       );
     }
 
@@ -312,8 +342,21 @@ export async function PATCH(
       const slug = key.toLowerCase().replace(/\s+/g, '-');
       const fieldId = fieldSlugToId[slug];
       if (fieldId && !protectedFieldIds.has(fieldId)) {
-        valuesToSet[fieldId] = value as string | null;
+        const field = fields.find(f => f.id === fieldId);
+        valuesToSet[fieldId] = field ? serializeWriteValue(field.type, value) : (value as string | null);
       }
+    }
+
+    // Server-side validation (amélioration #2) — only validate provided fields (partial update)
+    const validationErrors = await validateItemWrite(collection_id, fields, valuesToSet, {
+      requiredCheck: 'present',
+      excludeItemId: item_id,
+    });
+    if (validationErrors.length > 0) {
+      return NextResponse.json(
+        { error: 'Validation failed', code: 'VALIDATION_ERROR', details: validationErrors },
+        { status: 422 }
+      );
     }
 
     // Auto-update updated_at timestamp if field exists
@@ -383,7 +426,7 @@ export async function DELETE(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {

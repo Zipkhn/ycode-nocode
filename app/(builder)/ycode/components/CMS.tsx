@@ -2023,6 +2023,27 @@ const CMS = React.memo(function CMS() {
                         );
                       }
 
+                      // Object/array fields (amélioration #1) - show a compact summary,
+                      // never the raw nested value (React can't render objects as children).
+                      if (field.type === 'object' || field.type === 'array') {
+                        let parsed: unknown = value;
+                        if (typeof value === 'string') {
+                          try { parsed = JSON.parse(value); } catch { parsed = null; }
+                        }
+                        const summary = field.type === 'array'
+                          ? `${Array.isArray(parsed) ? parsed.length : 0} item${(Array.isArray(parsed) ? parsed.length : 0) === 1 ? '' : 's'}`
+                          : (parsed && typeof parsed === 'object' ? 'Object' : '-');
+                        return (
+                          <td
+                            key={field.id}
+                            className="px-4 py-5 text-muted-foreground"
+                            onClick={() => handleEditItem(item)}
+                          >
+                            <span className="line-clamp-1 truncate">{summary}</span>
+                          </td>
+                        );
+                      }
+
                       return (
                         <td
                           key={field.id}
@@ -2030,7 +2051,7 @@ const CMS = React.memo(function CMS() {
                           onClick={() => handleEditItem(item)}
                         >
                           <span className="line-clamp-1 truncate">
-                            {value || '-'}
+                            {value !== null && typeof value === 'object' ? JSON.stringify(value) : (value || '-')}
                           </span>
                         </td>
                       );

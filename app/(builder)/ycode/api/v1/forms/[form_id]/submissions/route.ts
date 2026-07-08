@@ -45,7 +45,7 @@ export async function GET(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {
@@ -127,7 +127,7 @@ export async function POST(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {

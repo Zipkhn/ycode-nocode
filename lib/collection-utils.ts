@@ -115,6 +115,22 @@ export function castValue(value: string | null, type: CollectionFieldType): any 
         return value;
       }
 
+    case 'object':
+      // Nested object (amélioration #1) — parse JSON, empty object on failure
+      try {
+        return JSON.parse(value);
+      } catch {
+        return {};
+      }
+
+    case 'array':
+      // Array of objects (amélioration #1) — parse JSON, empty array on failure
+      try {
+        return JSON.parse(value);
+      } catch {
+        return [];
+      }
+
     case 'link':
       // Keep as raw JSON string — parsed downstream by parseCollectionLinkValue
       return value;
@@ -276,6 +292,39 @@ export function getInverseReferenceFields(
  * @param allFields - Map of collection_id → fields (from collections store)
  * @returns Enhanced values with resolved reference paths
  */
+/**
+ * Flatten `object` field values into dot-path keys for nested binding (amélioration #1).
+ * For each object field, parses its JSON value and emits `${fieldId}.${subKey}` for
+ * every sub-field so the existing flat-lookup resolvers (canvas + publish) can bind
+ * `objectField.subKey`. Pure-local (no I/O). Handles both string and already-parsed values.
+ */
+export function flattenObjectFields(
+  itemValues: Record<string, unknown>,
+  fields: import('@/types').CollectionField[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const field of fields) {
+    if (field.type !== 'object' || !field.data?.objectFields?.length) continue;
+    const raw = itemValues[field.id];
+    if (raw === undefined || raw === null || raw === '') continue;
+    let parsed: unknown;
+    try {
+      parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch {
+      continue;
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+    const record = parsed as Record<string, unknown>;
+    for (const sub of field.data.objectFields) {
+      const v = record[sub.key];
+      if (v === undefined || v === null) continue;
+      out[`${field.id}.${sub.key}`] =
+        typeof v === 'string' ? v : typeof v === 'object' ? JSON.stringify(v) : String(v);
+    }
+  }
+  return out;
+}
+
 export function resolveReferenceFieldsSync(
   itemValues: Record<string, string>,
   fields: import('@/types').CollectionField[],
@@ -285,6 +334,9 @@ export function resolveReferenceFieldsSync(
   translateValues?: (itemId: string, values: Record<string, string>, fields: import('@/types').CollectionField[]) => Record<string, string>
 ): Record<string, string> {
   const enhancedValues = { ...itemValues };
+
+  // amélioration #1 — flatten object sub-fields into `objId.subKey` keys for binding
+  Object.assign(enhancedValues, flattenObjectFields(itemValues, fields));
 
   // Find reference fields (single reference only)
   const referenceFields = fields.filter(

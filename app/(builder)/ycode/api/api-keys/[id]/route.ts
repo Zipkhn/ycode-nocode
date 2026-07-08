@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getApiKeyById, deleteApiKey } from '@/lib/repositories/apiKeyRepository';
+import { getApiKeyById, deleteApiKey, revokeApiKey } from '@/lib/repositories/apiKeyRepository';
 import { noCache } from '@/lib/api-response';
 
 // Disable caching for this route
@@ -32,6 +32,39 @@ export async function GET(
     console.error('Error fetching API key:', error);
     return noCache(
       { error: error instanceof Error ? error.message : 'Failed to fetch API key' },
+      500
+    );
+  }
+}
+
+/**
+ * PATCH /ycode/api/api-keys/[id]
+ * Revoke an API key (sets revoked_at; row kept for audit).
+ * Body: { action: 'revoke' }
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json().catch(() => ({}));
+
+    if (body?.action !== 'revoke') {
+      return noCache({ error: "Unsupported action. Use { action: 'revoke' }" }, 400);
+    }
+
+    const existing = await getApiKeyById(id);
+    if (!existing) {
+      return noCache({ error: 'API key not found' }, 404);
+    }
+
+    const revoked = await revokeApiKey(id);
+    return noCache({ data: revoked });
+  } catch (error) {
+    console.error('Error revoking API key:', error);
+    return noCache(
+      { error: error instanceof Error ? error.message : 'Failed to revoke API key' },
       500
     );
   }

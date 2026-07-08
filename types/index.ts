@@ -1176,7 +1176,7 @@ export interface ActivityNotification {
 }
 
 // Collection Types (EAV Architecture)
-export type CollectionFieldType = 'text' | 'number' | 'boolean' | 'date' | 'date_only' | 'color' | 'reference' | 'multi_reference' | 'rich_text' | 'image' | 'audio' | 'video' | 'document' | 'link' | 'email' | 'phone' | 'option' | 'count' | 'status';
+export type CollectionFieldType = 'text' | 'number' | 'boolean' | 'date' | 'date_only' | 'color' | 'reference' | 'multi_reference' | 'rich_text' | 'image' | 'audio' | 'video' | 'document' | 'link' | 'email' | 'phone' | 'option' | 'count' | 'status' | 'object' | 'array';
 export type CollectionSortDirection = 'asc' | 'desc' | 'manual';
 
 export interface CollectionSorting {
@@ -1211,12 +1211,55 @@ export interface UpdateCollectionData {
   order?: number;
 }
 
+/**
+ * Per-field validation rules (amélioration #2). Stored in the `data` jsonb, no migration.
+ * `unique` is DB-backed and enforced at the write layer (API v1), not by the sync engine.
+ * `min`/`max` apply to numeric value (number/count); `minLength`/`maxLength` to string length.
+ */
+export interface FieldValidation {
+  required?: boolean;
+  unique?: boolean;
+  min?: number;
+  max?: number;
+  minLength?: number;
+  maxLength?: number;
+  regex?: string;
+  regexFlags?: string;
+  integer?: boolean;
+  precision?: number; // max decimal places (numeric)
+  level?: 'error' | 'warning'; // constraint severity; default 'error'. `required` always errors.
+}
+
+/**
+ * One sub-field of an `object`/`array` field (amélioration #1, nested).
+ * `type` is restricted to primitives (see OBJECT_SUBFIELD_TYPES) — no nesting/refs in v1.
+ */
+export interface ObjectSubField {
+  key: string; // stable key inside the stored JSON
+  name: string; // display label
+  type: CollectionFieldType;
+  validation?: FieldValidation;
+}
+
+/**
+ * A named, reusable object type (amélioration #1 registry). Defined once site-wide
+ * and linked from N object/array fields by id. Editing it propagates to linked fields.
+ */
+export interface ObjectType {
+  id: string;
+  name: string;
+  fields: ObjectSubField[];
+}
+
 /** Field-specific settings stored in the data column */
 export interface CollectionFieldData {
   multiple?: boolean; // For asset fields - allow multiple files
   options?: { id: string; name: string }[]; // For option fields - selectable values
   // For count fields: which child collection / reference field to count back from
   count?: { collectionId: string; fieldId: string };
+  validation?: FieldValidation; // amélioration #2 — per-field validation rules
+  objectFields?: ObjectSubField[]; // amélioration #1 — sub-field schema for object/array types
+  objectTypeId?: string; // amélioration #1 — link to a named reusable ObjectType (objectFields is a synced copy)
 }
 
 export interface CreateCollectionFieldData {
@@ -1557,7 +1600,7 @@ export interface CollectionVariable {
   limit?: number; // Maximum number of items to show (deprecated when pagination enabled)
   offset?: number; // Number of items to skip (deprecated when pagination enabled)
   source_field_id?: string; // Field ID from parent item (reference or multi-asset field), or field ID on child collection (inverse_reference)
-  source_field_type?: 'reference' | 'multi_reference' | 'multi_asset' | 'inverse_reference'; // Type of source field
+  source_field_type?: 'reference' | 'multi_reference' | 'multi_asset' | 'inverse_reference' | 'array'; // Type of source field ('array' = loop over an embedded array-of-objects field, amélioration #1)
   source_field_source?: 'page' | 'collection'; // Source of the field (page data or collection layer)
   filters?: ConditionalVisibility; // Filter conditions to apply to collection items
   pagination?: CollectionPaginationConfig; // Pagination settings for collection
@@ -1757,7 +1800,7 @@ export interface HreflangEntry {
 }
 
 // Version Types (for undo/redo functionality)
-export type VersionEntityType = 'page_layers' | 'component' | 'layer_style';
+export type VersionEntityType = 'page_layers' | 'component' | 'layer_style' | 'collection_item';
 export type VersionActionType = 'create' | 'update' | 'delete';
 
 export interface VersionMetadata {

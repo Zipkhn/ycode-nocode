@@ -187,6 +187,13 @@ export async function resolveItemReferences(
         console.error(`Failed to resolve multi-reference field ${field.name}:`, error);
         result[field.name] = [];
       }
+    } else if (field.type === 'object' || field.type === 'array') {
+      // Nested object/array (amélioration #1) - emit real JSON, not the stored string
+      try {
+        result[field.name] = JSON.parse(value);
+      } catch {
+        result[field.name] = field.type === 'array' ? [] : null;
+      }
     } else {
       // Regular field - just copy the value
       result[field.name] = value;

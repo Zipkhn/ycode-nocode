@@ -108,7 +108,7 @@ import { defaultPaginationCountDoc, defaultPaginationInfoDoc } from '@/lib/pagin
 import { createTextComponentVariableValue } from '@/lib/variable-utils';
 import { getRichTextValue, extractPlainTextFromTiptap, getSoleCmsFieldBinding } from '@/lib/tiptap-utils';
 import { DEFAULT_TEXT_STYLES, getTextStyle, getTiptapTextContent } from '@/lib/text-format-utils';
-import { buildFieldGroupsForLayer, getFieldIcon, hasBoundCollectionSource, isMultipleAssetField, MULTI_ASSET_COLLECTION_ID, SIMPLE_TEXT_FIELD_TYPES } from '@/lib/collection-field-utils';
+import { buildFieldGroupsForLayer, getFieldIcon, hasBoundCollectionSource, isMultipleAssetField, MULTI_ASSET_COLLECTION_ID, ARRAY_FIELD_COLLECTION_ID, SIMPLE_TEXT_FIELD_TYPES } from '@/lib/collection-field-utils';
 import { getInverseReferenceFields } from '@/lib/collection-utils';
 
 // 7. Types
@@ -1160,6 +1160,20 @@ const RightSidebar = React.memo(function RightSidebar({
           updates.children = pruneTextDescendants(selectedLayer.children);
         }
         handleLayerUpdate(selectedLayerId, updates);
+      } else if (selectedField && selectedField.type === 'array' && selectedField.data?.objectFields?.length) {
+        // Array field loop source (amélioration #1)
+        handleLayerUpdate(selectedLayerId, {
+          variables: {
+            ...selectedLayer?.variables,
+            collection: {
+              ...currentCollectionVariable,
+              id: ARRAY_FIELD_COLLECTION_ID,
+              source_field_id: value,
+              source_field_type: 'array',
+              source_field_source: 'collection',
+            }
+          }
+        });
       } else if (selectedField?.reference_collection_id) {
         handleLayerUpdate(selectedLayerId, {
           variables: {
@@ -1199,6 +1213,18 @@ const RightSidebar = React.memo(function RightSidebar({
           id: MULTI_ASSET_COLLECTION_ID,
           source_field_id: fieldId,
           source_field_type: 'multi_asset',
+          source_field_source: 'page',
+        };
+      }
+    } else if (value.startsWith('array:')) {
+      const fieldId = value.replace('array:', '');
+      const selectedField = dynamicPageArrayFields.find(f => f.id === fieldId);
+      if (selectedField) {
+        newCollectionVar = {
+          ...currentCollectionVariable,
+          id: ARRAY_FIELD_COLLECTION_ID,
+          source_field_id: fieldId,
+          source_field_type: 'array',
           source_field_source: 'page',
         };
       }
@@ -1264,6 +1290,9 @@ const RightSidebar = React.memo(function RightSidebar({
     if (collectionVariable.source_field_id) {
       if (collectionVariable.source_field_type === 'multi_asset') {
         return `multi_asset:${collectionVariable.source_field_id}`;
+      }
+      if (collectionVariable.source_field_type === 'array') {
+        return `array:${collectionVariable.source_field_id}`;
       }
       if (collectionVariable.source_field_type === 'inverse_reference') {
         return `inverse:${collectionVariable.source_field_id}:${collectionVariable.id}`;
@@ -1702,8 +1731,8 @@ const RightSidebar = React.memo(function RightSidebar({
     const collectionVariable = parentCollectionLayer ? getCollectionVariable(parentCollectionLayer) : null;
     let collectionId = collectionVariable?.id;
 
-    // Skip virtual collections (multi-asset)
-    if (collectionId === MULTI_ASSET_COLLECTION_ID) {
+    // Skip virtual collections (multi-asset / array)
+    if (collectionId === MULTI_ASSET_COLLECTION_ID || collectionId === ARRAY_FIELD_COLLECTION_ID) {
       collectionId = undefined;
     }
 
@@ -1730,8 +1759,8 @@ const RightSidebar = React.memo(function RightSidebar({
     if (!collectionVariable) return [];
 
     const collectionId = collectionVariable?.id;
-    // Skip virtual collections (multi-asset)
-    if (!collectionId || collectionId === MULTI_ASSET_COLLECTION_ID) return [];
+    // Skip virtual collections (multi-asset / array)
+    if (!collectionId || collectionId === MULTI_ASSET_COLLECTION_ID || collectionId === ARRAY_FIELD_COLLECTION_ID) return [];
     return fields[collectionId] || [];
   }, [selectedLayer, fields]);
 
@@ -1810,13 +1839,26 @@ const RightSidebar = React.memo(function RightSidebar({
     return collectionFields.filter(f => isMultipleAssetField(f));
   }, [editingComponentId, currentPage, fields]);
 
+  // Get array fields (amélioration #1) usable as a loop source, from parent + dynamic page context
+  const parentArrayFields = useMemo(() => {
+    return parentCollectionFields.filter(f => f.type === 'array' && !!f.data?.objectFields?.length);
+  }, [parentCollectionFields]);
+
+  const dynamicPageArrayFields = useMemo(() => {
+    if (editingComponentId || !currentPage?.is_dynamic) return [];
+    const collectionId = currentPage.settings?.cms?.collection_id;
+    if (!collectionId) return [];
+    const collectionFields = fields[collectionId] || [];
+    return collectionFields.filter(f => f.type === 'array' && !!f.data?.objectFields?.length);
+  }, [editingComponentId, currentPage, fields]);
+
   // Inverse reference fields: fields in OTHER collections that reference the parent collection
   // E.g., if parent is "Authors" and "Books" has a reference field "author" → Authors,
   // show "Books (via author)" as a connected relation source option
   const parentInverseReferenceFields = useMemo(() => {
     const collectionVariable = parentCollectionLayer ? getCollectionVariable(parentCollectionLayer) : null;
     let collectionId = collectionVariable?.id;
-    if (collectionId === MULTI_ASSET_COLLECTION_ID) collectionId = undefined;
+    if (collectionId === MULTI_ASSET_COLLECTION_ID || collectionId === ARRAY_FIELD_COLLECTION_ID) collectionId = undefined;
     if (!collectionId && !editingComponentId && currentPage?.is_dynamic) {
       collectionId = currentPage.settings?.cms?.collection_id || undefined;
     }
@@ -2567,6 +2609,19 @@ const RightSidebar = React.memo(function RightSidebar({
                                 ))}
                               </SelectGroup>
                             )}
+                            {parentArrayFields.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Array fields</SelectLabel>
+                                {parentArrayFields.map((field) => (
+                                  <SelectItem key={field.id} value={field.id}>
+                                    <span className="flex items-center gap-2">
+                                      <Icon name={getFieldIcon(field.type)} className="size-3 text-muted-foreground shrink-0" />
+                                      {field.name}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
                             {parentReferenceFields.length > 0 && (
                               <SelectGroup>
                                 <SelectLabel>Reference fields</SelectLabel>
@@ -2617,6 +2672,19 @@ const RightSidebar = React.memo(function RightSidebar({
                                 <SelectLabel>Multi-asset fields</SelectLabel>
                                 {dynamicPageMultiAssetFields.map((field) => (
                                   <SelectItem key={field.id} value={`multi_asset:${field.id}`}>
+                                    <span className="flex items-center gap-2">
+                                      <Icon name={getFieldIcon(field.type)} className="size-3 text-muted-foreground shrink-0" />
+                                      {field.name}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
+                            )}
+                            {dynamicPageArrayFields.length > 0 && (
+                              <SelectGroup>
+                                <SelectLabel>Array fields</SelectLabel>
+                                {dynamicPageArrayFields.map((field) => (
+                                  <SelectItem key={field.id} value={`array:${field.id}`}>
                                     <span className="flex items-center gap-2">
                                       <Icon name={getFieldIcon(field.type)} className="size-3 text-muted-foreground shrink-0" />
                                       {field.name}

@@ -4,6 +4,7 @@ import { enrichItemsWithCountValues } from '@/lib/repositories/collectionCountRe
 import { getCollectionById } from '@/lib/repositories/collectionRepository';
 import { clearAllCache } from '@/lib/services/cacheService';
 import { setValuesByFieldName } from '@/lib/repositories/collectionItemValueRepository';
+import { recordItemVersion } from '@/lib/services/collectionItemVersionService';
 import { getFieldsByCollectionId } from '@/lib/repositories/collectionFieldRepository';
 import { getAssetsByIds } from '@/lib/repositories/assetRepository';
 import { findStatusFieldId, isAssetFieldType, isMultipleAssetField } from '@/lib/collection-field-utils';
@@ -283,6 +284,8 @@ export async function POST(
     if (itemWithValues) {
       await enrichSingleItemWithStatus(itemWithValues, id);
     }
+
+    await recordItemVersion(item.id, 'create');
 
     return noCache(
       { data: itemWithValues },

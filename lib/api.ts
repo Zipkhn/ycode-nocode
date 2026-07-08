@@ -824,6 +824,20 @@ export const settingsApi = {
 };
 
 // Cache API - Manage Next.js cache
+export const versionsApi = {
+  async getHistory(entityType: string, entityId: string): Promise<ApiResponse<import('@/types').Version[]>> {
+    return apiRequest<import('@/types').Version[]>(
+      `/ycode/api/versions?entityType=${entityType}&entityId=${entityId}`
+    );
+  },
+
+  async restore(versionId: string): Promise<ApiResponse<CollectionItemWithValues>> {
+    return apiRequest<CollectionItemWithValues>(`/ycode/api/versions/${versionId}/restore`, {
+      method: 'POST',
+    });
+  },
+};
+
 export const cacheApi = {
   /**
    * Invalidate all Next.js cache

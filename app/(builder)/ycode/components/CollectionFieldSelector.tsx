@@ -169,6 +169,69 @@ function ReferenceFieldGroup({
 }
 
 /**
+ * Object field group (submenu) — surfaces an object field's sub-fields as bindable
+ * leaves (amélioration #1). Selecting one produces relationships `[...path, subKey]`,
+ * i.e. dot-path `objectFieldId.subKey` resolved by the flattened value map.
+ */
+function ObjectFieldGroup({
+  field,
+  onSelect,
+  relationshipPath,
+  source,
+  layerId,
+  depth = 0,
+  allowedTypes,
+}: {
+  field: CollectionField;
+  onSelect: (fieldId: string, relationshipPath: string[], source?: FieldSourceType, layerId?: string) => void;
+  relationshipPath: string[];
+  source?: FieldSourceType;
+  layerId?: string;
+  depth?: number;
+  allowedTypes?: CollectionFieldType[];
+}) {
+  const subFields = (field.data?.objectFields ?? []).filter(sub =>
+    !allowedTypes || allowedTypes.length === 0 || allowedTypes.includes(sub.type)
+  );
+  if (subFields.length === 0) return null;
+
+  return (
+    <DropdownMenuSub>
+      <DropdownMenuSubTrigger
+        className="gap-2"
+        style={{ paddingLeft: `${8 + depth * 16}px` }}
+      >
+        <Icon name="box" className="size-3 text-muted-foreground shrink-0" />
+        <span className="truncate">{field.name}</span>
+      </DropdownMenuSubTrigger>
+
+      <DropdownMenuSubContent className="min-w-45">
+        <DropdownMenuLabel className="text-xs text-foreground/80 flex items-center justify-between gap-2">
+          <span>{field.name}</span>
+          <DropdownMenuShortcut className="tracking-normal">Object</DropdownMenuShortcut>
+        </DropdownMenuLabel>
+        {subFields.map(sub => (
+          <DropdownMenuItem
+            key={sub.key}
+            className="gap-2"
+            onClick={() => {
+              if (relationshipPath.length > 0) {
+                onSelect(relationshipPath[0], [...relationshipPath.slice(1), field.id, sub.key], source, layerId);
+              } else {
+                onSelect(field.id, [sub.key], source, layerId);
+              }
+            }}
+          >
+            <Icon name={getFieldIcon(sub.type)} className="size-3 text-muted-foreground shrink-0" />
+            <span className="truncate">{sub.name}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+/**
  * Inner recursive component
  */
 function CollectionFieldSelectorInner({
@@ -196,6 +259,22 @@ function CollectionFieldSelectorInner({
               field={field}
               allFields={allFields}
               collections={collections}
+              onSelect={onSelect}
+              relationshipPath={relationshipPath}
+              source={source}
+              layerId={layerId}
+              depth={depth}
+              allowedTypes={allowedTypes}
+            />
+          );
+        }
+
+        // Object fields become drill-in groups exposing their sub-fields (amélioration #1)
+        if (field.type === 'object' && field.data?.objectFields?.length) {
+          return (
+            <ObjectFieldGroup
+              key={field.id}
+              field={field}
               onSelect={onSelect}
               relationshipPath={relationshipPath}
               source={source}

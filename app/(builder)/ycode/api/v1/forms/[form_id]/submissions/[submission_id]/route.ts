@@ -32,7 +32,7 @@ export async function GET(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {
@@ -90,7 +90,7 @@ export async function PATCH(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {
@@ -158,7 +158,7 @@ export async function DELETE(
   // Validate API key
   const authResult = await validateApiKey(request);
   if (!authResult.valid) {
-    return unauthorizedResponse(authResult.error!);
+    return unauthorizedResponse(authResult.error!, authResult.status);
   }
 
   try {

@@ -679,6 +679,8 @@ export function getFieldTypeLabel(type: CollectionFieldType): string {
     option: 'Option',
     count: 'Count',
     status: 'Status',
+    object: 'Object',
+    array: 'Array',
   };
   return labels[type] || type;
 }

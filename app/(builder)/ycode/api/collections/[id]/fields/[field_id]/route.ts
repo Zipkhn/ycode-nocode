@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFieldById, updateField, deleteField } from '@/lib/repositories/collectionFieldRepository';
-import { isValidFieldType, VALID_FIELD_TYPES } from '@/lib/collection-field-utils';
+import { isValidFieldType, VALID_FIELD_TYPES, validateObjectFieldsSchema } from '@/lib/collection-field-utils';
 import { getItemsByCollectionId } from '@/lib/repositories/collectionItemRepository';
 import { clearValuesForField, renameValuesForField } from '@/lib/repositories/collectionItemValueRepository';
 import { deleteTranslationsInBulk } from '@/lib/repositories/translationRepository';
@@ -126,6 +126,17 @@ export async function PUT(
         if (!nextIds.has(previous.id)) {
           removedOptionNames.push(previous.name);
         }
+      }
+    }
+
+    // Nested object/array (amélioration #1): validate sub-field schema when provided
+    if (
+      (existingField.type === 'object' || existingField.type === 'array') &&
+      body.data?.objectFields !== undefined
+    ) {
+      const schemaError = validateObjectFieldsSchema(body.data.objectFields);
+      if (schemaError) {
+        return noCache({ error: schemaError }, 400);
       }
     }
 

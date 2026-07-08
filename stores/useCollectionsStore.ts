@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { collectionsApi } from '@/lib/api';
 import { sortCollectionsByOrder, getSortParams } from '@/lib/collection-utils';
-import { MULTI_ASSET_COLLECTION_ID, findStatusFieldId, buildStatusValue, getStatusFlagsFromAction } from '@/lib/collection-field-utils';
+import { MULTI_ASSET_COLLECTION_ID, ARRAY_FIELD_COLLECTION_ID, findStatusFieldId, buildStatusValue, getStatusFlagsFromAction } from '@/lib/collection-field-utils';
 import type { StatusAction } from '@/lib/collection-field-utils';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { usePagesStore } from '@/stores/usePagesStore';
@@ -65,6 +65,7 @@ interface CollectionsActions {
   loadMissingItemSlugs: (itemIds: string[]) => Promise<void>;
   createItem: (collectionId: string, values: Record<string, any>, statusAction?: StatusAction) => Promise<CollectionItemWithValues>;
   updateItem: (collectionId: string, itemId: string, values: Record<string, any>) => Promise<void>;
+  replaceItem: (collectionId: string, item: CollectionItemWithValues) => void;
   deleteItem: (collectionId: string, itemId: string) => Promise<void>;
   duplicateItem: (collectionId: string, itemId: string) => Promise<CollectionItemWithValues | undefined>;
   searchItems: (collectionId: string, query: string, page?: number, limit?: number, sortBy?: string, sortOrder?: string) => Promise<void>;
@@ -460,8 +461,8 @@ export const useCollectionsStore = create<CollectionsStore>((set, get) => ({
 
   // Fields
   loadFields: async (collectionId: string | null, search?: string) => {
-    // Skip virtual collections (multi-asset)
-    if (collectionId === MULTI_ASSET_COLLECTION_ID) {
+    // Skip virtual collections (multi-asset / array)
+    if (collectionId === MULTI_ASSET_COLLECTION_ID || collectionId === ARRAY_FIELD_COLLECTION_ID) {
       return;
     }
 
@@ -600,8 +601,8 @@ export const useCollectionsStore = create<CollectionsStore>((set, get) => ({
 
   // Items
   loadItems: async (collectionId: string, page?: number, limit?: number, sortBy?: string, sortOrder?: string) => {
-    // Skip virtual collections (multi-asset)
-    if (collectionId === MULTI_ASSET_COLLECTION_ID) {
+    // Skip virtual collections (multi-asset / array)
+    if (collectionId === MULTI_ASSET_COLLECTION_ID || collectionId === ARRAY_FIELD_COLLECTION_ID) {
       return;
     }
 
@@ -818,6 +819,19 @@ export const useCollectionsStore = create<CollectionsStore>((set, get) => ({
       }
       throw error;
     }
+  },
+
+  // Replace a single item in the store with a fresh server copy (e.g. after
+  // restoring a version). No optimistic pass — the item is already persisted.
+  replaceItem: (collectionId, item) => {
+    set(state => ({
+      items: {
+        ...state.items,
+        [collectionId]: (state.items[collectionId] || []).map(existing =>
+          existing.id === item.id ? item : existing
+        ),
+      },
+    }));
   },
 
   deleteItem: async (collectionId, itemId) => {
