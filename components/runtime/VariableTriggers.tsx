@@ -11,7 +11,7 @@ import { ITEMS_INJECTED_EVENT } from '@/components/FilterableCollection';
  * a behavior trigger needs no animation. Binds by `data-layer-id` (mirrors the
  * animation runtime) and re-binds on ITEMS_INJECTED_EVENT for injected clones.
  */
-export default function VariableTriggers({ triggers, doc = document }: { triggers: StateActionLayer[]; doc?: Document }) {
+export default function VariableTriggers({ triggers, doc }: { triggers: StateActionLayer[]; doc?: Document }) {
   // Elements whose `load` actions already fired — keyed by node so they fire
   // once per element, never again on rebind (ITEMS_INJECTED) or effect re-run
   // (canvas layer edits). Persists for the component's lifetime; toggling Live
@@ -20,7 +20,10 @@ export default function VariableTriggers({ triggers, doc = document }: { trigger
 
   useEffect(() => {
     if (!triggers.length) return;
-    const win = doc.defaultView ?? window;
+    // Resolved here, not as a default param: the component is server-rendered
+    // and `document` only exists once the effect runs.
+    const target = doc ?? document;
+    const win = target.defaultView ?? window;
     const loadFired = loadFiredRef.current;
     let cleanups: Array<() => void> = [];
 
@@ -28,7 +31,7 @@ export default function VariableTriggers({ triggers, doc = document }: { trigger
       cleanups.forEach(c => c());
       cleanups = [];
       for (const { layerId, stateActions } of triggers) {
-        const els = doc.querySelectorAll<HTMLElement>(`[data-layer-id="${CSS.escape(layerId)}"]`);
+        const els = target.querySelectorAll<HTMLElement>(`[data-layer-id="${CSS.escape(layerId)}"]`);
         els.forEach((el) => {
           for (const t of stateActions) {
             if (t.trigger === 'load') {

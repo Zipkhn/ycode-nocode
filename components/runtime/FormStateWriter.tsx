@@ -26,8 +26,11 @@ const valueOf = (el: Field): unknown => {
   return el.value;
 };
 
-export default function FormStateWriter({ doc = document }: { doc?: Document } = {}) {
+export default function FormStateWriter({ doc }: { doc?: Document } = {}) {
   useEffect(() => {
+    // Resolved here, not as a default param: the component is server-rendered
+    // and `document` only exists once the effect runs.
+    const target = doc ?? document;
     const onChange = (e: Event) => {
       const t = e.target;
       if (!(t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement)) return;
@@ -40,13 +43,13 @@ export default function FormStateWriter({ doc = document }: { doc?: Document } =
       if (!(e.target instanceof HTMLFormElement)) return;
       useRuntimeVarStore.getState().setVar(`forms.${formIdOf(e.target)}`, {});
     };
-    doc.addEventListener('input', onChange, true);
-    doc.addEventListener('change', onChange, true);
-    doc.addEventListener('reset', onReset, true);
+    target.addEventListener('input', onChange, true);
+    target.addEventListener('change', onChange, true);
+    target.addEventListener('reset', onReset, true);
     return () => {
-      doc.removeEventListener('input', onChange, true);
-      doc.removeEventListener('change', onChange, true);
-      doc.removeEventListener('reset', onReset, true);
+      target.removeEventListener('input', onChange, true);
+      target.removeEventListener('change', onChange, true);
+      target.removeEventListener('reset', onReset, true);
     };
   }, [doc]);
 
