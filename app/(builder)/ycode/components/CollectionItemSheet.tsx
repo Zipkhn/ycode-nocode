@@ -54,6 +54,7 @@ import { useLocalizationMode } from '@/hooks/use-localization-mode';
 import { useLiveCollectionUpdates } from '@/hooks/use-live-collection-updates';
 import { useResourceLock } from '@/hooks/use-resource-lock';
 import { slugify, normalizeBooleanValue, parseMultiReferenceValue } from '@/lib/collection-utils';
+import { sanitizeSlug } from '@/lib/page-utils';
 import { isAssetFieldType, isMultipleAssetField, getFileManagerCategory, getAssetFieldLabel, getAssetFieldTypeLabel, isValidAssetForField, findStatusFieldId, validateField } from '@/lib/collection-field-utils';
 import type { StatusAction } from '@/lib/collection-field-utils';
 import { CollectionStatusPill, parseStatusValue } from './CollectionStatusPill';
@@ -472,6 +473,12 @@ export default function CollectionItemSheet({
         values[field.id] = normalizeBooleanValue(values[field.id]);
       }
     });
+
+    // Normalize the slug to a valid URL segment before validation/save so a
+    // pasted leading slash, spaces or invalid chars can't break routing.
+    if (slugField && typeof values[slugField.id] === 'string') {
+      values[slugField.id] = slugify(values[slugField.id]);
+    }
 
     let hasErrors = false;
 
@@ -1142,6 +1149,18 @@ export default function CollectionItemSheet({
                               value={formField.value}
                               onChange={formField.onChange}
                               onBlur={formField.onBlur}
+                            />
+                          ) : field.key === 'slug' ? (
+                            <Input
+                              placeholder={field.default || `Enter ${field.name.toLowerCase()}...`}
+                              autoComplete="off"
+                              name={formField.name}
+                              value={formField.value}
+                              onChange={(e) => formField.onChange(sanitizeSlug(e.target.value, true))}
+                              onBlur={(e) => {
+                                formField.onChange(sanitizeSlug(e.target.value, false));
+                                formField.onBlur();
+                              }}
                             />
                           ) : (
                             <Input

@@ -337,6 +337,13 @@ export async function generatePageMetadata(
   let canonicalUrl: string | null = null;
   let globalSettings: GlobalPageSettings = {};
 
+  // URL of the current page, shared by canonical and og:url. Prefer an absolute
+  // URL built from the resolved base (canonical / primary domain / Vercel env)
+  // so it's correct on Vercel and cloud even when the route doesn't set
+  // `metadataBase`. Falls back to the relative path locally (no base
+  // configured), which Next.js resolves against `metadataBase` when available.
+  let pageUrl: string | undefined;
+
   // Always fetch global settings — preview mode reads draft assets so the
   // favicon and web clip render before the user publishes.
   globalSettings = options.globalSeoSettings || (await fetchGlobalPageSettings(isPreview));
@@ -347,12 +354,19 @@ export async function generatePageMetadata(
       primaryDomainUrl,
     });
 
+    pageUrl = pagePath === undefined
+      ? undefined
+      : siteBaseUrl
+        ? buildAbsolutePageUrl(siteBaseUrl, pagePath)
+        : pagePath;
+
     // Google site verification
     if (globalSettings.googleSiteVerification) {
       metadata.verification = { google: globalSettings.googleSiteVerification };
     }
 
-    // Canonical URL — via governance (page override > global + path)
+    // Canonical URL — governance (page override > global + path), falling back
+    // to the self-referencing page URL so every page emits a canonical tag.
     const govCtx: SeoGovernanceContext = {
       page,
       isPreview,
@@ -361,9 +375,9 @@ export async function generatePageMetadata(
       globalCanonicalUrl: globalSettings.globalCanonicalUrl,
       primaryDomainUrl,
     };
-    canonicalUrl = getCanonicalUrl(govCtx);
+    canonicalUrl = getCanonicalUrl(govCtx) ?? pageUrl ?? null;
     if (canonicalUrl) {
-      metadata.alternates = { canonical: canonicalUrl };
+      metadata.alternates = { ...metadata.alternates, canonical: canonicalUrl };
     }
 
     // Add hreflang alternates for multilingual sites. Skipped for error pages
@@ -400,17 +414,6 @@ export async function generatePageMetadata(
         : globalSettings.webClipUrl;
     }
   }
-
-  // URL of the current page for og:url. Prefer an absolute URL built from the
-  // resolved base (canonical / primary domain / Vercel env) so it's correct on
-  // Vercel and cloud even when the route doesn't set `metadataBase`. Falls back
-  // to the relative path locally (no base configured), which Next.js resolves
-  // against `metadataBase` when available.
-  const pageUrl = pagePath === undefined
-    ? undefined
-    : siteBaseUrl
-      ? buildAbsolutePageUrl(siteBaseUrl, pagePath)
-      : pagePath;
 
   // ── OG image resolution ────────────────────────────────────────────────────
   let imageUrl: string | null = null;
