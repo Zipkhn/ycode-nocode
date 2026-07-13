@@ -40,7 +40,6 @@ import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { useColorVariablesStore } from '@/stores/useColorVariablesStore';
 import { useRuntimeVarStore } from '@/stores/useRuntimeVarStore';
-import { styleRuleMatches } from '@/lib/conditional-styles';
 import { useGlobalsStore } from '@/stores/useGlobalsStore';
 import { ShimmerSkeleton } from '@/components/ui/shimmer-skeleton';
 import { combineBgValues, mergeStaticBgVars } from '@/lib/tailwind-class-mapper';
@@ -545,19 +544,7 @@ const LayerItemImpl: React.FC<{
   const settingsByKey = useSettingsStore((state) => state.settingsByKey);
   const colorVariables = useColorVariablesStore((state) => state.colorVariables);
   const runtimeVars = useRuntimeVarStore((state) => state.vars);
-  const isCanvasPreview = useEditorStore((state) => state.isCanvasPreview);
   const timezone = (settingsByKey.timezone as string | null) ?? 'UTC';
-
-  // Live canvas preview (App State): append conditional-style classes whose
-  // runtime condition currently holds. Gated on preview so authoring shows the
-  // static authored state; the Tailwind CDN compiles the classes on the fly.
-  if (isCanvasPreview && layer.variables?.conditionalStyles?.length) {
-    const extra = layer.variables.conditionalStyles
-      .filter((rule) => styleRuleMatches(rule, runtimeVars))
-      .map((rule) => rule.className)
-      .join(' ');
-    if (extra) classesString = `${classesString} ${extra}`.trim();
-  }
 
   // Create asset resolver that checks pre-resolved assets first (SSR), then falls back to store
   const getAsset = useCallback((id: string) => {
