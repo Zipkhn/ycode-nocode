@@ -26,7 +26,6 @@ interface RuntimeVarStore {
   setVar: (path: string, value: unknown) => void;
   setNamespace: (namespace: string, data: Record<string, unknown>) => void;
   getVar: (path: string) => unknown;
-  reset: () => void;
 }
 
 export const useRuntimeVarStore = create<RuntimeVarStore>((set, get) => ({
@@ -34,7 +33,4 @@ export const useRuntimeVarStore = create<RuntimeVarStore>((set, get) => ({
   setVar: (path, value) => set((state) => ({ vars: setByPath(state.vars, path, value) })),
   setNamespace: (namespace, data) => set((state) => ({ vars: { ...state.vars, [namespace]: data } })),
   getVar: (path) => getByPath(get().vars, path),
-  reset: () => set({ vars: {} }),
 }));
-
-export { getByPath };

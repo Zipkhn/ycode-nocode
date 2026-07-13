@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { styleRuleMatches, collectStyleClassNames, pageHasConditionalStyles } from './conditional-styles';
+import { styleRuleMatches, pageHasConditionalStyles } from './conditional-styles';
 import type { ConditionalStyleRule, Layer } from '@/types';
 
 const rule = (over: Partial<ConditionalStyleRule>): ConditionalStyleRule => ({
@@ -12,15 +12,6 @@ test('styleRuleMatches: evaluates the runtime condition', () => {
   assert.equal(styleRuleMatches(rule({}), { state: { active: false } }), false);
   assert.equal(styleRuleMatches(rule({ operator: 'is_present', value: undefined }), { state: { active: 'x' } }), true);
   assert.equal(styleRuleMatches(rule({ varPath: '' }), { state: {} }), false);
-});
-
-test('collectStyleClassNames: gathers + splits all rule class names from the tree', () => {
-  const layers = [
-    { id: 'a', variables: { conditionalStyles: [rule({ className: 'bg-blue-500 scale-105' })] }, children: [
-      { id: 'b', variables: { conditionalStyles: [rule({ id: 'r2', className: 'text-white' })] } },
-    ] },
-  ] as unknown as Layer[];
-  assert.deepEqual(collectStyleClassNames(layers).sort(), ['bg-blue-500', 'scale-105', 'text-white']);
 });
 
 test('pageHasConditionalStyles: detects rules anywhere in the tree', () => {

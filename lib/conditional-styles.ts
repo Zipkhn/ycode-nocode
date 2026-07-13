@@ -4,9 +4,8 @@
  * the runtime_var operator logic, no server evaluator).
  *
  * The class only takes effect on the published site if it is in the compiled
- * CSS, so `collectStyleClassNames` feeds these classes into the page CSS
- * compiler (lib/server/cssGenerator) alongside static layer classes. The
- * RuntimeStyles runtime then toggles the class live.
+ * CSS, so lib/server/cssGenerator includes the rule class names alongside the
+ * static layer classes. The RuntimeStyles runtime then toggles the class live.
  */
 import { evaluateRuntimeCondition } from './runtime-visibility';
 import type { ConditionalStyleRule, VisibilityCondition, Layer } from '@/types';
@@ -25,28 +24,6 @@ export function styleRuleMatches(rule: ConditionalStyleRule, runtimeVars: Record
     value: rule.value,
   } as VisibilityCondition;
   return evaluateRuntimeCondition(condition, runtimeVars);
-}
-
-/**
- * All class names referenced by conditional style rules across the tree, so the
- * CSS compiler includes them (otherwise Tailwind purges classes absent from the
- * static layer classes and the runtime toggle would have no effect).
- */
-export function collectStyleClassNames(layers: Layer[]): string[] {
-  const out: string[] = [];
-  const walk = (ls: Layer[]) => {
-    for (const l of ls) {
-      const rules = l.variables?.conditionalStyles;
-      if (rules) {
-        for (const r of rules) {
-          if (r.className) out.push(...r.className.split(/\s+/).filter(Boolean));
-        }
-      }
-      if (l.children) walk(l.children);
-    }
-  };
-  walk(layers);
-  return out;
 }
 
 /** True if any layer carries conditional style rules — gates mounting the runtime. */

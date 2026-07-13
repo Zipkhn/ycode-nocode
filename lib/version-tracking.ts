@@ -121,23 +121,6 @@ export function markUndoRedoSave(entityType: VersionEntityType, entityId: string
 }
 
 /**
- * Clear undo/redo save mark (call after save completes)
- */
-export function clearUndoRedoSave(entityType: VersionEntityType, entityId: string): void {
-  const key = `${entityType}:${entityId}`;
-
-  // Clear the mark
-  undoRedoSaveInProgress.delete(key);
-
-  // Clear the timeout
-  const timeout = undoRedoSaveTimeouts.get(key);
-  if (timeout) {
-    clearTimeout(timeout);
-    undoRedoSaveTimeouts.delete(key);
-  }
-}
-
-/**
  * Record a version via API (client-safe, no server-only imports)
  */
 export async function recordVersionViaApi(

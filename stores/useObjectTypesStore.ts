@@ -12,7 +12,6 @@ const BASE = '/ycode/api/object-types';
 
 interface ObjectTypesState {
   objectTypes: ObjectType[];
-  isLoaded: boolean;
   isLoading: boolean;
   load: () => Promise<void>;
   /** Create or update a type. Returns the saved type (with id) or null on failure. */
@@ -22,7 +21,6 @@ interface ObjectTypesState {
 
 export const useObjectTypesStore = create<ObjectTypesState>((set, get) => ({
   objectTypes: [],
-  isLoaded: false,
   isLoading: false,
 
   load: async () => {
@@ -31,9 +29,9 @@ export const useObjectTypesStore = create<ObjectTypesState>((set, get) => ({
     try {
       const res = await fetch(BASE);
       const json = await res.json();
-      set({ objectTypes: json.data ?? [], isLoaded: true });
+      set({ objectTypes: json.data ?? [] });
     } catch {
-      set({ isLoaded: true });
+      // Keep previous state on failure
     } finally {
       set({ isLoading: false });
     }
