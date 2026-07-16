@@ -2044,6 +2044,13 @@ const CMS = React.memo(function CMS() {
                         );
                       }
 
+                      // Guard against non-primitive values (e.g. rich-text objects
+                      // paired with a text field during a collection switch) that
+                      // would crash React if rendered directly.
+                      const displayValue = typeof value === 'object' && value !== null
+                        ? extractPlainTextFromTiptap(value)
+                        : value;
+
                       return (
                         <td
                           key={field.id}
@@ -2051,7 +2058,7 @@ const CMS = React.memo(function CMS() {
                           onClick={() => handleEditItem(item)}
                         >
                           <span className="line-clamp-1 truncate">
-                            {value !== null && typeof value === 'object' ? JSON.stringify(value) : (value || '-')}
+                            {displayValue || '-'}
                           </span>
                         </td>
                       );

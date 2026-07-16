@@ -35,7 +35,7 @@ import { useCollectionsStore } from '@/stores/useCollectionsStore';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { useAssetsStore } from '@/stores/useAssetsStore';
 import { useObjectTypesStore } from '@/stores/useObjectTypesStore';
-import RichTextEditor from './RichTextEditor';
+import ExpandableRichTextEditor from './ExpandableRichTextEditor';
 import CollectionLinkFieldInput from './CollectionLinkFieldInput';
 import ColorFieldInput from './ColorFieldInput';
 import AssetFieldCard from './AssetFieldCard';
@@ -821,10 +821,11 @@ export default function FieldFormDialog({
                     />
                   )
                 ) : fieldType === 'rich_text' ? (
-                  <RichTextEditor
+                  <ExpandableRichTextEditor
                     value={fieldDefault}
                     onChange={setFieldDefault}
                     placeholder="Default value"
+                    sheetDescription="Field default value"
                   />
                 ) : fieldType === 'link' ? (
                   <CollectionLinkFieldInput
