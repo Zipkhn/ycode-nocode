@@ -11,6 +11,7 @@ import VariableTriggers from '@/components/runtime/VariableTriggers';
 import RuntimeStateProvider from '@/components/runtime/RuntimeStateProvider';
 import RuntimeStyles from '@/components/runtime/RuntimeStyles';
 import PasswordForm from '@/components/PasswordForm';
+import InitialLoadScript from '@/components/InitialLoadScript';
 import YcodeBadge from '@/components/YcodeBadge';
 import { unstable_cache } from 'next/cache';
 import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables';
@@ -399,6 +400,9 @@ export default async function PageRenderer({
   passwordProtection,
   jsonLdScripts,
 }: PageRendererProps) {
+  // Page transitions are injected once at the (site) layout so the curtain engine
+  // and overlay persist across client (router.push) navigations — see app/(site)/layout.tsx.
+
   const usePublishedData = page.is_published && !isPreview;
   // Check if this is a 401 error page that needs password form
   const is401Page = page.error_page === 401;
@@ -844,23 +848,26 @@ export default async function PageRenderer({
         />
       )}
 
-      {/* Inject JSON-LD structured data (WebSite, Organization, …) */}
+      {/* Inject JSON-LD structured data (WebSite, Organization, …). Initial-load only:
+          crawlers read it from the SSR HTML; re-emitting on client nav only warns. */}
       {jsonLdScripts && jsonLdScripts.map((script, i) => (
-        <script
+        <InitialLoadScript
           key={`json-ld-${i}`}
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: script }}
         />
       ))}
 
-      {/* Inject Google Analytics script (non-preview only) */}
+      {/* Inject Google Analytics script (non-preview only). The gtag loader is a
+          src script (React dedupes it); the init runs once on initial load —
+          client-nav pageviews are sent by PageCurtain instead. */}
       {gaMeasurementId && (
         <>
           <script
             async
             src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
           />
-          <script
+          <InitialLoadScript
             id="google-analytics"
             dangerouslySetInnerHTML={{
               __html: `
@@ -874,12 +881,9 @@ export default async function PageRenderer({
         </>
       )}
 
-      {/* Apply body layer classes immediately to prevent FOUC */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `document.body.className=document.body.className.replace(/\\bycode-body-applied\\b/g,'')+' ${(bodyClasses || 'bg-white').replace(/'/g, "\\'")} ycode-body-applied'`,
-        }}
-      />
+      {/* Apply body layer classes: BodyClassApplier emits a synchronous FOUC
+          bootstrap script on the initial load and keeps the class in sync across
+          client navigations via useLayoutEffect. */}
       <BodyClassApplier classes={bodyClasses || 'bg-white'} />
 
       <main
