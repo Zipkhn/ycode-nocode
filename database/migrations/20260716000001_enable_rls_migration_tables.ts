@@ -22,15 +22,15 @@ const TABLES = ['migrations', 'migrations_lock'];
 export async function up(knex: Knex): Promise<void> {
   for (const t of TABLES) {
     if (!(await knex.schema.hasTable(t))) continue;
-    await knex.schema.raw(`ALTER TABLE ?? ENABLE ROW LEVEL SECURITY`, [t]);
-    await knex.schema.raw(`REVOKE ALL ON ?? FROM anon, authenticated`, [t]);
+    await knex.schema.raw(`ALTER TABLE ${t} ENABLE ROW LEVEL SECURITY`);
+    await knex.schema.raw(`REVOKE ALL ON ${t} FROM anon, authenticated`);
   }
 }
 
 export async function down(knex: Knex): Promise<void> {
   for (const t of TABLES) {
     if (!(await knex.schema.hasTable(t))) continue;
-    await knex.schema.raw(`GRANT SELECT, INSERT, UPDATE, DELETE ON ?? TO anon, authenticated`, [t]);
-    await knex.schema.raw(`ALTER TABLE ?? DISABLE ROW LEVEL SECURITY`, [t]);
+    await knex.schema.raw(`GRANT SELECT, INSERT, UPDATE, DELETE ON ${t} TO anon, authenticated`);
+    await knex.schema.raw(`ALTER TABLE ${t} DISABLE ROW LEVEL SECURITY`);
   }
 }
