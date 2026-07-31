@@ -2103,14 +2103,13 @@ export default function ColorPicker({
           <Label variant="muted" className="truncate max-w-30 cursor-pointer">
             {imagePreviewUrl ? (imageLabel || 'Image') : getDisplayText(displayValue, rgbaColor.a)}
           </Label>
-          <span
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
             className="ml-auto -mr-0.5 p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
             onClick={handleClear}
           >
             <Icon name="x" className="size-2.5" />
-          </span>
+          </button>
         </div>
       ) : (
           <Button
@@ -2242,14 +2241,13 @@ export default function ColorPicker({
                     <Label variant="muted" className="truncate text-xs flex-1">
                       {solidBinding.fieldName || 'Color field'}
                     </Label>
-                    <span
-                      role="button"
-                      tabIndex={0}
+                    <button
+                      type="button"
                       className="ml-auto -mr-0.5 p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
                       onClick={() => binding?.onUnbind(null)}
                     >
                       <Icon name="x" className="size-2.5" />
-                    </span>
+                    </button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -2380,14 +2378,13 @@ export default function ColorPicker({
                           <Label variant="muted" className="truncate text-xs flex-1">
                             {stopBinding.fieldName || 'Color field'}
                           </Label>
-                          <span
-                            role="button"
-                            tabIndex={0}
+                          <button
+                            type="button"
                             className="ml-auto -mr-0.5 p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
                             onClick={() => binding?.onUnbind(selectedStopId)}
                           >
                             <Icon name="x" className="size-2.5" />
-                          </span>
+                          </button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -2509,14 +2506,13 @@ export default function ColorPicker({
                           <Label variant="muted" className="truncate text-xs flex-1">
                             {stopBinding.fieldName || 'Color field'}
                           </Label>
-                          <span
-                            role="button"
-                            tabIndex={0}
+                          <button
+                            type="button"
                             className="ml-auto -mr-0.5 p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
                             onClick={() => binding?.onUnbind(selectedStopId)}
                           >
                             <Icon name="x" className="size-2.5" />
-                          </span>
+                          </button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">

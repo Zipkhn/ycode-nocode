@@ -126,6 +126,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 interface RightSidebarProps {
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
+  /**
+   * When true, the column chrome (width, border, background) is provided by a
+   * parent wrapper (RightPanel) and this component only renders its body.
+   */
+  embedded?: boolean;
 }
 
 /**
@@ -163,6 +168,7 @@ function extractBgVars(bg: BackgroundsDesign | undefined): BgVars | undefined {
 
 const RightSidebar = React.memo(function RightSidebar({
   onLayerUpdate,
+  embedded = false,
 }: RightSidebarProps) {
   const selectedLayerId = useEditorStore((state) => state.selectedLayerId);
 
@@ -1981,7 +1987,14 @@ const RightSidebar = React.memo(function RightSidebar({
     // No layer selected → Page context. Surface project-level App State
     // variables here (formerly a topbar modal).
     return (
-      <div className="w-64 shrink-0 bg-background border-l flex flex-col h-full overflow-y-auto no-scrollbar divide-y">
+      <div
+        className={cn(
+          'flex flex-col overflow-y-auto no-scrollbar divide-y',
+          embedded
+            ? 'flex-1 min-h-0'
+            : 'w-64 shrink-0 bg-background border-l h-full',
+        )}
+      >
         <VariablesPanel />
       </div>
     );
@@ -2004,12 +2017,20 @@ const RightSidebar = React.memo(function RightSidebar({
         fields={fields}
         collections={collections}
         isInsideCollectionLayer={!!parentCollectionLayer}
+        embedded={embedded}
       />
     );
   }
 
   return (
-    <div className="w-64 shrink-0 bg-background border-l flex flex-col p-4 pb-0 h-full overflow-hidden">
+    <div
+      className={cn(
+        'flex flex-col p-4 pb-0 overflow-hidden',
+        embedded
+          ? 'flex-1 min-h-0'
+          : 'w-64 shrink-0 bg-background border-l h-full',
+      )}
+    >
       {/* Tabs.
           When the user is translating (non-default locale active) we keep the
           tab list visible but disable Design + Interactions and force the

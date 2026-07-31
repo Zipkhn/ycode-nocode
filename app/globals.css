@@ -75,6 +75,59 @@
   100% { transform: translateX(400%); }
 }
 
+/* Shimmering outline drawn over canvas layers the AI agent is actively editing.
+   Uses the mask "gradient border" trick: the element box minus its content-box
+   leaves only the padding ring, which we paint with a base violet tint plus a
+   moving highlight band (animated via background-position) for the shimmer. */
+.ai-activity-outline {
+  border-radius: 0;
+  padding: 1px;
+  background:
+    linear-gradient(110deg, transparent 30%, rgba(196, 181, 253, 0.95) 50%, transparent 70%),
+    rgba(139, 92, 246, 0.4);
+  background-size: 220% 100%, 100% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+/* Shimmering ring for in-DOM elements the AI agent is actively working on — used
+   in the CMS for collection rows, the items area, and individual item rows.
+   Unlike .ai-activity-outline (an absolutely-positioned canvas overlay) this is
+   an inset ::after pseudo-element, so any element works as long as it is
+   positioned. Reuses the same mask "gradient border" + shimmer animation. */
+.ai-activity-shimmer {
+  position: relative;
+}
+.ai-activity-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  z-index: 2;
+  background:
+    linear-gradient(110deg, transparent 30%, rgba(196, 181, 253, 0.95) 50%, transparent 70%),
+    rgba(139, 92, 246, 0.4);
+  background-size: 220% 100%, 100% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
 /* ============================================================
    5. VARIABLES OKLCH (thème Shadcn/ui)
    ============================================================ */
@@ -202,10 +255,33 @@
   stroke: currentColor;
 }
 
-/* RichTextEditor — Base */
-.rich-text-editor.ProseMirror { @apply outline-none w-full min-h-full; }
-.rich-text-editor.ProseMirror p { @apply block m-0 p-0; }
-.rich-text-editor.ProseMirror p.is-editor-empty:first-child { @apply relative; }
+/* AI chat composer (TipTap) */
+.ai-chat-composer.ProseMirror {
+  @apply outline-none w-full;
+}
+
+.ai-chat-composer.ProseMirror p {
+  @apply m-0;
+}
+
+.ai-chat-composer.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply text-muted-foreground/50 pointer-events-none float-left h-0;
+}
+
+/* RichTextEditor Styles */
+.rich-text-editor.ProseMirror {
+  @apply outline-none w-full min-h-full;
+}
+
+.rich-text-editor.ProseMirror p {
+  @apply block m-0 p-0;
+}
+
+.rich-text-editor.ProseMirror p.is-editor-empty:first-child {
+  @apply relative;
+}
+
 .rich-text-editor.ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   @apply absolute left-0 top-1/2 -translate-y-1/2 text-current/25 pointer-events-none text-xs leading-[1.375rem] whitespace-nowrap overflow-hidden text-ellipsis max-w-full;

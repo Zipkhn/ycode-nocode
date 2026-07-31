@@ -549,14 +549,13 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
                   </div>
                 </PopoverContent>
               </Popover>
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 className="p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
                 onClick={handleRemoveUnderline}
               >
                 <Icon name="x" className="size-2.5" />
-              </span>
+              </button>
             </div>
           </div>
         )}
@@ -581,14 +580,13 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 className="p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
                 onClick={handleRemoveTransform}
               >
                 <Icon name="x" className="size-2.5" />
-              </span>
+              </button>
             </div>
           </div>
         )}
@@ -606,14 +604,13 @@ const TypographyControls = memo(function TypographyControls({ layer, onLayerUpda
                 placeholder="2"
                 className="flex-1"
               />
-              <span
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
                 className="p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
                 onClick={handleRemoveLineClamp}
               >
                 <Icon name="x" className="size-2.5" />
-              </span>
+              </button>
             </div>
           </div>
         )}
