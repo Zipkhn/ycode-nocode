@@ -114,6 +114,14 @@
   display: none;
 }
 
+/* LayerRenderer forces `open` so the modal is editable while the selection sits
+   inside it. The UA then positions it absolutely with auto margins, floating it
+   over the page; render it in flow on the canvas instead. */
+#canvas-body dialog[open] {
+  position: static;
+  margin: 0;
+}
+
 /* Hide any manually-built dev-grid_wrapper from page content (injected grid lives on body, not here) */
 #canvas-body .dev-grid_wrapper { display: none !important; }
 

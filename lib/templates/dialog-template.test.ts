@@ -45,6 +45,26 @@ test('dialog modal renders as a native <dialog> and the root stays a div', () =>
   assert.equal(getLayerHtmlTag(modal), 'dialog');
 });
 
+test('the <dialog> carries no display utility', () => {
+  const root = getLayerFromTemplate('dialogRoot');
+  assert.ok(root);
+  const modal = findLayer(root, (l) => l.name === 'dialog');
+  assert.ok(modal);
+
+  // A closed <dialog> is hidden by a UA rule, and author styles beat the UA
+  // origin regardless of specificity — one display utility here leaves the
+  // modal permanently visible, stretched over the page by the UA's absolute
+  // positioning. Layout belongs on the Dialog Content child.
+  const classes = Array.isArray(modal.classes) ? modal.classes : String(modal.classes).split(/\s+/);
+  const display = ['block', 'flex', 'grid', 'inline-flex', 'inline-block', 'inline-grid', 'contents', 'table'];
+  assert.deepEqual(classes.filter((c) => display.includes(c)), []);
+  assert.equal(modal.design?.layout?.display, undefined);
+
+  const content = findLayer(modal, (l) => l.customName === 'Dialog Content');
+  assert.ok(content, 'layout lives on a Dialog Content child');
+  assert.equal(content.design?.layout?.display, 'Flex');
+});
+
 test('the close button sits inside the modal, the trigger outside it', () => {
   const root = getLayerFromTemplate('dialogRoot');
   assert.ok(root);

@@ -163,15 +163,21 @@ export const utilityTemplates: Record<string, BlockTemplate> = {
         },
         // Native <dialog>: the browser provides focus trapping, Escape, an
         // inert background and top-layer stacking once DialogInitializer calls
-        // showModal(). Closed by default, so it is display:none until opened.
+        // showModal().
+        //
+        // It deliberately carries NO display utility. A closed <dialog> is
+        // hidden by a UA rule (`dialog:not([open]) { display: none }`), and
+        // author styles beat the UA origin regardless of specificity — a single
+        // `flex` here would leave the modal permanently visible, stretched over
+        // the page by the UA's absolute positioning and eating wheel events.
+        // Layout lives on the Dialog Content child instead.
         {
           name: 'dialog',
           customName: 'Dialog Modal',
-          classes: ['flex', 'flex-col', 'gap-[16px]', 'w-[400px]', 'max-w-[90vw]', 'pt-[24px]', 'pr-[24px]', 'pb-[24px]', 'pl-[24px]', 'rounded-[12px]', 'bg-[#FFFFFF]'],
+          classes: ['w-[400px]', 'max-w-[90vw]', 'max-h-[85vh]', 'overflow-y-auto', 'pt-[24px]', 'pr-[24px]', 'pb-[24px]', 'pl-[24px]', 'rounded-[12px]', 'bg-[#FFFFFF]'],
           settings: { tag: 'dialog' },
           restrictions: { copy: false, delete: false, ancestor: 'dialogRoot' },
           design: {
-            layout: { isActive: true, display: 'Flex', flexDirection: 'column', gap: '16' },
             sizing: { isActive: true, width: '400px' },
             spacing: { isActive: true, paddingTop: '24', paddingRight: '24', paddingBottom: '24', paddingLeft: '24' },
             backgrounds: { isActive: true, backgroundColor: '#ffffff' },
@@ -179,42 +185,54 @@ export const utilityTemplates: Record<string, BlockTemplate> = {
           open: true,
           children: [
             {
-              name: 'heading',
-              customName: 'Dialog Title',
-              settings: { tag: 'h2', customAttributes: { 'data-dialog-title': '' } },
-              classes: ['text-[20px]', 'font-[600]'],
-              design: { typography: { isActive: true, fontSize: '20px', fontWeight: '600' } },
-              restrictions: { editText: true },
-              variables: { text: { type: 'dynamic_rich_text', data: { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Dialog title' }] }] } } } },
-            },
-            {
-              name: 'text',
-              customName: 'Dialog Description',
-              settings: { tag: 'p' },
-              classes: ['text-[14px]'],
-              design: { typography: { isActive: true, fontSize: '14px' } },
-              restrictions: { editText: true },
-              variables: { text: { type: 'dynamic_rich_text', data: { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Describe what this dialog is for.' }] }] } } } },
-            },
-            {
-              name: 'button',
-              customName: 'Dialog Close',
-              classes: ['flex', 'flex-row', 'items-center', 'justify-center', 'w-fit', 'pr-[16px]', 'pl-[16px]', 'h-[38px]', 'text-[14px]', 'rounded-[12px]', 'bg-[#F5F5F5]'],
-              settings: { customAttributes: { 'data-dialog-close': '' } },
-              attributes: { type: 'button' },
+              name: 'div',
+              customName: 'Dialog Content',
+              classes: ['flex', 'flex-col', 'gap-[16px]'],
               design: {
-                typography: { isActive: true, fontSize: '14px' },
-                spacing: { isActive: true, paddingLeft: '16', paddingRight: '16' },
-                backgrounds: { isActive: true, backgroundColor: '#f5f5f5' },
+                layout: { isActive: true, display: 'Flex', flexDirection: 'column', gap: '16' },
               },
+              restrictions: { ancestor: 'dialogRoot' },
+              open: true,
               children: [
                 {
-                  name: 'text',
-                  settings: { tag: 'span' },
-                  classes: [],
-                  design: {},
+                  name: 'heading',
+                  customName: 'Dialog Title',
+                  settings: { tag: 'h2', customAttributes: { 'data-dialog-title': '' } },
+                  classes: ['text-[20px]', 'font-[600]'],
+                  design: { typography: { isActive: true, fontSize: '20px', fontWeight: '600' } },
                   restrictions: { editText: true },
-                  variables: { text: { type: 'dynamic_rich_text', data: { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Close' }] }] } } } },
+                  variables: { text: { type: 'dynamic_rich_text', data: { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Dialog title' }] }] } } } },
+                },
+                {
+                  name: 'text',
+                  customName: 'Dialog Description',
+                  settings: { tag: 'p' },
+                  classes: ['text-[14px]'],
+                  design: { typography: { isActive: true, fontSize: '14px' } },
+                  restrictions: { editText: true },
+                  variables: { text: { type: 'dynamic_rich_text', data: { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Describe what this dialog is for.' }] }] } } } },
+                },
+                {
+                  name: 'button',
+                  customName: 'Dialog Close',
+                  classes: ['flex', 'flex-row', 'items-center', 'justify-center', 'w-fit', 'pr-[16px]', 'pl-[16px]', 'h-[38px]', 'text-[14px]', 'rounded-[12px]', 'bg-[#F5F5F5]'],
+                  settings: { customAttributes: { 'data-dialog-close': '' } },
+                  attributes: { type: 'button' },
+                  design: {
+                    typography: { isActive: true, fontSize: '14px' },
+                    spacing: { isActive: true, paddingLeft: '16', paddingRight: '16' },
+                    backgrounds: { isActive: true, backgroundColor: '#f5f5f5' },
+                  },
+                  children: [
+                    {
+                      name: 'text',
+                      settings: { tag: 'span' },
+                      classes: [],
+                      design: {},
+                      restrictions: { editText: true },
+                      variables: { text: { type: 'dynamic_rich_text', data: { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Close' }] }] } } } },
+                    },
+                  ],
                 },
               ],
             },
