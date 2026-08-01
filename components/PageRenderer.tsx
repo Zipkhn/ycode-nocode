@@ -6,6 +6,7 @@ import HreflangAlternateLinks from '@/components/HreflangAlternateLinks';
 import LayerRendererPublic from '@/components/LayerRendererPublic';
 import SliderInitializer from '@/components/SliderInitializer';
 import LightboxInitializer from '@/components/LightboxInitializer';
+import DialogInitializer from '@/components/DialogInitializer';
 import RuntimeVisibility from '@/components/runtime/RuntimeVisibility';
 import FormStateWriter from '@/components/runtime/FormStateWriter';
 import VariableTriggers from '@/components/runtime/VariableTriggers';
@@ -314,6 +315,11 @@ function hasSliderLayers(layers: Layer[]): boolean {
 /** Check if any layer in the tree (including rich-text-embedded components) is a lightbox */
 function hasLightboxLayers(layers: Layer[]): boolean {
   return layerTreeHasLayer(layers, layer => layer.name === 'lightbox');
+}
+
+/** Check if any layer in the tree (including rich-text-embedded components) is a dialog */
+function hasDialogLayers(layers: Layer[]): boolean {
+  return layerTreeHasLayer(layers, layer => layer.name === 'dialog');
 }
 
 /**
@@ -986,6 +992,9 @@ export default async function PageRenderer({
 
       {/* Initialize lightbox modals */}
       {hasLightboxLayers(resolvedLayers) && <LightboxInitializer />}
+
+      {/* Wire native <dialog> modals (trigger, close, backdrop, scroll lock) */}
+      {hasDialogLayers(resolvedLayers) && <DialogInitializer />}
 
       {/* Seed runtime variables with their project defaults (before the
           visibility runtime so the first re-eval sees them). */}

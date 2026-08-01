@@ -121,6 +121,109 @@ export const utilityTemplates: Record<string, BlockTemplate> = {
     },
   },
 
+  dialogRoot: {
+    icon: 'center-block',
+    name: 'Dialog',
+    template: {
+      name: 'dialogRoot',
+      customName: 'Dialog',
+      classes: ['flex', 'flex-col', 'w-fit'],
+      settings: {
+        tag: 'div',
+        customAttributes: { 'data-dialog-root': '' },
+      },
+      design: {
+        layout: { isActive: true, display: 'Flex', flexDirection: 'column' },
+        sizing: { isActive: true, width: 'fit-content' },
+      },
+      open: true,
+      children: [
+        {
+          name: 'button',
+          customName: 'Dialog Trigger',
+          classes: ['flex', 'flex-row', 'items-center', 'justify-center', 'text-[#FFFFFF]', 'pr-[16px]', 'pl-[16px]', 'h-[38px]', 'text-[14px]', 'rounded-[12px]', 'bg-[#171717]'],
+          settings: { customAttributes: { 'data-dialog-trigger': '' } },
+          attributes: { type: 'button' },
+          restrictions: { ancestor: 'dialogRoot' },
+          design: {
+            typography: { isActive: true, color: '#ffffff', fontSize: '14px' },
+            spacing: { isActive: true, paddingLeft: '16', paddingRight: '16' },
+            backgrounds: { isActive: true, backgroundColor: '#171717' },
+          },
+          children: [
+            {
+              name: 'text',
+              settings: { tag: 'span' },
+              classes: [],
+              design: {},
+              restrictions: { editText: true },
+              variables: { text: { type: 'dynamic_rich_text', data: { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Open dialog' }] }] } } } },
+            },
+          ],
+        },
+        // Native <dialog>: the browser provides focus trapping, Escape, an
+        // inert background and top-layer stacking once DialogInitializer calls
+        // showModal(). Closed by default, so it is display:none until opened.
+        {
+          name: 'dialog',
+          customName: 'Dialog Modal',
+          classes: ['flex', 'flex-col', 'gap-[16px]', 'w-[400px]', 'max-w-[90vw]', 'pt-[24px]', 'pr-[24px]', 'pb-[24px]', 'pl-[24px]', 'rounded-[12px]', 'bg-[#FFFFFF]'],
+          settings: { tag: 'dialog' },
+          restrictions: { copy: false, delete: false, ancestor: 'dialogRoot' },
+          design: {
+            layout: { isActive: true, display: 'Flex', flexDirection: 'column', gap: '16' },
+            sizing: { isActive: true, width: '400px' },
+            spacing: { isActive: true, paddingTop: '24', paddingRight: '24', paddingBottom: '24', paddingLeft: '24' },
+            backgrounds: { isActive: true, backgroundColor: '#ffffff' },
+          },
+          open: true,
+          children: [
+            {
+              name: 'heading',
+              customName: 'Dialog Title',
+              settings: { tag: 'h2', customAttributes: { 'data-dialog-title': '' } },
+              classes: ['text-[20px]', 'font-[600]'],
+              design: { typography: { isActive: true, fontSize: '20px', fontWeight: '600' } },
+              restrictions: { editText: true },
+              variables: { text: { type: 'dynamic_rich_text', data: { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Dialog title' }] }] } } } },
+            },
+            {
+              name: 'text',
+              customName: 'Dialog Description',
+              settings: { tag: 'p' },
+              classes: ['text-[14px]'],
+              design: { typography: { isActive: true, fontSize: '14px' } },
+              restrictions: { editText: true },
+              variables: { text: { type: 'dynamic_rich_text', data: { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Describe what this dialog is for.' }] }] } } } },
+            },
+            {
+              name: 'button',
+              customName: 'Dialog Close',
+              classes: ['flex', 'flex-row', 'items-center', 'justify-center', 'w-fit', 'pr-[16px]', 'pl-[16px]', 'h-[38px]', 'text-[14px]', 'rounded-[12px]', 'bg-[#F5F5F5]'],
+              settings: { customAttributes: { 'data-dialog-close': '' } },
+              attributes: { type: 'button' },
+              design: {
+                typography: { isActive: true, fontSize: '14px' },
+                spacing: { isActive: true, paddingLeft: '16', paddingRight: '16' },
+                backgrounds: { isActive: true, backgroundColor: '#f5f5f5' },
+              },
+              children: [
+                {
+                  name: 'text',
+                  settings: { tag: 'span' },
+                  classes: [],
+                  design: {},
+                  restrictions: { editText: true },
+                  variables: { text: { type: 'dynamic_rich_text', data: { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Close' }] }] } } } },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // --- Slider sub-element templates (not shown in Element Library) ---
   slides: {
     icon: 'slides',

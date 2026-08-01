@@ -272,6 +272,55 @@ const SLIDER_BOOT_SCRIPT = `
 `.trim()
 
 /**
+ * Dialog runtime for the static export. Mirrors components/DialogInitializer:
+ * the modal is a native `<dialog>`, so showModal() supplies focus trapping,
+ * Escape, the inert background and top-layer stacking — this only binds the
+ * trigger/close buttons, the backdrop click, body scroll lock and the
+ * aria-labelledby wiring.
+ */
+const DIALOG_BOOT_SCRIPT = `
+(function () {
+  function boot() {
+    var roots = document.querySelectorAll('[data-dialog-root]');
+    Array.prototype.forEach.call(roots, function (root, index) {
+      var modal = root.querySelector('dialog');
+      if (!modal || typeof modal.showModal !== 'function') return;
+
+      var title = modal.querySelector('[data-dialog-title]');
+      if (title) {
+        if (!title.id) title.id = 'ycode-dialog-title-' + index;
+        modal.setAttribute('aria-labelledby', title.id);
+      }
+
+      function open() {
+        if (modal.open) return;
+        modal.showModal();
+        document.body.classList.add('overflow-hidden');
+      }
+      function close() { if (modal.open) modal.close(); }
+
+      Array.prototype.forEach.call(root.querySelectorAll('[data-dialog-trigger]'), function (el) {
+        el.addEventListener('click', open);
+      });
+      Array.prototype.forEach.call(modal.querySelectorAll('[data-dialog-close]'), function (el) {
+        el.addEventListener('click', close);
+      });
+      modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+      modal.addEventListener('close', function () {
+        document.body.classList.remove('overflow-hidden');
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+`.trim()
+
+/**
  * Minimal interactions runtime for the static export. Reads a JSON blob
  * Ycode emits per-page and wires click→display toggles + breakpoint-aware
  * on-load hiding. Intentionally a tiny subset of what Ycode's React
@@ -727,6 +776,10 @@ export function buildDocument({
   // don't use any dynamic-date visibility.
   if (bodyHtml.indexOf('data-ycode-vis-rule=') !== -1) {
     trailingScripts.push(`<script>${VISIBILITY_BOOT_SCRIPT}</script>`)
+  }
+  // Same sniffing approach: only ship the dialog runtime when the page has one.
+  if (bodyHtml.indexOf('data-dialog-root') !== -1) {
+    trailingScripts.push(`<script>${DIALOG_BOOT_SCRIPT}</script>`)
   }
 
   // Custom body code goes after the page body / scripts but before </body>,

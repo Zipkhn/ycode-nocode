@@ -483,6 +483,13 @@ const LayerItemImpl: React.FC<{
   const isCurrentStatePreview = useEditorStore(
     (state) => state.selectedLayerId === layer.id && state.activeUIState === 'current'
   );
+  // A closed <dialog> is display:none, so it would be invisible and unstylable
+  // on the canvas. Open it while the user works inside it. The selector returns
+  // a stable `null` for every non-dialog layer, so nothing else re-renders on
+  // selection changes.
+  const dialogSelectedId = useEditorStore(
+    (state) => (layer.name === 'dialog' ? state.selectedLayerId : null)
+  );
   const isEditing = editingLayerId === layer.id;
   const isDragging = activeLayerId === layer.id;
   const textEditable = isTextEditable(layer);
@@ -2407,6 +2414,12 @@ const LayerItemImpl: React.FC<{
     // Apply custom attributes from settings (map HTML attr names to JSX equivalents)
     if (layer.settings?.customAttributes) {
       applyCustomAttributes(elementProps, layer.settings.customAttributes);
+    }
+
+    // Canvas only: reveal the dialog while the user is working inside it.
+    // Published pages open it with showModal() instead (DialogInitializer).
+    if (htmlTag === 'dialog' && isEditMode && dialogSelectedId && containsLayerId(layer, dialogSelectedId)) {
+      elementProps.open = true;
     }
 
     // Select with placeholder: set defaultValue so React shows the placeholder option
