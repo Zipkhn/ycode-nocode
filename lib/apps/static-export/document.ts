@@ -278,6 +278,14 @@ const SLIDER_BOOT_SCRIPT = `
  * trigger/close buttons, the backdrop click, body scroll lock and the
  * aria-labelledby wiring.
  */
+/**
+ * Restores the UA "closed means hidden" rule, which the dialog layer's own
+ * display utility overrides. The exported body has no `#ybody` wrapper, so
+ * unlike `app/site.css` these are unscoped. Also ships a visible scrim, since
+ * the default ::backdrop is nearly transparent.
+ */
+const DIALOG_STYLES = `dialog:not([open]){display:none}dialog::backdrop{background-color:rgb(0 0 0 / 0.5)}`
+
 const DIALOG_BOOT_SCRIPT = `
 (function () {
   function boot() {
@@ -743,7 +751,11 @@ export function buildDocument({
   }
   if (noindex) head.push('<meta name="robots" content="noindex" />')
 
-  const css = [fontsCss, colorVariablesCss, publishedCss].filter(Boolean).join('\n')
+  // Sniffed rather than plumbed through BuildHtmlInput, matching how the
+  // visibility runtime below decides whether to ship.
+  const hasDialog = bodyHtml.indexOf('data-dialog-root') !== -1
+
+  const css = [fontsCss, colorVariablesCss, publishedCss, hasDialog ? DIALOG_STYLES : ''].filter(Boolean).join('\n')
   if (css) head.push(`<style>${css}</style>`)
 
   if (includeSwiper) {
@@ -777,8 +789,7 @@ export function buildDocument({
   if (bodyHtml.indexOf('data-ycode-vis-rule=') !== -1) {
     trailingScripts.push(`<script>${VISIBILITY_BOOT_SCRIPT}</script>`)
   }
-  // Same sniffing approach: only ship the dialog runtime when the page has one.
-  if (bodyHtml.indexOf('data-dialog-root') !== -1) {
+  if (hasDialog) {
     trailingScripts.push(`<script>${DIALOG_BOOT_SCRIPT}</script>`)
   }
 

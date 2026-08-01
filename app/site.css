@@ -142,6 +142,22 @@
   display: none !important;
 }
 
+/* Dialog: restore the UA "closed means hidden" rule. The Dialog template gives
+   the <dialog> a display utility (`flex`) so its contents can be laid out, and
+   that utility overrides the UA sheet's `dialog:not([open]) { display: none }`
+   — leaving every dialog permanently open on the page. The attribute selector
+   outranks a single utility class, so the layer's own layout styling still
+   applies once DialogInitializer opens it. Mirrored in `public/canvas.css`. */
+#ybody dialog:not([open]) {
+  display: none;
+}
+
+/* The UA ::backdrop is nearly transparent, which reads as a broken modal.
+   Ship a visible scrim by default. */
+#ybody dialog::backdrop {
+  background-color: rgb(0 0 0 / 0.5);
+}
+
 /* Custom dropdown chevron for native <select> elements on published pages.
    The native arrow is removed by the inline `ycode-form-reset` styles in
    PageRenderer.tsx; this rule restores a consistent chevron. */
