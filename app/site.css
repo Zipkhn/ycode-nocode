@@ -156,6 +156,16 @@
   display: none !important;
 }
 
+/* Keep a long modal inside the viewport and let it scroll internally. Declared
+   here rather than as `max-h-[85vh]` / `overflow-y-auto` utilities on the layer:
+   the builder canvas scans element classes and rewrites every `vh` unit to a
+   pixel value with !important, and an internal scroll container interferes with
+   its wheel-driven panning. CSS rules are invisible to that scanner. */
+#ybody dialog {
+  max-block-size: 85vh;
+  overflow-y: auto;
+}
+
 /* The UA ::backdrop is nearly transparent, which reads as a broken modal.
    Ship a visible scrim by default. */
 #ybody dialog::backdrop {

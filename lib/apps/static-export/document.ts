@@ -284,7 +284,7 @@ const SLIDER_BOOT_SCRIPT = `
  * unlike `app/site.css` these are unscoped. Also ships a visible scrim, since
  * the default ::backdrop is nearly transparent.
  */
-const DIALOG_STYLES = `dialog:not([open]){display:none!important}dialog::backdrop{background-color:rgb(0 0 0 / 0.5)}`
+const DIALOG_STYLES = `dialog:not([open]){display:none!important}dialog{max-block-size:85vh;overflow-y:auto}dialog::backdrop{background-color:rgb(0 0 0 / 0.5)}`
 
 const DIALOG_BOOT_SCRIPT = `
 (function () {

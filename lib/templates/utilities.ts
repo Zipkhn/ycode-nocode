@@ -174,7 +174,12 @@ export const utilityTemplates: Record<string, BlockTemplate> = {
         {
           name: 'dialog',
           customName: 'Dialog Modal',
-          classes: ['w-[400px]', 'max-w-[90vw]', 'max-h-[85vh]', 'overflow-y-auto', 'pt-[24px]', 'pr-[24px]', 'pb-[24px]', 'pl-[24px]', 'rounded-[12px]', 'bg-[#FFFFFF]'],
+          // No `max-h-[85vh]` / `overflow-y-auto` utilities here on purpose: the
+          // canvas scans element classes, rewriting every `vh` unit to pixels
+          // with !important (updateViewportOverrides) and panning on wheel
+          // events. Both live as plain CSS on `dialog` in the stylesheets, which
+          // the scanner never reads.
+          classes: ['w-[400px]', 'max-w-[90vw]', 'pt-[24px]', 'pr-[24px]', 'pb-[24px]', 'pl-[24px]', 'rounded-[12px]', 'bg-[#FFFFFF]'],
           settings: { tag: 'dialog' },
           restrictions: { copy: false, delete: false, ancestor: 'dialogRoot' },
           design: {
