@@ -111,7 +111,7 @@
    display utility (`flex`) overrides the UA `dialog:not([open])` rule and the
    modal sits permanently open over the page. Mirrors `app/site.css`. */
 #canvas-body dialog:not([open]) {
-  display: none;
+  display: none !important;
 }
 
 /* LayerRenderer forces `open` so the modal is editable while the selection sits

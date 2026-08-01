@@ -142,14 +142,18 @@
   display: none !important;
 }
 
-/* Dialog: restore the UA "closed means hidden" rule. The Dialog template gives
-   the <dialog> a display utility (`flex`) so its contents can be laid out, and
-   that utility overrides the UA sheet's `dialog:not([open]) { display: none }`
-   — leaving every dialog permanently open on the page. The attribute selector
-   outranks a single utility class, so the layer's own layout styling still
-   applies once DialogInitializer opens it. Mirrored in `public/canvas.css`. */
+/* Dialog: hold the UA "closed means hidden" rule. Author styles beat the UA
+   origin regardless of specificity, so any display utility landing on the
+   <dialog> defeats `dialog:not([open]) { display: none }` and leaves the modal
+   rendered while closed — stretched over the page by the UA's absolute
+   positioning, swallowing wheel events.
+
+   The template keeps display off the <dialog> (layout lives on its Dialog
+   Content child), so this is a backstop for the two cases the template can't
+   cover: layers built from the older template, and a display the user sets in
+   the Layout controls. Hence `!important`. Mirrored in `public/canvas.css`. */
 #ybody dialog:not([open]) {
-  display: none;
+  display: none !important;
 }
 
 /* The UA ::backdrop is nearly transparent, which reads as a broken modal.
