@@ -65,6 +65,23 @@ test('the <dialog> carries no display utility', () => {
   assert.equal(content.design?.layout?.display, 'Flex');
 });
 
+test('the modal is full-viewport by default', () => {
+  const root = getLayerFromTemplate('dialogRoot');
+  assert.ok(root);
+  const modal = findLayer(root, (l) => l.name === 'dialog');
+  assert.ok(modal);
+
+  // Sizing lives in classes so the Sizing panel can edit it — the stylesheets
+  // only contribute a zero-specificity ceiling. A `max-w-*` here would re-cap
+  // the modal below the viewport, which is what `max-w-[90vw]` used to do.
+  const classes = Array.isArray(modal.classes) ? modal.classes : String(modal.classes).split(/\s+/);
+  assert.ok(classes.includes('w-[100vw]'), 'full viewport width');
+  assert.ok(classes.includes('h-[100vh]'), 'full viewport height');
+  assert.deepEqual(classes.filter((c) => c.startsWith('max-w-') || c.startsWith('max-h-')), []);
+  // Rounded corners on a full-bleed modal leave four notches of backdrop.
+  assert.deepEqual(classes.filter((c) => c.startsWith('rounded')), []);
+});
+
 test('the close button sits inside the modal, the trigger outside it', () => {
   const root = getLayerFromTemplate('dialogRoot');
   assert.ok(root);

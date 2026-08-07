@@ -174,16 +174,20 @@ export const utilityTemplates: Record<string, BlockTemplate> = {
         {
           name: 'dialog',
           customName: 'Dialog Modal',
-          // No `max-h-[85vh]` / `overflow-y-auto` utilities here on purpose: the
-          // canvas scans element classes, rewriting every `vh` unit to pixels
-          // with !important (updateViewportOverrides) and panning on wheel
-          // events. Both live as plain CSS on `dialog` in the stylesheets, which
-          // the scanner never reads.
-          classes: ['w-[400px]', 'max-w-[90vw]', 'pt-[24px]', 'pr-[24px]', 'pb-[24px]', 'pl-[24px]', 'rounded-[12px]', 'bg-[#FFFFFF]'],
+          // Full-viewport by default. Sizing lives in classes so the Sizing
+          // panel can edit it; the stylesheets only supply a `max-block-size`
+          // ceiling and the internal scroll, both at zero specificity so these
+          // win. No corner radius: on a full-bleed modal it would leave four
+          // notches of backdrop showing.
+          //
+          // No `overflow-y-auto` utility here on purpose — an internal scroll
+          // container swallows the wheel events the canvas pans with, so that
+          // one declaration stays in plain CSS where the canvas never reads it.
+          classes: ['w-[100vw]', 'h-[100vh]', 'pt-[24px]', 'pr-[24px]', 'pb-[24px]', 'pl-[24px]', 'bg-[#FFFFFF]'],
           settings: { tag: 'dialog' },
           restrictions: { copy: false, delete: false, ancestor: 'dialogRoot' },
           design: {
-            sizing: { isActive: true, width: '400px' },
+            sizing: { isActive: true, width: '100vw', height: '100vh' },
             spacing: { isActive: true, paddingTop: '24', paddingRight: '24', paddingBottom: '24', paddingLeft: '24' },
             backgrounds: { isActive: true, backgroundColor: '#ffffff' },
           },

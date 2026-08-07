@@ -156,13 +156,22 @@
   display: none !important;
 }
 
-/* Keep a long modal inside the viewport and let it scroll internally. Declared
-   here rather than as `max-h-[85vh]` / `overflow-y-auto` utilities on the layer:
-   the builder canvas scans element classes and rewrites every `vh` unit to a
-   pixel value with !important, and an internal scroll container interferes with
-   its wheel-driven panning. CSS rules are invisible to that scanner. */
-#ybody dialog {
-  max-block-size: 85vh;
+/* Hold the modal inside the viewport and let it scroll internally, so a long one
+   can never push its own close button out of reach. Declared here rather than as
+   an `overflow-y-auto` utility on the layer: an internal scroll container under
+   the cursor swallows the wheel events the builder canvas pans with.
+
+   `:where()` keeps the #ybody scoping while contributing zero specificity, so
+   these stay defaults rather than a ceiling: a `max-h-*` set in the layer's
+   Sizing controls (0,1,0) outranks them. Without it `#ybody dialog` (1,0,1)
+   wins and no panel value can lift the cap. The closed-state rule above
+   deliberately keeps its specificity — that one must never be overridable. */
+:where(#ybody) dialog {
+  /* Both axes are set explicitly: the UA caps a top-layer dialog at
+     `calc(100% - 2em - 6px)` on each, so leaving either unset silently pins a
+     full-bleed modal 38px short of the viewport. */
+  max-inline-size: 100vw;
+  max-block-size: 100vh;
   overflow-y: auto;
 }
 
