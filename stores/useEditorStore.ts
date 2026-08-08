@@ -126,6 +126,8 @@ interface EditorActions {
   setCleanSlate: (value: boolean) => void;
   isDevMode: boolean;
   toggleDevMode: () => void;
+  isSpacingOverlay: boolean;
+  toggleSpacingOverlay: () => void;
   defaultUnit: string;
   setDefaultUnit: (unit: string) => void;
   // Canvas drag-and-drop actions (pointer-based)
@@ -326,6 +328,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
   isDevMode: false,
   toggleDevMode: () => set((state) => ({ isDevMode: !state.isDevMode })),
+  isSpacingOverlay: false,
+  toggleSpacingOverlay: () => set((state) => ({ isSpacingOverlay: !state.isSpacingOverlay })),
   defaultUnit: (() => {
     const saved = typeof window !== 'undefined' ? (localStorage.getItem('ycode_default_unit') || 'px') : 'px';
     setDefaultMeasurementUnit(saved);

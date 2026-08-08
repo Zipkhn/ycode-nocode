@@ -44,6 +44,8 @@ export function SelectionOverlay({
   // While the AI composer is in "reference a layer" mode, outlines turn teal to
   // signal the click will attach the layer to the chat rather than just select it.
   const isAiLayerPicking = useEditorStore((state) => state.isAiLayerPicking);
+  // Canvas spacing overlay (Cmd+Shift+D)
+  const isSpacingOverlay = useEditorStore((state) => state.isSpacingOverlay);
 
   // Pick-mode uses a brighter, slightly thicker teal so the outline keeps
   // contrast over both light and dark page content (the muted badge teal washes
@@ -74,10 +76,101 @@ export function SelectionOverlay({
   const isSliderAnimatingRef = useRef(false);
   const isSidebarResizingRef = useRef(false);
 
+  const spacingContainerRef = useRef<HTMLDivElement>(null);
+
   const hideAllOutlines = useCallback(() => {
     if (selectedContainerRef.current) selectedContainerRef.current.style.display = 'none';
     if (hoveredContainerRef.current) hoveredContainerRef.current.style.display = 'none';
     if (parentContainerRef.current) parentContainerRef.current.style.display = 'none';
+    if (spacingContainerRef.current) spacingContainerRef.current.style.display = 'none';
+  }, []);
+
+  /**
+   * Paint the selected element's padding (inside the box) and margin (outside
+   * it), Chrome DevTools colour convention: green for padding, orange for
+   * margin. Bands are pooled children positioned in the same screen coordinate
+   * space as the outlines above, so they inherit every listener already wired
+   * up below (scroll, mutation, resize, zoom).
+   */
+  const updateSpacingOverlay = useCallback((
+    container: HTMLDivElement | null,
+    layerId: string | null,
+    iframeDoc: Document,
+    iframeElement: HTMLIFrameElement,
+    containerElement: HTMLElement,
+    scale: number,
+  ) => {
+    if (!container) return;
+
+    // The body layer has no box of its own (#canvas-body is display:contents).
+    const target = layerId && layerId !== 'body'
+      ? iframeDoc.querySelector(`[data-layer-id="${layerId}"]`)
+      : null;
+    if (!target) {
+      container.style.display = 'none';
+      return;
+    }
+
+    const view = iframeElement.contentWindow;
+    if (!view) {
+      container.style.display = 'none';
+      return;
+    }
+
+    const cs = view.getComputedStyle(target);
+    const rect = target.getBoundingClientRect();
+    const iframeRect = iframeElement.getBoundingClientRect();
+    const containerRect = containerElement.getBoundingClientRect();
+
+    const top = iframeRect.top - containerRect.top + rect.top * scale;
+    const left = iframeRect.left - containerRect.left + rect.left * scale;
+    const width = rect.width * scale;
+    const height = rect.height * scale;
+
+    const num = (v: string) => parseFloat(v) || 0;
+    const pad = { t: num(cs.paddingTop), r: num(cs.paddingRight), b: num(cs.paddingBottom), l: num(cs.paddingLeft) };
+    const mar = { t: num(cs.marginTop), r: num(cs.marginRight), b: num(cs.marginBottom), l: num(cs.marginLeft) };
+
+    // Inner height of the padding side-bands, so they don't overlap top/bottom.
+    const sideTop = top + pad.t * scale;
+    const sideHeight = Math.max(0, height - (pad.t + pad.b) * scale);
+
+    type Band = { x: number; y: number; w: number; h: number; value: number; margin: boolean };
+    const bands: Band[] = [
+      { x: left, y: top, w: width, h: pad.t * scale, value: pad.t, margin: false },
+      { x: left, y: top + height - pad.b * scale, w: width, h: pad.b * scale, value: pad.b, margin: false },
+      { x: left, y: sideTop, w: pad.l * scale, h: sideHeight, value: pad.l, margin: false },
+      { x: left + width - pad.r * scale, y: sideTop, w: pad.r * scale, h: sideHeight, value: pad.r, margin: false },
+      { x: left, y: top - mar.t * scale, w: width, h: mar.t * scale, value: mar.t, margin: true },
+      { x: left, y: top + height, w: width, h: mar.b * scale, value: mar.b, margin: true },
+      { x: left - mar.l * scale, y: top, w: mar.l * scale, h: height, value: mar.l, margin: true },
+      { x: left + width, y: top, w: mar.r * scale, h: height, value: mar.r, margin: true },
+      // Negative margins are dropped below rather than drawn inverted.
+    ].filter(b => b.value > 0 && b.w > 0 && b.h > 0);
+
+    container.style.display = 'block';
+
+    while (container.children.length < bands.length) {
+      const div = document.createElement('div');
+      div.className = 'absolute flex items-center justify-center text-[10px] leading-none font-medium text-black/70 tabular-nums overflow-hidden';
+      container.appendChild(div);
+    }
+    for (let i = bands.length; i < container.children.length; i++) {
+      (container.children[i] as HTMLElement).style.display = 'none';
+    }
+
+    bands.forEach((band, idx) => {
+      const child = container.children[idx] as HTMLElement;
+      child.style.display = 'flex';
+      child.style.top = `${band.y}px`;
+      child.style.left = `${band.x}px`;
+      child.style.width = `${band.w}px`;
+      child.style.height = `${band.h}px`;
+      child.style.background = band.margin ? 'rgba(246, 178, 107, 0.45)' : 'rgba(147, 196, 125, 0.45)';
+      // The value is the CSS px the user set, not the zoomed screen size. Hide it
+      // when the band is too small to hold the label legibly.
+      child.textContent = band.w >= 22 && band.h >= 12 ? String(Math.round(band.value)) : '';
+    });
   }, []);
 
   // Update outline(s) for all elements matching a layer ID
@@ -214,6 +307,12 @@ export function SelectionOverlay({
       return;
     }
 
+    updateSpacingOverlay(
+      spacingContainerRef.current,
+      isSpacingOverlay && !isAiLayerPicking ? selectedLayerId : null,
+      ctx.iframeDoc, ctx.iframeElement, ctx.containerElement, ctx.scale,
+    );
+
     // Pick mode: strip selection/parent outlines for a focused picking UX and
     // show only the layer currently under the cursor.
     if (isAiLayerPicking) {
@@ -237,7 +336,7 @@ export function SelectionOverlay({
       ? selectedLayerId
       : (parentLayerId !== selectedLayerId ? parentLayerId : null);
     updateOutline(parentContainerRef.current, effectiveParentId, ctx.iframeDoc, ctx.iframeElement, ctx.containerElement, ctx.scale, PARENT_OUTLINE_CLASS);
-  }, [getOutlineContext, hideAllOutlines, selectedLayerId, parentLayerId, updateOutline, activeSublayerIndex, activeListItemIndex, SELECTED_OUTLINE_CLASS, HOVERED_OUTLINE_CLASS, PARENT_OUTLINE_CLASS, isAiLayerPicking]);
+  }, [getOutlineContext, hideAllOutlines, selectedLayerId, parentLayerId, updateOutline, updateSpacingOverlay, isSpacingOverlay, activeSublayerIndex, activeListItemIndex, SELECTED_OUTLINE_CLASS, HOVERED_OUTLINE_CLASS, PARENT_OUTLINE_CLASS, isAiLayerPicking]);
 
   // Initial update and updates when IDs change. Selecting a layer can reveal a
   // previously hidden ancestor (display:none → visible) in the iframe's separate
@@ -457,6 +556,9 @@ export function SelectionOverlay({
       className="absolute inset-0 pointer-events-none overflow-hidden z-40"
       style={isCanvasContextMenuOpen ? { display: 'none' } : undefined}
     >
+      {/* Spacing bands (Cmd+Shift+D) - painted under the outlines */}
+      <div ref={spacingContainerRef} style={{ display: 'none' }} />
+
       {/* Parent outline container (dashed) - visible during drag */}
       <div ref={parentContainerRef} style={{ display: 'none' }} />
 

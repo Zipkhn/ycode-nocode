@@ -1616,6 +1616,16 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
           return;
         }
 
+        // Shift + Cmd + D - Toggle the canvas spacing overlay. Uses e.code so the
+        // shifted key ('D') doesn't fall through to the Cmd+D duplicate handler.
+        if (e.shiftKey && (e.metaKey || e.ctrlKey) && e.code === 'KeyD') {
+          if (!isInputFocused) {
+            e.preventDefault();
+            useEditorStore.getState().toggleSpacingOverlay();
+          }
+          return;
+        }
+
         // Shift + Cmd + H - Toggle layer visibility (Show/Hide)
         if (e.shiftKey && e.metaKey && e.code === 'KeyH' && !isContentOnlyRole) {
           if (!isInputFocused && (currentPageId || editingComponentId) && selectedLayerId) {

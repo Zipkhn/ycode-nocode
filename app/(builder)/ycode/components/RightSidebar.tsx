@@ -271,6 +271,8 @@ const RightSidebar = React.memo(function RightSidebar({
   const isElementPickerActive = useEditorStore((state) => !!state.elementPicker?.active);
   const isDevMode = useEditorStore((state) => state.isDevMode);
   const toggleDevMode = useEditorStore((state) => state.toggleDevMode);
+  const isSpacingOverlay = useEditorStore((state) => state.isSpacingOverlay);
+  const toggleSpacingOverlay = useEditorStore((state) => state.toggleSpacingOverlay);
   const openRichTextSheet = useEditorStore((state) => state.openRichTextSheet);
 
   // Check if text is being edited on canvas
@@ -2048,6 +2050,15 @@ const RightSidebar = React.memo(function RightSidebar({
               <TabsTrigger value="settings">Settings</TabsTrigger>
               <TabsTrigger value="interactions" disabled={isLocalizing}>Interactions</TabsTrigger>
             </TabsList>
+            <Button
+              variant={isSpacingOverlay ? 'secondary' : 'ghost'}
+              size="xs"
+              className="ml-1 shrink-0"
+              onClick={toggleSpacingOverlay}
+              title="Show spacing (⌘⇧D)"
+            >
+              <Icon name="space" className="size-3.5" />
+            </Button>
             <Button
               variant={isDevMode ? 'secondary' : 'ghost'}
               size="xs"
