@@ -193,6 +193,15 @@ lib/runtime-visibility.ts             ← App State runtime_var (visibilité ré
 
 Validation : `tsc` 0 err, `npm test` 170/170, smoke HTTP (/ , /ycode, /sitemap.xml, /robots.txt tous 200, og:url + grille `u-col-span` rendus). Tags `backup/pre-v1.26.0`, `merge/upstream-v1.26.0-tested`.
 
+### v1.29.6 (merge 2026-08-07, checklist navigateur passée 2026-08-08) — 1.29.2 → v1.29.6, 15 commits, 0 migration
+Merge : seul `package-lock.json` en conflit. Mutations fork toutes intactes (§2 vert).
+
+**🔴 Régression trouvée par la checklist — `<html lang>`** : upstream `93b986d` (24 juil.) ajoute un `<script>` brut dans `PageRenderer` pour poser `document.documentElement.lang`. Upstream n'a pas de routing client ; notre nav `router.push` (`f4bb253`, 16 juil.) le re-render à chaque navigation → React refuse d'exécuter un script créé au render client (*« Encountered a script tag while rendering React component »*) et `lang` reste figé entre locales. **Fix** : `components/HtmlLangApplier.tsx` (`useLayoutEffect`, même pattern que `BodyClassApplier`).
+→ **Au prochain merge** : tout `<script>` inline ajouté par upstream dans `PageRenderer`/`(site)` doit passer par `InitialLoadScript` (initial-load only) ou un effet client (si la valeur change d'une page à l'autre).
+
+Validé navigateur : canvas (grille `u-col-span`, Lottie animé, Dev mode 12 col., Clean Slate, Studio 8 sections + rendu live d'une variable couleur), preview + error-page 404 (favicon custom), site publié (cascade `<style id="studio-theme">`, soft nav sans reload). `tsc` 0 err, `npm test` 303/303.
+Non couverts (projet mono-locale / réglages absents) : traductions on canvas, link-block, import CSV, JSON-LD, hreflang.
+
 ---
 
 **Règle d'or :** Ne push jamais sur `main` sans avoir validé section 4 (tests fonctionnels en navigateur). Le tsc + build ne détectent PAS les régressions de rendu (Lottie absent, dimensions effondrées, etc.).

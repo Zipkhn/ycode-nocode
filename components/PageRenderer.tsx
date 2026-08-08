@@ -1,5 +1,6 @@
 import AnimationInitializer from '@/components/AnimationInitializer';
 import BodyClassApplier from '@/components/BodyClassApplier';
+import HtmlLangApplier from '@/components/HtmlLangApplier';
 import ContentHeightReporter from '@/components/ContentHeightReporter';
 import CustomCodeInjector from '@/components/CustomCodeInjector';
 import HreflangAlternateLinks from '@/components/HreflangAlternateLinks';
@@ -925,13 +926,7 @@ export default async function PageRenderer({
       {/* Set <html lang> from the page locale. The root element is rendered by
           the shared layout (which can't know the per-page locale), so apply it
           here where the locale is resolved. */}
-      {resolvedLang && (
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `document.documentElement.lang=${JSON.stringify(resolvedLang)}`,
-          }}
-        />
-      )}
+      {resolvedLang && <HtmlLangApplier lang={resolvedLang} />}
 
       <div
         id="ybody"
