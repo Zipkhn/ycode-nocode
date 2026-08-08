@@ -22,9 +22,15 @@ const COLOR_ROWS = [
 const MODES = ['light', 'dark'] as const;
 type Mode = typeof MODES[number];
 
-function ColorCell({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+/**
+ * `value` is the stored value — a hex or a `var(--token)` alias, shown as-is in the
+ * text field so editing a row never silently flattens the alias. `swatch` is that
+ * value resolved to a hex, for the preview and the native picker (which can only
+ * emit a hex: picking a color is an explicit override of the alias).
+ */
+function ColorCell({ value, swatch, onChange }: { value: string; swatch: string; onChange: (v: string) => void }) {
   const id = useId();
-  const hex = /^#[0-9a-f]{6}$/i.test(value) ? value : '#000000';
+  const hex = /^#[0-9a-f]{6}$/i.test(swatch) ? swatch : '#000000';
   return (
     <div className="flex items-center gap-1.5 w-full">
       <label
@@ -43,7 +49,7 @@ function ColorCell({ value, onChange }: { value: string; onChange: (v: string) =
         type="text" value={value}
         onChange={e => onChange(e.target.value)}
         className="flex-1 min-w-0 bg-transparent text-white text-[11px] font-mono outline-none focus:bg-white/5 rounded px-1 py-0.5"
-        maxLength={9} spellCheck={false}
+        maxLength={48} spellCheck={false}
       />
     </div>
   );
@@ -149,8 +155,10 @@ export function ThemeSection({ hook }: Props) {
   const dynamicGradientTokens = getDynamicGradientTokens(variables);
   const allGradientTokens = [...STATIC_GRADIENT_TOKENS, ...dynamicGradientTokens];
 
-  const getColorVal = (rowKey: string, mode: Mode) => {
-    const raw = variables[`theme-${mode}--${rowKey}`] ?? '';
+  const getColorRaw = (rowKey: string, mode: Mode) => variables[`theme-${mode}--${rowKey}`] ?? '';
+
+  const getColorSwatch = (rowKey: string, mode: Mode) => {
+    const raw = getColorRaw(rowKey, mode);
     return raw.startsWith('var(') ? resolveVarToHex(raw, variables) || raw : raw;
   };
 
@@ -224,7 +232,8 @@ export function ThemeSection({ hook }: Props) {
               {MODES.map(mode => (
                 <td key={mode} className="border-l border-white/5 px-2 py-0.5">
                   <ColorCell
-                    value={getColorVal(row.key, mode)}
+                    value={getColorRaw(row.key, mode)}
+                    swatch={getColorSwatch(row.key, mode)}
                     onChange={v => setVar(`theme-${mode}--${row.key}`, v)}
                   />
                 </td>
@@ -248,7 +257,8 @@ export function ThemeSection({ hook }: Props) {
               {MODES.map(mode => (
                 <td key={mode} className="border-l border-white/5 px-2 py-0.5">
                   <ColorCell
-                    value={getColorVal(row.key, mode)}
+                    value={getColorRaw(row.key, mode)}
+                    swatch={getColorSwatch(row.key, mode)}
                     onChange={v => setVar(`theme-${mode}--${row.key}`, v)}
                   />
                 </td>
