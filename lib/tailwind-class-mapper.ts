@@ -521,9 +521,40 @@ export function getConflictingClassPattern(property: string): RegExp | null {
 /**
  * Helper: Extract arbitrary value from Tailwind class
  */
+/**
+ * Colour values that carry spaces inside parentheses: `oklch(0.7 0.2 180)`,
+ * `rgb(255 0 0)`, `linear-gradient(90deg, #fff, #000)`. Tailwind writes those
+ * spaces as `_` inside an arbitrary value, so they need escaping on the way out
+ * and unescaping on the way back in.
+ */
+const SPACED_COLOR_FN_RE = /^(?:oklch|oklab|rgba?|hsla?|color-mix|color|(?:repeating-)?(?:linear|radial|conic)-gradient)\(/i;
+
+/**
+ * Build an arbitrary colour class. Two Tailwind rules apply:
+ * - an arbitrary value cannot contain spaces — they are written `_`;
+ * - the opacity modifier is a trailing `/NN`. A slash *inside* the value belongs
+ *   to the colour function (`oklch(L C H / a)`) and must never be split on.
+ */
+function arbitraryColorClass(prefix: string, value: string): string {
+  const withOpacity = value.match(/^(.*)\/(\d+)$/);
+  const color = withOpacity ? withOpacity[1] : value;
+  const opacity = withOpacity ? withOpacity[2] : null;
+  const escaped = color.replace(/\s+/g, '_');
+  return opacity ? `${prefix}-[${escaped}]/${opacity}` : `${prefix}-[${escaped}]`;
+}
+
+/**
+ * Restore the spaces Tailwind requires us to write as `_`. Only colour functions
+ * are unescaped: `_` is legitimate elsewhere, most notably in a custom-property
+ * name (`var(--my_token)`).
+ */
+function unescapeArbitraryColor(value: string): string {
+  return SPACED_COLOR_FN_RE.test(value) ? value.replace(/_/g, ' ') : value;
+}
+
 function extractArbitraryValue(className: string): string | null {
   const match = className.match(/\[([^\]]+)\]/);
-  return match ? match[1] : null;
+  return match ? unescapeArbitraryColor(match[1]) : null;
 }
 
 /**
@@ -534,7 +565,7 @@ function extractArbitraryValueWithOpacity(className: string): string | null {
   const match = className.match(/\[([^\]]+)\](?:\/(\d+))?/);
   if (!match) return null;
 
-  const value = match[1];
+  const value = unescapeArbitraryColor(match[1]);
   const opacity = match[2];
 
   // If opacity exists, append it with /
@@ -825,11 +856,7 @@ export function propertyToClass(
           return `decoration-[color:${value}]`;
         }
         if (value.match(/^#|^rgb|^hsl|^oklch\(|^oklab\(/)) {
-          const parts = value.split('/');
-          if (parts.length === 2) {
-            return `decoration-[${parts[0]}]/${parts[1]}`;
-          }
-          return `decoration-[${value}]`;
+          return arbitraryColorClass('decoration', value);
         }
         return `decoration-${value}`;
       }
@@ -853,12 +880,7 @@ export function propertyToClass(
           return `text-[color:${value}]`;
         }
         if (value.match(/^#|^rgb|^oklch\(|^oklab\(/)) {
-          // Handle opacity: split "#cc8d8d/59" into "text-[#cc8d8d]/59"
-          const parts = value.split('/');
-          if (parts.length === 2) {
-            return `text-[${parts[0]}]/${parts[1]}`;
-          }
-          return `text-[${value}]`;
+          return arbitraryColorClass('text', value);
         }
         return `text-${value}`;
       case 'placeholderColor':
@@ -869,11 +891,7 @@ export function propertyToClass(
           return `placeholder:text-[color:${value}]`;
         }
         if (value.match(/^#|^rgb|^oklch\(|^oklab\(/)) {
-          const parts = value.split('/');
-          if (parts.length === 2) {
-            return `placeholder:text-[${parts[0]}]/${parts[1]}`;
-          }
-          return `placeholder:text-[${value}]`;
+          return arbitraryColorClass('placeholder:text', value);
         }
         return `placeholder:text-${value}`;
     }
@@ -994,12 +1012,7 @@ export function propertyToClass(
           return `border-[color:${value}]`;
         }
         if (value.match(/^#|^rgb|^oklch\(|^oklab\(/)) {
-          // Handle opacity: split "#cc8d8d/59" into "border-[#cc8d8d]/59"
-          const parts = value.split('/');
-          if (parts.length === 2) {
-            return `border-[${parts[0]}]/${parts[1]}`;
-          }
-          return `border-[${value}]`;
+          return arbitraryColorClass('border', value);
         }
         return `border-${value}`;
       case 'borderRadius':
@@ -1028,12 +1041,7 @@ export function propertyToClass(
           return `divide-[color:${value}]`;
         }
         if (value.match(/^#|^rgb|^oklch\(|^oklab\(/)) {
-          // Handle opacity: split "#cc8d8d/59" into "divide-[#cc8d8d]/59"
-          const parts = value.split('/');
-          if (parts.length === 2) {
-            return `divide-[${parts[0]}]/${parts[1]}`;
-          }
-          return `divide-[${value}]`;
+          return arbitraryColorClass('divide', value);
         }
         return `divide-${value}`;
       case 'outlineWidth':
@@ -1046,11 +1054,7 @@ export function propertyToClass(
           return `outline-[color:${value}]`;
         }
         if (value.match(/^#|^rgb|^oklch\(|^oklab\(/)) {
-          const parts = value.split('/');
-          if (parts.length === 2) {
-            return `outline-[${parts[0]}]/${parts[1]}`;
-          }
-          return `outline-[${value}]`;
+          return arbitraryColorClass('outline', value);
         }
         return `outline-${value}`;
       case 'outlineOffset':
@@ -1070,12 +1074,7 @@ export function propertyToClass(
         }
         // Gradients and hex/rgb colors need brackets for arbitrary values
         if (value.match(/^#|^rgb|gradient\(|^oklch\(|^oklab\(/)) {
-          // Handle opacity: split "#cc8d8d/59" into "bg-[#cc8d8d]/59"
-          const parts = value.split('/');
-          if (parts.length === 2 && !value.includes('gradient(')) {
-            return `bg-[${parts[0]}]/${parts[1]}`;
-          }
-          return `bg-[${value}]`;
+          return arbitraryColorClass('bg', value);
         }
         return `bg-${value}`;
       case 'backgroundImage':

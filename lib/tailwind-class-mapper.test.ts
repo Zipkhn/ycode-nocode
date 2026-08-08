@@ -7,6 +7,8 @@ import {
   getBreakpointClasses,
   removeConflictingClasses,
   removeRedundantSpacingShorthands,
+  designToClassString,
+  classesToDesign,
 } from '@/lib/tailwind-class-mapper';
 import type { Breakpoint } from '@/types';
 
@@ -108,4 +110,59 @@ test('removeRedundantSpacingShorthands: different breakpoint groups do not cross
   // pl/pr on desktop must NOT make max-md:px redundant
   const out = removeRedundantSpacingShorthands(['max-md:px-4', 'pl-2', 'pr-2']);
   assert.ok(out.includes('max-md:px-4'));
+});
+
+// --- spaced colour values (oklch / oklab / modern rgb) ------------------------
+// Tailwind writes spaces inside an arbitrary value as `_`. Emitting the raw
+// spaces produced several class tokens instead of one, so the rule was never
+// generated and the colour silently did not render.
+test('designToClassString: oklch is emitted as a single escaped token', () => {
+  const cls = designToClassString({ backgrounds: { backgroundColor: 'oklch(0.7 0.2 180)' } } as never);
+  assert.equal(cls, 'bg-[oklch(0.7_0.2_180)]');
+  assert.equal(cls.trim().split(/\s+/).length, 1);
+});
+
+test('designToClassString: the slash inside oklch is not read as an opacity modifier', () => {
+  const cls = designToClassString({ backgrounds: { backgroundColor: 'oklch(0.7 0.2 180 / 0.5)' } } as never);
+  assert.equal(cls, 'bg-[oklch(0.7_0.2_180_/_0.5)]');
+});
+
+test('designToClassString: a trailing /NN stays an opacity modifier', () => {
+  const oklch = designToClassString({ backgrounds: { backgroundColor: 'oklch(0.7 0.2 180)/50' } } as never);
+  assert.equal(oklch, 'bg-[oklch(0.7_0.2_180)]/50');
+  const hex = designToClassString({ backgrounds: { backgroundColor: '#cc8d8d/59' } } as never);
+  assert.equal(hex, 'bg-[#cc8d8d]/59');
+});
+
+test('designToClassString: modern rgb and gradients are escaped too', () => {
+  assert.equal(
+    designToClassString({ backgrounds: { backgroundColor: 'rgb(255 0 0)' } } as never),
+    'bg-[rgb(255_0_0)]'
+  );
+  assert.equal(
+    designToClassString({ backgrounds: { backgroundColor: 'linear-gradient(90deg, #fff, #000)' } } as never),
+    'bg-[linear-gradient(90deg,_#fff,_#000)]'
+  );
+});
+
+test('designToClassString: colour properties other than background are escaped', () => {
+  assert.equal(designToClassString({ typography: { color: 'oklch(0.5 0.1 20)' } } as never), 'text-[oklch(0.5_0.1_20)]');
+  assert.equal(designToClassString({ borders: { borderColor: 'oklch(0.5 0.1 20)' } } as never), 'border-[oklch(0.5_0.1_20)]');
+});
+
+test('classesToDesign: underscores are restored to spaces for colour functions', () => {
+  const design = classesToDesign('bg-[oklch(0.7_0.2_180)]');
+  assert.equal(design?.backgrounds?.backgroundColor, 'oklch(0.7 0.2 180)');
+});
+
+test('classesToDesign: underscores in a custom-property name are left alone', () => {
+  const design = classesToDesign('bg-[color:var(--my_token)]');
+  assert.equal(design?.backgrounds?.backgroundColor, 'color:var(--my_token)');
+});
+
+test('oklch survives a full design → class → design round trip', () => {
+  for (const value of ['oklch(0.7 0.2 180)', 'oklch(70% 0.2 180)', 'oklch(0.7 0.2 180 / 0.5)', '#2B3799']) {
+    const cls = designToClassString({ backgrounds: { backgroundColor: value } } as never);
+    assert.equal(classesToDesign(cls)?.backgrounds?.backgroundColor, value, `round trip for ${value}`);
+  }
 });

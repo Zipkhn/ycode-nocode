@@ -95,6 +95,33 @@ function oklchToRgb(l: number, c: number, h: number): { r: number; g: number; b:
   };
 }
 
+/** Inverse of oklchToRgb — same matrices, run backwards. */
+function rgbToOklch(r: number, g: number, b: number): { l: number; c: number; h: number } {
+  const toLinear = (x: number) => { const v = x / 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const lr = toLinear(r), lg = toLinear(g), lb = toLinear(b);
+  const l_ = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+  const m_ = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+  const s_ = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+  const l = 0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_;
+  const a = 1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_;
+  const bb = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_;
+  const c = Math.sqrt(a * a + bb * bb);
+  let h = (Math.atan2(bb, a) * 180) / Math.PI;
+  if (h < 0) h += 360;
+  return { l, c, h };
+}
+
+/**
+ * Serialise to `oklch(L C H)`, mirroring rgbaToHex's opacity convention
+ * (a trailing `/NN`, applied by Tailwind as an opacity modifier).
+ */
+function rgbaToOklch(rgba: { r: number; g: number; b: number; a: number }): string {
+  const { l, c, h } = rgbToOklch(rgba.r, rgba.g, rgba.b);
+  const round = (n: number, d: number) => parseFloat(n.toFixed(d));
+  const color = `oklch(${round(l, 4)} ${round(c, 4)} ${round(h, 2)})`;
+  return rgba.a < 1 ? `${color}/${Math.round(rgba.a * 100)}` : color;
+}
+
 // Helper to convert hex/rgba to RgbaColor object
 // Supports formats: #hex, #hex/opacity, #rrggbbaa (8-char with alpha), rgba(...)
 function parseColor(colorString: string): { r: number; g: number; b: number; a: number } {
@@ -172,14 +199,24 @@ function rgbaToHex(rgba: { r: number; g: number; b: number; a: number }): string
  * e.g. "#ff0000/50" → "rgba(255,0,0,0.5)", "#ff0000" → "#ff0000"
  */
 function hexToRgba(value: string): string {
-  const parts = value.split('/');
-  const hex = parts[0];
-  if (parts.length < 2) return hex;
-  const opacity = parseInt(parts[1]) / 100;
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${opacity})`;
+  const hexWithOpacity = value.match(/^(#[0-9a-fA-F]{6})\/(\d+)$/);
+  if (hexWithOpacity) {
+    const hex = hexWithOpacity[1];
+    const opacity = parseInt(hexWithOpacity[2]) / 100;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${opacity})`;
+  }
+
+  // A colour function carries its own alpha slot, so fold the `/NN` modifier in
+  // rather than splitting on a slash that may also live inside the parentheses.
+  const fnWithOpacity = value.match(/^(\w+\(.*\))\/(\d+)$/);
+  if (fnWithOpacity) {
+    return fnWithOpacity[1].replace(/\)\s*$/, ` / ${parseInt(fnWithOpacity[2]) / 100})`);
+  }
+
+  return value;
 }
 
 // Helper to get just the hex part (6 chars) from a color value
@@ -1488,6 +1525,16 @@ export default function ColorPicker({
     }
   };
 
+  /**
+   * Serialise an edited colour, preserving the format it came in as. The wheel
+   * works in sRGB, so a value stored as `oklch(...)` (Tailwind v4 / Shadcn
+   * themes) would otherwise be silently rewritten to hex on the first edit.
+   * Wide-gamut colours are still clamped to sRGB — that is the wheel's limit,
+   * not the format's.
+   */
+  const emitColor = (rgba: { r: number; g: number; b: number; a: number }) =>
+    /^oklch\(/i.test(value ?? '') ? rgbaToOklch(rgba) : rgbaToHex(rgba);
+
   /** Routes a color value through varEditState (edit/create) or directly to the parent onChange. */
   const commitColorValue = (colorValue: string) => {
     if (varEditState?.mode === 'edit' && varEditState.id) {
@@ -1505,7 +1552,7 @@ export default function ColorPicker({
   const handleRgbaChange = (color: { r: number; g: number; b: number; a: number }) => {
     setRgbaColor(color);
     isInternalUpdate.current = true;
-    commitColorValue(rgbaToHex(color));
+    commitColorValue(emitColor(color));
   };
 
   // EyeDropper handler for solid colors
@@ -1536,7 +1583,7 @@ export default function ColorPicker({
 
       // Mark as internal update
       isInternalUpdate.current = true;
-      immediateOnChange(rgbaToHex(parsed));
+      immediateOnChange(emitColor(parsed));
     } catch {
       // User cancelled or error occurred
     }
@@ -1670,7 +1717,7 @@ export default function ColorPicker({
         setSaturation(hsv.s);
         setHsvValue(hsv.v);
         setHexInputValue(validHex);
-        commitColorValue(rgbaToHex(finalRgba));
+        commitColorValue(emitColor(finalRgba));
       }
     } else {
       // Invalid format - reset to current color
