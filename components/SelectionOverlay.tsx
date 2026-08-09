@@ -10,7 +10,7 @@
  * useCanvasSiblingReorder hook, which listens to iframe mousedown events.
  */
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { useEditorStore } from '@/stores/useEditorStore';
 interface SelectionOverlayProps {
   /** Reference to the canvas iframe element */
@@ -46,6 +46,9 @@ export function SelectionOverlay({
   const isAiLayerPicking = useEditorStore((state) => state.isAiLayerPicking);
   // Canvas spacing overlay (Cmd+Shift+D)
   const isSpacingOverlay = useEditorStore((state) => state.isSpacingOverlay);
+  // Held Alt+Shift "peeks" at spacing: the bands follow the cursor instead of
+  // the selection, for as long as the modifiers are down.
+  const [isSpacingPeek, setIsSpacingPeek] = useState(false);
 
   // Pick-mode uses a brighter, slightly thicker teal so the outline keeps
   // contrast over both light and dark page content (the muted badge teal washes
@@ -268,6 +271,38 @@ export function SelectionOverlay({
     });
   }, []);
 
+  // Track the Alt+Shift peek modifiers. The cursor sits over the iframe while
+  // peeking, so its document is what receives the key events — listen in both.
+  useEffect(() => {
+    const iframeDoc = iframeElement?.contentDocument;
+    const targets: Document[] = iframeDoc ? [document, iframeDoc] : [document];
+    const sync = (e: Event) => setIsSpacingPeek((e as KeyboardEvent).altKey && (e as KeyboardEvent).shiftKey);
+    const clear = () => setIsSpacingPeek(false);
+
+    targets.forEach((t) => {
+      t.addEventListener('keydown', sync);
+      t.addEventListener('keyup', sync);
+    });
+    // A modifier released while the window is unfocused never fires keyup.
+    window.addEventListener('blur', clear);
+
+    return () => {
+      targets.forEach((t) => {
+        t.removeEventListener('keydown', sync);
+        t.removeEventListener('keyup', sync);
+      });
+      window.removeEventListener('blur', clear);
+    };
+  }, [iframeElement]);
+
+  /** Which layer the spacing bands describe: the hovered one while peeking,
+   * otherwise the selection when the persistent overlay is on. */
+  const spacingLayerId = useCallback(() => {
+    if (isAiLayerPicking) return null;
+    if (isSpacingPeek) return hoveredLayerIdRef.current;
+    return isSpacingOverlay ? selectedLayerId : null;
+  }, [isAiLayerPicking, isSpacingPeek, isSpacingOverlay, selectedLayerId]);
+
   /** Resolve iframe state needed to position an outline. Returns null when
    * outlines must be hidden (during slider animation, sidebar resize, or when
    * the iframe isn't ready). */
@@ -295,7 +330,13 @@ export function SelectionOverlay({
       ? hovered
       : hovered !== selectedLayerId ? hovered : null;
     updateOutline(hoveredContainerRef.current, effectiveHoveredId, ctx.iframeDoc, ctx.iframeElement, ctx.containerElement, ctx.scale, HOVERED_OUTLINE_CLASS);
-  }, [getOutlineContext, hideAllOutlines, selectedLayerId, updateOutline, HOVERED_OUTLINE_CLASS, isAiLayerPicking]);
+
+    // While peeking, the bands track the cursor at the same rate as the hover
+    // outline rather than waiting for the next scroll/mutation pass.
+    if (isSpacingPeek) {
+      updateSpacingOverlay(spacingContainerRef.current, hovered, ctx.iframeDoc, ctx.iframeElement, ctx.containerElement, ctx.scale);
+    }
+  }, [getOutlineContext, hideAllOutlines, selectedLayerId, updateOutline, updateSpacingOverlay, isSpacingPeek, HOVERED_OUTLINE_CLASS, isAiLayerPicking]);
 
   // Update all outlines. Called whenever selection/parent change, on scroll,
   // viewport switches, drag start/end, and on iframe layout shifts (image
@@ -308,8 +349,7 @@ export function SelectionOverlay({
     }
 
     updateSpacingOverlay(
-      spacingContainerRef.current,
-      isSpacingOverlay && !isAiLayerPicking ? selectedLayerId : null,
+      spacingContainerRef.current, spacingLayerId(),
       ctx.iframeDoc, ctx.iframeElement, ctx.containerElement, ctx.scale,
     );
 
@@ -336,7 +376,7 @@ export function SelectionOverlay({
       ? selectedLayerId
       : (parentLayerId !== selectedLayerId ? parentLayerId : null);
     updateOutline(parentContainerRef.current, effectiveParentId, ctx.iframeDoc, ctx.iframeElement, ctx.containerElement, ctx.scale, PARENT_OUTLINE_CLASS);
-  }, [getOutlineContext, hideAllOutlines, selectedLayerId, parentLayerId, updateOutline, updateSpacingOverlay, isSpacingOverlay, activeSublayerIndex, activeListItemIndex, SELECTED_OUTLINE_CLASS, HOVERED_OUTLINE_CLASS, PARENT_OUTLINE_CLASS, isAiLayerPicking]);
+  }, [getOutlineContext, hideAllOutlines, selectedLayerId, parentLayerId, updateOutline, updateSpacingOverlay, spacingLayerId, activeSublayerIndex, activeListItemIndex, SELECTED_OUTLINE_CLASS, HOVERED_OUTLINE_CLASS, PARENT_OUTLINE_CLASS, isAiLayerPicking]);
 
   // Initial update and updates when IDs change. Selecting a layer can reveal a
   // previously hidden ancestor (display:none → visible) in the iframe's separate
