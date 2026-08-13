@@ -128,6 +128,11 @@ interface EditorActions {
   toggleDevMode: () => void;
   isSpacingOverlay: boolean;
   toggleSpacingOverlay: () => void;
+  isRulers: boolean;
+  toggleRulers: () => void;
+  /** Dev grid rendering: tinted columns ('filled') or column edges only ('line'). */
+  devGridStyle: 'filled' | 'line';
+  toggleDevGridStyle: () => void;
   defaultUnit: string;
   setDefaultUnit: (unit: string) => void;
   // Canvas drag-and-drop actions (pointer-based)
@@ -330,6 +335,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   toggleDevMode: () => set((state) => ({ isDevMode: !state.isDevMode })),
   isSpacingOverlay: false,
   toggleSpacingOverlay: () => set((state) => ({ isSpacingOverlay: !state.isSpacingOverlay })),
+  isRulers: false,
+  toggleRulers: () => set((state) => ({ isRulers: !state.isRulers })),
+  devGridStyle: 'filled',
+  toggleDevGridStyle: () => set((state) => ({ devGridStyle: state.devGridStyle === 'filled' ? 'line' : 'filled' })),
   defaultUnit: (() => {
     const saved = typeof window !== 'undefined' ? (localStorage.getItem('ycode_default_unit') || 'px') : 'px';
     setDefaultMeasurementUnit(saved);

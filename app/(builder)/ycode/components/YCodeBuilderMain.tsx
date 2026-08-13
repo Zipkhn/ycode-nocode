@@ -1626,6 +1626,24 @@ export default function YCodeBuilder({ children }: YCodeBuilderProps = {} as YCo
           return;
         }
 
+        // Shift + G - Toggle the guides grid (Option+Shift+G swaps filled/line)
+        if (e.shiftKey && !e.metaKey && !e.ctrlKey && e.code === 'KeyG' && !isInputFocused) {
+          e.preventDefault();
+          if (e.altKey) {
+            useEditorStore.getState().toggleDevGridStyle();
+          } else {
+            useEditorStore.getState().toggleDevMode();
+          }
+          return;
+        }
+
+        // Shift + R - Toggle the canvas rulers
+        if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.code === 'KeyR' && !isInputFocused) {
+          e.preventDefault();
+          useEditorStore.getState().toggleRulers();
+          return;
+        }
+
         // Shift + Cmd + H - Toggle layer visibility (Show/Hide)
         if (e.shiftKey && e.metaKey && e.code === 'KeyH' && !isContentOnlyRole) {
           if (!isInputFocused && (currentPageId || editingComponentId) && selectedLayerId) {

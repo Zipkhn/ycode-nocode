@@ -220,6 +220,7 @@ function CanvasContent({
 
   // Sync dev mode class on iframe body + inject/remove grid overlay
   const isDevMode = useEditorStore((state) => state.isDevMode);
+  const devGridStyle = useEditorStore((state) => state.devGridStyle);
   useEffect(() => {
     if (!bodyRef.current) return;
     const iframeDoc = bodyRef.current.ownerDocument;
@@ -244,11 +245,27 @@ function CanvasContent({
         wrapper.appendChild(container);
         iframeBody.appendChild(wrapper);
       }
+      // 'line' variant: drop the column tint and keep only the edges. Injected
+      // here rather than in global-theme.css so it can't reach the published
+      // site — and the #id selector outbids the themed .dev-grid_wrapper rule.
+      const styleId = 'ycode-dev-grid-style';
+      let style = iframeDoc.getElementById(styleId) as HTMLStyleElement | null;
+      if (devGridStyle === 'line') {
+        if (!style) {
+          style = iframeDoc.createElement('style');
+          style.id = styleId;
+          iframeDoc.head.appendChild(style);
+        }
+        style.textContent = 'body.is-dev-mode #ycode-dev-grid .u-grid > div { background-color: transparent !important; border-inline-color: rgba(255, 0, 0, 0.35) !important; }';
+      } else {
+        style?.remove();
+      }
     } else {
       iframeBody.classList.remove('is-dev-mode');
       iframeDoc.getElementById('ycode-dev-grid')?.remove();
+      iframeDoc.getElementById('ycode-dev-grid-style')?.remove();
     }
-  }, [isDevMode]);
+  }, [isDevMode, devGridStyle]);
 
   // Move body layer classes from #canvas-body to the iframe's <body> element
   useEffect(() => {

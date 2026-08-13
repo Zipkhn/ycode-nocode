@@ -18,7 +18,7 @@ export interface IconProps extends React.SVGProps<SVGSVGElement> {
     | 'paragraph' | 'droplet' | 'expand' | 'collapse' | 'filter' | 'crosshair' | 'lightbox' | 'slider' | 'slide' | 'slides' | 'slide-button-prev' | 'slide-button-next'
     | 'slide-bullets' | 'slide-bullet' | 'slide-navigation' | 'slide-fraction' | 'loop-alternate' | 'loop-repeat' | 'listItem' | 'external-link'
     | 'settings' | 'center-block' | 'code-block' | 'table' | 'table-row' | 'table-cell' | 'add-column' | 'add-row' | 'delete-column' | 'delete-row' | 'delete-table' | 'header' | 'body'
-    | 'webflow' | 'figma' | 'space' | 'sparkles'
+    | 'webflow' | 'figma' | 'space' | 'ruler' | 'sparkles'
     | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle'
     | 'claude' | 'openai' | 'gemini' | 'grok'
   );
@@ -1053,6 +1053,15 @@ const ICONS: Record<IconProps['name'], React.ReactNode> = {
     <g transform="scale(0.5)">
       <path d="M4 9V13H20V9H22V14C22 14.5523 21.5523 15 21 15H3C2.44772 15 2 14.5523 2 14V9H4Z" />
     </g>
+  ),
+  ruler: (
+    <>
+      <path
+        fillRule="evenodd" clipRule="evenodd"
+        d="M1 3.5h10v5H1v-5Zm1 1v3h8v-3H2Z"
+      />
+      <path d="M3.5 4.5h0.75v2H3.5v-2Zm2 0h0.75v1.25H5.5V4.5Zm2 0h0.75v2H7.5v-2Z" />
+    </>
   ),
   sparkles: (
     <>

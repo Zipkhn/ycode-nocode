@@ -273,6 +273,8 @@ const RightSidebar = React.memo(function RightSidebar({
   const toggleDevMode = useEditorStore((state) => state.toggleDevMode);
   const isSpacingOverlay = useEditorStore((state) => state.isSpacingOverlay);
   const toggleSpacingOverlay = useEditorStore((state) => state.toggleSpacingOverlay);
+  const isRulers = useEditorStore((state) => state.isRulers);
+  const toggleRulers = useEditorStore((state) => state.toggleRulers);
   const openRichTextSheet = useEditorStore((state) => state.openRichTextSheet);
 
   // Check if text is being edited on canvas
@@ -2060,11 +2062,20 @@ const RightSidebar = React.memo(function RightSidebar({
               <Icon name="space" className="size-3.5" />
             </Button>
             <Button
+              variant={isRulers ? 'secondary' : 'ghost'}
+              size="xs"
+              className="ml-1 shrink-0"
+              onClick={toggleRulers}
+              title="Show rulers (⇧R)"
+            >
+              <Icon name="ruler" className="size-3.5" />
+            </Button>
+            <Button
               variant={isDevMode ? 'secondary' : 'ghost'}
               size="xs"
               className="ml-1 shrink-0"
               onClick={toggleDevMode}
-              title="Dev mode"
+              title="Guides (⇧G) — ⌥⇧G switches filled/line"
             >
               <Icon name="grid" className="size-3.5" />
             </Button>

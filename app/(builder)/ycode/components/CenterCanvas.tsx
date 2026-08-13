@@ -57,6 +57,7 @@ import CanvasBuildSkeleton from './CanvasBuildSkeleton';
 import { CollectionFieldSelector } from './CollectionFieldSelector';
 import AiActivityOverlay from '@/components/AiActivityOverlay';
 import SelectionOverlay from '@/components/SelectionOverlay';
+import CanvasRulers from '@/components/CanvasRulers';
 import RichTextLinkPopover from './RichTextLinkPopover';
 import PageSelector from './PageSelector';
 import CollectionItemSelector from './CollectionItemSelector';
@@ -672,6 +673,7 @@ const CenterCanvas = React.memo(function CenterCanvas({
   const elementPicker = useEditorStore((state) => state.elementPicker);
   const stopElementPicker = useEditorStore((state) => state.stopElementPicker);
   const isAiLayerPicking = useEditorStore((state) => state.isAiLayerPicking);
+  const isRulers = useEditorStore((state) => state.isRulers);
   const assets = useAssetsStore((state) => state.assets);
 
   // Note: Canvas drag-and-drop state is handled by useCanvasDropDetection hook
@@ -2588,6 +2590,15 @@ const CenterCanvas = React.memo(function CenterCanvas({
             zoom={zoom}
             activeSublayerIndex={activeSublayerIndex}
             activeListItemIndex={activeListItemIndex}
+          />
+        )}
+
+        {/* Canvas rulers (⇧R) - graduated px rulers along the top/left edges */}
+        {!isPreviewMode && activeSidebarTab !== 'pages' && canvasIframeElement && isRulers && (
+          <CanvasRulers
+            iframeElement={canvasIframeElement}
+            containerElement={scrollContainerRef.current}
+            zoom={zoom}
           />
         )}
 

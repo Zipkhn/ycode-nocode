@@ -77,6 +77,11 @@ const shortcutCategories: { left: ShortcutCategory[]; right: ShortcutCategory[] 
         { name: 'Collapse layers', keys: [{ name: '⌥' }, { name: 'L' }] },
         { name: 'Show/Hide element', keys: [{ name: '⇧' }, { name: '⌘' }, { name: 'H' }] },
         { name: 'Open add elements', keys: [{ name: 'A' }] },
+        { name: 'Show spacing', keys: [{ name: '⇧' }, { name: '⌘' }, { name: 'D' }] },
+        { name: 'Peek spacing (hold)', keys: [{ name: '⌥' }, { name: '⇧' }] },
+        { name: 'Show guides', keys: [{ name: '⇧' }, { name: 'G' }] },
+        { name: 'Guides style', keys: [{ name: '⌥' }, { name: '⇧' }, { name: 'G' }] },
+        { name: 'Show rulers', keys: [{ name: '⇧' }, { name: 'R' }] },
       ],
     },
     {
