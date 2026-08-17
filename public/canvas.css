@@ -115,11 +115,52 @@
 }
 
 /* LayerRenderer forces `open` so the modal is editable while the selection sits
-   inside it. The UA then positions it absolutely with auto margins, floating it
-   over the page; render it in flow on the canvas instead. */
+   inside it. A non-modal `open` dialog never reaches the top layer, so the canvas
+   has to stage the overlay itself.
+
+   It must stay OUT OF FLOW. In flow, the template's 100vw-wide modal inflates the
+   `w-fit` on its `[data-dialog-root]` parent, and a flex column stretches every
+   sibling to that width — the trigger button blows up to the full viewport the
+   moment the modal is selected. Out of flow the root shrink-wraps the trigger
+   again, exactly like `showModal()` does on a published page.
+
+   `fixed` + `inset: 0` + `margin: auto` is the UA's own top-layer recipe: in page
+   mode CenterCanvas sizes the iframe to exactly fill the visible canvas area and
+   lets it scroll internally, so the fixed containing block IS the canvas viewport.
+   A full-bleed modal covers it edge to edge; a smaller one centres in it, exactly
+   like `showModal()`. (In component-edit mode the iframe is content-height, so it
+   pins to the top of that canvas instead — harmless there.) */
 #canvas-body dialog[open] {
-  position: static;
-  margin: 0;
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  z-index: 2147483000;
+}
+
+/* Clamp to the canvas viewport and paint a scrim. A non-modal dialog gets no
+   `::backdrop`, so the scrim is an outer shadow — it never overlaps the modal's
+   own content and costs no extra element. Without the clamp, a `100vh` height
+   (rewritten to the *reference* device height by updateViewportOverrides, which
+   can exceed the visible canvas) would overflow the auto margins symmetrically
+   and push the modal's top — its close button — out of reach.
+
+   `:where()` keeps all of this at zero specificity, so a `max-h-*` or a shadow
+   set in the Sizing/Effects panels still outranks it and previews correctly. */
+:where(#canvas-body) dialog[open] {
+  max-inline-size: 100%;
+  max-block-size: 100%;
+  box-shadow: 0 0 0 100vmax rgb(0 0 0 / 0.5);
+}
+
+/* Viewport-height modal: fill the canvas. LayerRenderer sets this attribute only
+   when the layer itself asked for vh, so an `h-[600px]` modal keeps its 600px.
+   The `!important` and the (1,2,1) specificity are both needed — they outrank the
+   `.h-\[100vh\]{height:…px !important}` rule that `updateViewportOverrides`
+   injects, which is computed off the unzoomed canvas height and therefore
+   undershoots the iframe viewport at any zoom below 100%. Width needs no
+   equivalent: `vw` is never rewritten, so it already resolves against the iframe. */
+#canvas-body dialog[open][data-canvas-viewport-h] {
+  height: 100% !important;
 }
 
 /* Hide any manually-built dev-grid_wrapper from page content (injected grid lives on body, not here) */

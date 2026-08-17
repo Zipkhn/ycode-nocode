@@ -2420,6 +2420,19 @@ const LayerItemImpl: React.FC<{
     // Published pages open it with showModal() instead (DialogInitializer).
     if (htmlTag === 'dialog' && isEditMode && dialogSelectedId && containsLayerId(layer, dialogSelectedId)) {
       elementProps.open = true;
+
+      // A top-layer modal sizes against the viewport; on the canvas that role is
+      // played by the iframe. Width already behaves — `vw` is never rewritten, so
+      // `w-[100vw]` resolves against the iframe natively. Height doesn't:
+      // `updateViewportOverrides` turns every vh/svh/dvh/lvh utility into fixed
+      // pixels off the *unzoomed* canvas height, while the iframe's own viewport
+      // is that height divided by the zoom — so a `h-[100vh]` modal falls short of
+      // the canvas at any zoom below 100%. Flag it and let `canvas.css` map the
+      // height back to 100% of the staged overlay. Height-only and opt-in on
+      // purpose: a modal sized `h-[600px]` must keep its 600px.
+      if (/(?:^|\s)(?:h|size)-\[[\d.]+[sdl]?vh\]|(?:^|\s)h-(?:screen|[sdl]?vh)(?:\s|$)/.test(classesString)) {
+        elementProps['data-canvas-viewport-h'] = '';
+      }
     }
 
     // Select with placeholder: set defaultValue so React shows the placeholder option
