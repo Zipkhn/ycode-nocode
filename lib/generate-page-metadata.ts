@@ -19,7 +19,7 @@ import { getSlugTranslationsByLocale } from '@/lib/repositories/translationRepos
 import { buildSvgDataUrl, getAssetProxyUrl } from '@/lib/asset-utils';
 import { generateColorVariablesCss } from '@/lib/repositories/colorVariableRepository';
 import { buildPageHreflangAlternates, type HreflangAlternate } from '@/lib/hreflang-utils';
-import { getTranslatableKey } from '@/lib/locale-runtime';
+import { getTranslatableKey, getTranslatedAssetId, getTranslatedText } from '@/lib/locale-runtime';
 import { buildAbsolutePageUrl, getSiteBaseUrl } from '@/lib/url-utils';
 import {
   getCanonicalUrl,
@@ -83,6 +83,8 @@ export interface GenerateMetadataOptions {
    * and future use.
    */
   isPasswordProtected?: boolean;
+  /** Per-locale translations, keyed `{source}:{id}:{content_key}`, for localized SEO */
+  translations?: Record<string, Translation> | null;
 }
 
 // ── Fetch global settings ─────────────────────────────────────────────────────
@@ -299,22 +301,28 @@ export async function generatePageMetadata(
     pagePath,
     primaryDomainUrl,
     isPasswordProtected = false,
+    translations,
   } = options;
 
   const seo = page.settings?.seo;
   const isErrorPage = page.error_page !== null;
 
+  // Locale-translated SEO values (fall back to the originals when no completed
+  // translation exists for the current locale).
+  const seoTitle = getTranslatedText(seo?.title, 'seo:title', translations, page.id);
+  const seoDescription = getTranslatedText(seo?.description, 'seo:description', translations, page.id);
+
   // ── Title ──────────────────────────────────────────────────────────────────
-  let title = seo?.title || page.name || fallbackTitle || 'Page';
-  if (collectionItem && seo?.title) {
-    title = resolveInlineVariables(seo.title, collectionItem) || page.name || fallbackTitle || 'Page';
+  let title = seoTitle || page.name || fallbackTitle || 'Page';
+  if (collectionItem && seoTitle) {
+    title = resolveInlineVariables(seoTitle, collectionItem) || page.name || fallbackTitle || 'Page';
   }
   if (isPreview) title = `[Preview] ${title}`;
 
   // ── Description ────────────────────────────────────────────────────────────
-  let description = seo?.description || fallbackDescription || page.name;
-  if (collectionItem && seo?.description) {
-    description = resolveInlineVariables(seo.description, collectionItem) || fallbackDescription || page.name;
+  let description = seoDescription || fallbackDescription || page.name;
+  if (collectionItem && seoDescription) {
+    description = resolveInlineVariables(seoDescription, collectionItem) || fallbackDescription || page.name;
   }
 
   // ── Base metadata ──────────────────────────────────────────────────────────
@@ -393,7 +401,12 @@ export async function generatePageMetadata(
   // ── OG image resolution ────────────────────────────────────────────────────
   let imageUrl: string | null = null;
   if (seo?.image && !isErrorPage) {
-    imageUrl = await resolveImageUrl(seo.image, collectionItem);
+    // A fixed asset (string ID) can be translated per locale; CMS field
+    // variables resolve from the collection item instead.
+    const seoImage = typeof seo.image === 'string'
+      ? getTranslatedAssetId(seo.image, 'seo:image', translations, page.id)
+      : seo.image;
+    imageUrl = seoImage ? await resolveImageUrl(seoImage, collectionItem) : null;
     // Social crawlers require absolute og:image URLs.
     if (imageUrl && imageUrl.startsWith('/') && siteBaseUrl) {
       imageUrl = `${siteBaseUrl}${imageUrl}`;
