@@ -10,6 +10,7 @@
 
 import { layerToHtml, buildAnchorMap } from '@/lib/page-fetcher'
 import type { PageData } from '@/lib/page-fetcher'
+import type { FontPreload } from '@/lib/font-utils'
 import { getClassesString } from '@/lib/layer-utils'
 import { getEffectiveApplyStyle } from '@/lib/animation-utils'
 
@@ -699,6 +700,8 @@ export interface BuildHtmlInput {
   colorVariablesCss: string | null
   /** Inlined @font-face + font class CSS for Google and custom fonts. */
   fontsCss?: string | null
+  /** Custom font binaries to hint via `<link rel="preload" as="font">`. */
+  fontPreloads?: FontPreload[]
   includeSwiper: boolean
   interactions: ExportedInteraction[]
   /** Site-wide custom code from Settings → General (head + body slots). */
@@ -721,6 +724,7 @@ export function buildDocument({
   publishedCss,
   colorVariablesCss,
   fontsCss,
+  fontPreloads,
   includeSwiper,
   interactions,
   globalCustomCodeHead,
@@ -750,6 +754,15 @@ export function buildDocument({
     head.push(`<meta name="twitter:image" content="${escapeHtml(ogImage)}" />`)
   }
   if (noindex) head.push('<meta name="robots" content="noindex" />')
+
+  // Preload uploaded custom font binaries so the browser fetches them from
+  // <head> instead of after CSS parsing. `crossorigin` is required — fonts are
+  // always fetched in CORS mode.
+  for (const font of fontPreloads ?? []) {
+    head.push(
+      `<link rel="preload" as="font" href="${escapeHtml(font.href)}" type="${escapeHtml(font.type)}" crossorigin="anonymous" />`,
+    )
+  }
 
   // Sniffed rather than plumbed through BuildHtmlInput, matching how the
   // visibility runtime below decides whether to ship.

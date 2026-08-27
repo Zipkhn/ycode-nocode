@@ -37,6 +37,7 @@ import BackgroundsControls from './BackgroundsControls';
 import CustomAttributeRow from './CustomAttributeRow';
 import BorderControls from './BorderControls';
 import ComponentVariablesDialog from './ComponentVariablesDialog';
+import CursorControls from './CursorControls';
 import EffectControls from './EffectControls';
 import CollectionFiltersSettings from './CollectionFiltersSettings';
 import ConditionalVisibilitySettings from './ConditionalVisibilitySettings';
@@ -634,6 +635,10 @@ const RightSidebar = React.memo(function RightSidebar({
         // Opacity is useful in text edit mode for transparency
         return true;
 
+      case 'cursor':
+        if (showTextStyleControls) return false;
+        return true;
+
       case 'position':
         // In text style mode, hide position controls
         if (showTextStyleControls) return false;
@@ -911,9 +916,19 @@ const RightSidebar = React.memo(function RightSidebar({
 
   // Update local state when selected layer changes (for settings fields)
   const [prevSelectedLayerId, setPrevSelectedLayerId] = useState<string | null>(null);
+  // Track element name + tag so the tag selectors resync when the layer's type
+  // changes in place (e.g. converting a heading to text via the context menu),
+  // where the selection id stays the same.
+  const layerTagSignature = `${selectedLayer?.name ?? ''}:${selectedLayer?.settings?.tag ?? ''}`;
+  const [prevLayerTagSignature, setPrevLayerTagSignature] = useState<string>('');
   if (selectedLayerId !== prevSelectedLayerId) {
     setPrevSelectedLayerId(selectedLayerId);
+    setPrevLayerTagSignature(layerTagSignature);
     setCustomId(sanitizeHtmlId(selectedLayer?.settings?.id || selectedLayer?.attributes?.id || ''));
+    setContainerTag(selectedLayer?.settings?.tag || getDefaultContainerTag(selectedLayer));
+    setTextTag(selectedLayer?.settings?.tag || getDefaultTextTag(selectedLayer));
+  } else if (layerTagSignature !== prevLayerTagSignature) {
+    setPrevLayerTagSignature(layerTagSignature);
     setContainerTag(selectedLayer?.settings?.tag || getDefaultContainerTag(selectedLayer));
     setTextTag(selectedLayer?.settings?.tag || getDefaultTextTag(selectedLayer));
   }
@@ -1057,9 +1072,16 @@ const RightSidebar = React.memo(function RightSidebar({
     setTextTag(tag);
     if (selectedLayerId) {
       const currentSettings = selectedLayer?.settings || {};
-      handleLayerUpdate(selectedLayerId, {
-        settings: { ...currentSettings, tag }
-      });
+      // Normalize the element name to match the tag family so legacy headings
+      // (stored as text with an h1-h6 tag) migrate to a proper heading.
+      const name = headingTagOptions.some(opt => opt.value === tag) ? 'heading' : 'text';
+      const updates: Partial<Layer> = { name, settings: { ...currentSettings, tag } };
+      // Drop an auto-assigned "Text"/"Heading" label so the layer shows its
+      // content again (a user's custom layer name is left untouched).
+      if (selectedLayer?.customName === 'Text' || selectedLayer?.customName === 'Heading') {
+        updates.customName = undefined;
+      }
+      handleLayerUpdate(selectedLayerId, updates);
     }
   };
 
@@ -2132,6 +2154,10 @@ const RightSidebar = React.memo(function RightSidebar({
             <SizingControls layer={controlLayer} onLayerUpdate={controlUpdate} />
           )}
 
+          {shouldShowControl('position', selectedLayer) && !showTextStyleControls && (
+            <PositionControls layer={controlLayer} onLayerUpdate={controlUpdate} />
+          )}
+
           {shouldShowControl('typography', selectedLayer) && (
             <TypographyControls
               layer={controlLayer}
@@ -2173,8 +2199,11 @@ const RightSidebar = React.memo(function RightSidebar({
             />
           )}
 
-          {shouldShowControl('position', selectedLayer) && !showTextStyleControls && (
-            <PositionControls layer={controlLayer} onLayerUpdate={controlUpdate} />
+          {shouldShowControl('cursor', selectedLayer) && (
+            <CursorControls
+              layer={controlLayer}
+              onLayerUpdate={controlUpdate}
+            />
           )}
 
           {shouldShowControl('transforms', selectedLayer) && (
@@ -2430,7 +2459,11 @@ const RightSidebar = React.memo(function RightSidebar({
 
               {/* Tag Selector - For heading and text layers */}
               {(selectedLayer?.name === 'heading' || (selectedLayer?.name === 'text' && !isContainerLayer(selectedLayer))) && (() => {
-                const tagOptions = selectedLayer?.name === 'heading' ? headingTagOptions : textTagOptions;
+                // Use isHeadingLayer (not name === 'heading') so legacy headings
+                // stored as text with an h1-h6 tag still get heading tag options
+                // instead of p/span/label — otherwise changing the tag demotes
+                // them to a paragraph.
+                const tagOptions = isHeadingLayer(selectedLayer) ? headingTagOptions : textTagOptions;
                 return (
                   <div className="grid grid-cols-3">
                     <Label variant="muted">Tag</Label>
