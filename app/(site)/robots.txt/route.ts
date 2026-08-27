@@ -32,7 +32,8 @@ export async function GET() {
 
     const content = buildRobotsTxt({
       customRobots: typeof allSettings.robots_txt === 'string' ? allSettings.robots_txt : null,
-      sitemapUrl: sitemapEnabled ? `${baseUrl}/sitemap.xml` : null,
+      // A relative `Sitemap:` line is invalid — omit it when no base URL is set.
+      sitemapUrl: sitemapEnabled && baseUrl ? `${baseUrl}/sitemap.xml` : null,
     });
 
     return new NextResponse(content, {
