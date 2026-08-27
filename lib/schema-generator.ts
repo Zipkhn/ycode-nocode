@@ -44,6 +44,7 @@
  *   Organization → {baseUrl}/#organization
  *   Article      → {pageUrl}/#article        (Phase 3D, uses canonical page URL)
  *   FAQPage      → {pageUrl}/#faqpage        (Phase 3D)
+ *   WebPage      → {pageUrl}/#webpage        (carries the AI summary as `abstract`)
  *
  * Schema.org reference: https://schema.org
  */
@@ -238,6 +239,36 @@ export function generateFaqSchema(
   };
 }
 
+/**
+ * Generate a https://schema.org/WebPage node carrying the AI summary.
+ *
+ * Emitted only when an ai_summary exists: the summary is written for generative
+ * engines (which read `abstract`) and has no equivalent in the classic meta tags,
+ * so without this node it never leaves the database.
+ * Returns null when the summary or page URL is missing.
+ */
+export function generateWebPageSchema(
+  aiSummary: string | null | undefined,
+  pageUrl: string,
+  name: string,
+  websiteId?: string
+): Record<string, unknown> | null {
+  const abstract = aiSummary?.trim();
+  if (!abstract || !pageUrl) return null;
+
+  const cleanUrl = pageUrl.replace(/\/$/, '');
+  const node: Record<string, unknown> = {
+    '@type': 'WebPage',
+    '@id': buildEntityId(cleanUrl, 'webpage'),
+    url: cleanUrl,
+    name,
+    abstract,
+  };
+  if (websiteId) node.isPartOf = { '@id': websiteId };
+
+  return node;
+}
+
 // ── Safe serialization ────────────────────────────────────────────────────────
 
 /**
@@ -323,6 +354,17 @@ export function generatePageJsonLd(ctx: JsonLdGenerationContext): string[] {
 
   if (schemas?.faq && pageUrl) {
     const node = generateFaqSchema(schemas.faq, pageUrl);
+    if (node) nodes.push(node);
+  }
+
+  // AI summary — surfaced as WebPage.abstract for generative engines.
+  if (pageUrl) {
+    const node = generateWebPageSchema(
+      ctx.govCtx.page.settings?.seo?.ai_summary,
+      pageUrl,
+      ctx.govCtx.page.settings?.seo?.title || ctx.govCtx.page.name,
+      cleanBase ? buildEntityId(cleanBase, 'website') : undefined
+    );
     if (node) nodes.push(node);
   }
 

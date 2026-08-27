@@ -713,6 +713,10 @@ export interface BuildHtmlInput {
    */
   pageCustomCodeHead?: string | null
   pageCustomCodeBody?: string | null
+  /** Absolute canonical URL for this route. Omitted when no base URL is configured. */
+  canonicalUrl?: string | null
+  /** Serialized JSON-LD documents (see lib/schema-generator). */
+  jsonLdScripts?: string[]
 }
 
 export function buildDocument({
@@ -731,6 +735,8 @@ export function buildDocument({
   globalCustomCodeBody,
   pageCustomCodeHead,
   pageCustomCodeBody,
+  canonicalUrl,
+  jsonLdScripts,
 }: BuildHtmlInput): string {
   const seo = extractSeo(page)
   const title = seo.title || page.name
@@ -754,6 +760,12 @@ export function buildDocument({
     head.push(`<meta name="twitter:image" content="${escapeHtml(ogImage)}" />`)
   }
   if (noindex) head.push('<meta name="robots" content="noindex" />')
+  if (canonicalUrl) head.push(`<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`)
+
+  // Structured data — already serialized and XSS-escaped by serializeJsonLd.
+  for (const script of jsonLdScripts ?? []) {
+    head.push(`<script type="application/ld+json">${script}</script>`)
+  }
 
   // Preload uploaded custom font binaries so the browser fetches them from
   // <head> instead of after CSS parsing. `crossorigin` is required — fonts are

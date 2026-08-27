@@ -7,6 +7,7 @@
 import { NextResponse } from 'next/server';
 import { getSettingsByKeys } from '@/lib/repositories/settingsRepository';
 import { credentials } from '@/lib/credentials';
+import { buildRobotsTxt } from '@/lib/robots-txt';
 import { getSiteBaseUrl } from '@/lib/url-utils';
 import type { SitemapSettings } from '@/types';
 
@@ -15,15 +16,8 @@ export async function GET() {
     const hasSupabaseCredentials = await credentials.exists();
     if (!hasSupabaseCredentials) {
       const baseUrl = getSiteBaseUrl() || '';
-      const fallback = `# Default robots.txt
-User-agent: *
-Allow: /
-Disallow: /ycode/
 
-# Sitemap
-Sitemap: ${baseUrl}/sitemap.xml`;
-
-      return new NextResponse(fallback, {
+      return new NextResponse(buildRobotsTxt({ sitemapUrl: baseUrl ? `${baseUrl}/sitemap.xml` : null }), {
         headers: {
           'Content-Type': 'text/plain',
           'Cache-Control': 'public, max-age=86400, s-maxage=86400',
@@ -36,27 +30,10 @@ Sitemap: ${baseUrl}/sitemap.xml`;
     const sitemapEnabled = sitemapSettings?.mode && sitemapSettings.mode !== 'none';
     const baseUrl = getSiteBaseUrl({ globalCanonicalUrl: allSettings.global_canonical_url }) || '';
 
-    let content: string;
-
-    const customRobots = allSettings.robots_txt;
-    if (customRobots && typeof customRobots === 'string' && customRobots.trim()) {
-      content = customRobots.trim();
-
-      if (sitemapEnabled && !content.toLowerCase().includes('sitemap:')) {
-        content += `\n\nSitemap: ${baseUrl}/sitemap.xml`;
-      }
-    } else {
-      content = `# Default robots.txt
-User-agent: *
-Allow: /
-
-# Disallow admin/editor paths
-Disallow: /ycode/`;
-
-      if (sitemapEnabled) {
-        content += `\n\n# Sitemap\nSitemap: ${baseUrl}/sitemap.xml`;
-      }
-    }
+    const content = buildRobotsTxt({
+      customRobots: typeof allSettings.robots_txt === 'string' ? allSettings.robots_txt : null,
+      sitemapUrl: sitemapEnabled ? `${baseUrl}/sitemap.xml` : null,
+    });
 
     return new NextResponse(content, {
       headers: {
@@ -68,11 +45,7 @@ Disallow: /ycode/`;
     console.error('[robots.txt] Error generating robots.txt:', error);
 
     // Return default on error
-    const fallback = `User-agent: *
-Allow: /
-Disallow: /ycode/`;
-
-    return new NextResponse(fallback, {
+    return new NextResponse(buildRobotsTxt({}), {
       headers: {
         'Content-Type': 'text/plain',
         'Cache-Control': 'public, max-age=3600',

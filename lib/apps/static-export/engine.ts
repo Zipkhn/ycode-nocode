@@ -20,9 +20,16 @@ import type { FontPreload } from '@/lib/font-utils'
 import { generateColorVariablesCss } from '@/lib/repositories/colorVariableRepository'
 import { getAssetById } from '@/lib/repositories/assetRepository'
 import { getPublishedFonts } from '@/lib/repositories/fontRepository'
-import { getSettingByKey } from '@/lib/repositories/settingsRepository'
+import { getSettingByKey, getSettingsByKeys } from '@/lib/repositories/settingsRepository'
 import { getTranslationsByLocale } from '@/lib/repositories/translationRepository'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
+import { generatePageJsonLd } from '@/lib/schema-generator'
+import { shouldAppearInSitemap } from '@/lib/seo-governance'
+import { generateLlmsTxt } from '@/lib/llms-txt'
+import { buildRobotsTxt } from '@/lib/robots-txt'
+import { generateSitemapXml, type SitemapUrl } from '@/lib/sitemap-utils'
+import { getSiteBaseUrl } from '@/lib/url-utils'
+import type { SitemapSettings } from '@/types'
 
 import type { Locale, Page, PageFolder } from '@/types'
 
@@ -74,6 +81,16 @@ function relativizePaths(html: string, outputKey: string): string {
   })
 
   return result
+}
+
+/**
+ * Convert an output key to the path it will be served under.
+ *   `index.html`       → `/`
+ *   `about/index.html` → `/about`
+ */
+function sitePathFor(outputKey: string): string {
+  const trimmed = outputKey.replace(/index\.html$/, '').replace(/\/$/, '')
+  return trimmed ? `/${trimmed}` : '/'
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -148,6 +165,7 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
       fonts,
       globalCustomCodeHead,
       globalCustomCodeBody,
+      seoSettings,
       localeResult,
     ] = await Promise.all([
       client
@@ -160,6 +178,15 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
       getPublishedFonts().catch(() => []),
       getSettingByKey('custom_code_head').catch(() => null),
       getSettingByKey('custom_code_body').catch(() => null),
+      getSettingsByKeys([
+        'global_canonical_url',
+        'og_site_name',
+        'schema_org_name',
+        'schema_org_logo_url',
+        'robots_txt',
+        'llms_txt',
+        'sitemap',
+      ]).catch(() => ({} as Record<string, unknown>)),
       client
         .from('locales')
         .select('*')
@@ -175,6 +202,11 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
     // The export always covers the default locale, plus one pass per
     // non-default published locale (writing to `<code>/...`).
     const defaultLocale = locales.find((l) => l.is_default) ?? null
+
+    // Canonical/JSON-LD/sitemap all need an absolute origin. Without one the
+    // export still ships, just without the URL-bound SEO surfaces.
+    const globalCanonicalUrl = (seoSettings.global_canonical_url as string | null) ?? null
+    const siteBaseUrl = getSiteBaseUrl({ globalCanonicalUrl })
     const additionalLocales = locales.filter((l) => !l.is_default)
 
     if (!publishedCss) {
@@ -202,6 +234,9 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
     // ---- Render every page (default locale + per non-default locale) ----
     const outputs: OutputFile[] = []
     const referencedAssetPaths = new Set<string>()
+    // Routes eligible for the sitemap — collected while rendering, where the
+    // page (and so its noindex/error status) is still in hand.
+    const sitemapPaths: string[] = []
 
     const renderPage = async (page: Page, ctx: LocaleContext): Promise<void> => {
       let yieldedAny = false
@@ -209,6 +244,16 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
       try {
         for await (const resolved of resolvePages(page, folders, pages, ctx)) {
           yieldedAny = true
+          const pagePath = sitePathFor(resolved.outputKey)
+          const canonicalUrl = siteBaseUrl ? `${siteBaseUrl}${pagePath === '/' ? '' : pagePath}` : null
+          const jsonLdScripts = generatePageJsonLd({
+            baseUrl: siteBaseUrl,
+            ogSiteName: seoSettings.og_site_name as string | null,
+            schemaOrgName: seoSettings.schema_org_name as string | null,
+            schemaOrgLogoUrl: seoSettings.schema_org_logo_url as string | null,
+            govCtx: { page: resolved.page, pagePath, globalCanonicalUrl },
+            pageCanonicalUrl: canonicalUrl,
+          })
           const html = buildDocument({
             page: resolved.page,
             bodyHtml: resolved.bodyHtml,
@@ -225,6 +270,8 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
             globalCustomCodeBody: globalCustomCodeBody ?? null,
             pageCustomCodeHead: resolved.pageCustomCodeHead,
             pageCustomCodeBody: resolved.pageCustomCodeBody,
+            canonicalUrl,
+            jsonLdScripts,
           })
 
           // Collect Ycode's built-in placeholder URLs referenced from this
@@ -239,6 +286,8 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
           if (resolved.hasSlider) {
             referencedAssetPaths.add(SWIPER_CSS_PATH)
           }
+
+          if (shouldAppearInSitemap(resolved.page)) sitemapPaths.push(pagePath)
 
           const finalHtml = relativizePaths(html, resolved.outputKey)
 
@@ -280,6 +329,57 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
       const ctx: LocaleContext = { locale, translations: translationsMap }
       for (const page of pages) {
         await renderPage(page, ctx)
+      }
+    }
+
+    // ---- SEO surfaces: sitemap.xml, robots.txt, llms.txt ----------------
+    // Only emitted with an absolute origin — a sitemap or canonical built on a
+    // relative path is worse than none.
+    if (siteBaseUrl) {
+      const sitemapSettings = seoSettings.sitemap as SitemapSettings | null
+      const sitemapEnabled = !sitemapSettings?.mode || sitemapSettings.mode !== 'none'
+      let sitemapEmitted = false
+
+      if (sitemapEnabled) {
+        // Built from the rendered routes rather than re-deriving them: what
+        // shipped is exactly what the sitemap lists.
+        const urls: SitemapUrl[] = sitemapPaths.map((path) => ({
+          loc: `${siteBaseUrl}${path === '/' ? '/' : path}`,
+        }))
+
+        if (urls.length > 0) {
+          outputs.push({
+            key: 'sitemap.xml',
+            body: generateSitemapXml(urls),
+            contentType: 'application/xml',
+          })
+          sitemapEmitted = true
+        }
+      }
+
+      outputs.push({
+        key: 'robots.txt',
+        body: buildRobotsTxt({
+          customRobots: seoSettings.robots_txt as string | null,
+          sitemapUrl: sitemapEmitted ? `${siteBaseUrl}/sitemap.xml` : null,
+        }),
+        contentType: 'text/plain; charset=utf-8',
+      })
+
+      const customLlms = (seoSettings.llms_txt as string | null)?.trim()
+      const homePage = pages.find((p) => p.is_index && p.deleted_at == null)
+      const llmsTxt =
+        customLlms ||
+        generateLlmsTxt({
+          pages,
+          folders,
+          baseUrl: siteBaseUrl,
+          siteName: (seoSettings.og_site_name as string | null) ?? (seoSettings.schema_org_name as string | null),
+          siteDescription: homePage?.settings?.seo?.description ?? null,
+        })
+
+      if (llmsTxt) {
+        outputs.push({ key: 'llms.txt', body: llmsTxt, contentType: 'text/plain; charset=utf-8' })
       }
     }
 

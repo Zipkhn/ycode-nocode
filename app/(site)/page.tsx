@@ -13,7 +13,6 @@ import { matchRedirect } from '@/lib/redirect-utils';
 import { parseAuthCookie, getPasswordProtection, fetchFoldersForAuth } from '@/lib/page-auth';
 import { getSiteBaseUrl } from '@/lib/url-utils';
 import { generatePageJsonLd } from '@/lib/schema-generator';
-import { generateHreflangEntries } from '@/lib/hreflang-generator';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import type { Redirect as RedirectType } from '@/types';
 import type { Metadata } from 'next';
@@ -107,34 +106,6 @@ async function fetchCachedFoldersForAuth() {
     )();
   } catch {
     return [];
-  }
-}
-
-async function fetchCachedTranslationsMap(): Promise<Record<string, Record<string, Translation>>> {
-  try {
-    return await unstable_cache(
-      async () => {
-        const supabase = await getSupabaseAdmin();
-        if (!supabase) return {};
-        const { data } = await supabase
-          .from('translations')
-          .select('*')
-          .eq('is_published', true)
-          .is('deleted_at', null);
-        const map: Record<string, Record<string, Translation>> = {};
-        if (data) {
-          for (const t of data) {
-            if (!map[t.locale_id]) map[t.locale_id] = {};
-            map[t.locale_id][`${t.source_type}:${t.source_id}:${t.content_key}`] = t;
-          }
-        }
-        return map;
-      },
-      ['data-for-translations-map'],
-      { tags: ['all-pages'], revalidate: false }
-    )();
-  } catch {
-    return {};
   }
 }
 
@@ -311,41 +282,22 @@ export async function generateMetadata(): Promise<Metadata> {
     };
   }
 
-  const [translationsByLocale, { meta, baseUrl }] = await Promise.all([
-    fetchCachedTranslationsMap(),
-    unstable_cache(
-      async () => ({
-        meta: await generatePageMetadata(data.page, {
-          fallbackTitle: 'Home',
-          pagePath: '/',
-          globalSeoSettings: globalSettings,
-          translations: data.translations,
-        }),
-        baseUrl: getSiteBaseUrl({ globalCanonicalUrl: globalSettings.globalCanonicalUrl }),
+  const { meta, baseUrl } = await unstable_cache(
+    async () => ({
+      meta: await generatePageMetadata(data.page, {
+        fallbackTitle: 'Home',
+        pagePath: '/',
+        globalSeoSettings: globalSettings,
+        translations: data.translations,
       }),
-      ['data-for-route-/-meta'],
-      { tags: ['all-pages', 'route-/'], revalidate: false }
-    )(),
-  ]);
+      baseUrl: getSiteBaseUrl({ globalCanonicalUrl: globalSettings.globalCanonicalUrl }),
+    }),
+    ['data-for-route-/-meta'],
+    { tags: ['all-pages', 'route-/'], revalidate: false }
+  )();
 
   if (baseUrl) {
     try { meta.metadataBase = new URL(baseUrl); } catch { /* invalid URL */ }
-  }
-
-  // Hreflang — multilocale only
-  if (data.availableLocales && data.availableLocales.length > 1 && baseUrl) {
-    const hreflangEntries = generateHreflangEntries(
-      data.page,
-      folders,
-      data.availableLocales,
-      translationsByLocale,
-      baseUrl
-    );
-    if (hreflangEntries.length > 0) {
-      const languages: Record<string, string> = {};
-      for (const entry of hreflangEntries) languages[entry.hreflang] = entry.href;
-      meta.alternates = { ...meta.alternates, languages };
-    }
   }
 
   return meta;

@@ -107,3 +107,25 @@ test('generatePageJsonLd: WebSite + Organization graph with publisher cross-refe
   const website = doc['@graph'].find(n => n['@type'] === 'WebSite')!;
   assert.deepEqual(website.publisher, { '@id': 'https://example.com/#organization' });
 });
+
+test('generatePageJsonLd: ai_summary becomes a WebPage abstract linked to the WebSite', () => {
+  const ctx = govCtx({ name: 'Pricing', settings: { seo: { ai_summary: '  Ycode pricing in one paragraph.  ' } } });
+  const out = generatePageJsonLd({
+    baseUrl: 'https://example.com', ogSiteName: 'Acme Site', govCtx: ctx,
+    pageCanonicalUrl: 'https://example.com/pricing/',
+  });
+  const doc = JSON.parse(out[0]) as { '@graph': Array<Record<string, unknown>> };
+  const webpage = doc['@graph'].find(n => n['@type'] === 'WebPage')!;
+  assert.equal(webpage['@id'], 'https://example.com/pricing/#webpage');
+  assert.equal(webpage.abstract, 'Ycode pricing in one paragraph.');
+  assert.equal(webpage.name, 'Pricing');
+  assert.deepEqual(webpage.isPartOf, { '@id': 'https://example.com/#website' });
+});
+
+test('generatePageJsonLd: no WebPage node without an ai_summary', () => {
+  const out = generatePageJsonLd({
+    baseUrl: 'https://example.com', ogSiteName: 'Acme Site', govCtx: govCtx(),
+  });
+  const doc = JSON.parse(out[0]) as { '@graph': Array<Record<string, unknown>> };
+  assert.ok(!doc['@graph'].some(n => n['@type'] === 'WebPage'));
+});
