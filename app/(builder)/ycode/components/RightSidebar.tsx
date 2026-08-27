@@ -2068,16 +2068,18 @@ const RightSidebar = React.memo(function RightSidebar({
         className="flex flex-col flex-1 min-h-0 gap-0"
       >
         <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <TabsList className="flex-1">
-              <TabsTrigger value="design" disabled={isLocalizing}>Design</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
-              <TabsTrigger value="interactions" disabled={isLocalizing}>Interactions</TabsTrigger>
-            </TabsList>
+          <TabsList className="w-full">
+            <TabsTrigger value="design" disabled={isLocalizing}>Design</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+            <TabsTrigger value="interactions" disabled={isLocalizing}>Interactions</TabsTrigger>
+          </TabsList>
+          {/* Canvas overlays. Own row: alongside the tabs they overflowed the
+              w-64 sidebar and the last toggle was clipped by overflow-hidden. */}
+          <div className="flex items-center justify-end gap-1">
             <Button
               variant={isSpacingOverlay ? 'secondary' : 'ghost'}
               size="xs"
-              className="ml-1 shrink-0"
+              className="shrink-0"
               onClick={toggleSpacingOverlay}
               title="Show spacing (⌘⇧D)"
             >
@@ -2086,7 +2088,7 @@ const RightSidebar = React.memo(function RightSidebar({
             <Button
               variant={isRulers ? 'secondary' : 'ghost'}
               size="xs"
-              className="ml-1 shrink-0"
+              className="shrink-0"
               onClick={toggleRulers}
               title="Show rulers (⇧R)"
             >
@@ -2095,7 +2097,7 @@ const RightSidebar = React.memo(function RightSidebar({
             <Button
               variant={isDevMode ? 'secondary' : 'ghost'}
               size="xs"
-              className="ml-1 shrink-0"
+              className="shrink-0"
               onClick={toggleDevMode}
               title="Guides (⇧G) — ⌥⇧G switches filled/line"
             >
