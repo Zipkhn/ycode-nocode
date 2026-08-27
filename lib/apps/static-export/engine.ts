@@ -18,6 +18,8 @@ import {
 } from '@/lib/font-utils'
 import type { FontPreload } from '@/lib/font-utils'
 import { generateColorVariablesCss } from '@/lib/repositories/colorVariableRepository'
+import { loadCurrentTheme } from '@/lib/studio-theme-store'
+import { renderStudioDynamicCss } from '@/lib/studio-css'
 import { getAssetById } from '@/lib/repositories/assetRepository'
 import { getPublishedFonts } from '@/lib/repositories/fontRepository'
 import { getSettingByKey, getSettingsByKeys } from '@/lib/repositories/settingsRepository'
@@ -162,6 +164,7 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
       folderResult,
       publishedCss,
       colorVariablesCss,
+      studioCss,
       fonts,
       globalCustomCodeHead,
       globalCustomCodeBody,
@@ -175,6 +178,9 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
         .order('depth', { ascending: true }),
       getSettingByKey('published_css').catch(() => null),
       generateColorVariablesCss().catch(() => null),
+      loadCurrentTheme()
+        .then((theme) => renderStudioDynamicCss(theme) || null)
+        .catch(() => null),
       getPublishedFonts().catch(() => []),
       getSettingByKey('custom_code_head').catch(() => null),
       getSettingByKey('custom_code_body').catch(() => null),
@@ -262,6 +268,7 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
             ogImageUrl,
             publishedCss: publishedCss ?? null,
             colorVariablesCss: colorVariablesCss ?? null,
+            studioCss: studioCss ?? null,
             fontsCss: fontsCss || null,
             fontPreloads,
             includeSwiper: resolved.hasSlider,

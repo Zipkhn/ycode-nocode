@@ -3570,6 +3570,7 @@ function filterByVisibility(
           timezone,
         };
         const groups = conditionalVisibility.groups.map(group => ({
+          action: group.action,
           conditions: (group.conditions || []).map((condition): DynamicVisibilityCondition => {
             if (isDynamicDateCondition(condition) && condition.fieldId) {
               const v = resolveFieldFromSources(
@@ -3598,7 +3599,11 @@ function filterByVisibility(
             ...(layer._dynamicStyles || {}),
             display: isVisible ? '' : 'none',
           },
-          _dynamicVisibilityRule: { timezone, groups },
+          _dynamicVisibilityRule: {
+            timezone,
+            defaultVisibility: conditionalVisibility.defaultVisibility,
+            groups,
+          },
           children: layer.children
             ? layer.children
               .map(child => filterLayer(child, effectiveCollectionLayerData, effectiveCurrentItemId))

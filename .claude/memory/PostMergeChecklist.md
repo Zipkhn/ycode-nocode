@@ -50,7 +50,13 @@ grep -n "cleanSlate" "app/(builder)/ycode/components/ElementLibrary.tsx"
 grep -n "'link-block'" lib/layer-utils.ts "app/(builder)/ycode/components/ElementLibrary.tsx"
 
 # JSON-LD / Hreflang / SEO
-grep -n "generatePageJsonLd\|generateHreflangEntries" "app/(site)/page.tsx"
+grep -n "generatePageJsonLd" "app/(site)/page.tsx"
+# hreflang : chemin fork supprimé (405fbcf) — hreflang-utils upstream est la seule source
+grep -n "buildPageHreflangAlternatesForPage" components/PageRenderer.tsx lib/generate-page-metadata.ts
+# GEO fork
+grep -n "generateWebPageSchema" lib/schema-generator.ts
+grep -n "AI_CRAWLER_BLOCK" lib/robots-txt.ts
+grep -n "generateLlmsTxt" "app/(site)/llms.txt/route.ts" lib/apps/static-export/engine.ts
 
 # SEO governance (depuis v1.21.x — conflits récurrents dans generate-page-metadata)
 grep -n "getCanonicalUrl\|getRobotsDirectives\|SeoGovernanceContext" lib/generate-page-metadata.ts

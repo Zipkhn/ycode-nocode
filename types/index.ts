@@ -550,7 +550,9 @@ export interface Layer {
   _dynamicVisibilityRule?: {
     /** Project timezone (IANA) for resolving date presets on the client. */
     timezone?: string;
-    groups: Array<{ conditions: DynamicVisibilityCondition[] }>;
+    /** "Else" fallback when no group matches. Mirrors ConditionalVisibility. */
+    defaultVisibility?: 'visible' | 'hidden';
+    groups: Array<{ action?: 'show' | 'hide'; conditions: DynamicVisibilityCondition[] }>;
   };
   // SSR-only property for filterable collection config (when collection has linked filter inputs)
   _filterConfig?: {
