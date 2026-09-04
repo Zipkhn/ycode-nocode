@@ -5,17 +5,20 @@
  */
 
 import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
 import { getSettingsByKeys } from '@/lib/repositories/settingsRepository';
 import { credentials } from '@/lib/credentials';
 import { buildRobotsTxt } from '@/lib/robots-txt';
-import { getSiteBaseUrl } from '@/lib/url-utils';
+import { getRequestOrigin, getSiteBaseUrl } from '@/lib/url-utils';
 import type { SitemapSettings } from '@/types';
 
 export async function GET() {
   try {
+    const requestOrigin = getRequestOrigin(await headers());
+
     const hasSupabaseCredentials = await credentials.exists();
     if (!hasSupabaseCredentials) {
-      const baseUrl = getSiteBaseUrl() || '';
+      const baseUrl = getSiteBaseUrl({ requestOrigin }) || '';
 
       return new NextResponse(buildRobotsTxt({ sitemapUrl: baseUrl ? `${baseUrl}/sitemap.xml` : null }), {
         headers: {
@@ -28,7 +31,7 @@ export async function GET() {
     const allSettings = await getSettingsByKeys(['robots_txt', 'sitemap', 'global_canonical_url']);
     const sitemapSettings = allSettings.sitemap as SitemapSettings | null;
     const sitemapEnabled = sitemapSettings?.mode && sitemapSettings.mode !== 'none';
-    const baseUrl = getSiteBaseUrl({ globalCanonicalUrl: allSettings.global_canonical_url }) || '';
+    const baseUrl = getSiteBaseUrl({ globalCanonicalUrl: allSettings.global_canonical_url, requestOrigin }) || '';
 
     const content = buildRobotsTxt({
       customRobots: typeof allSettings.robots_txt === 'string' ? allSettings.robots_txt : null,
