@@ -33,6 +33,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 // 4. Internal components
 import AddAttributeModal from './AddAttributeModal';
+import AdvancedSettings from './AdvancedSettings';
 import BackgroundsControls from './BackgroundsControls';
 import CustomAttributeRow from './CustomAttributeRow';
 import BorderControls from './BorderControls';
@@ -72,6 +73,7 @@ import SettingsPanel from './SettingsPanel';
 import SizingControls from './SizingControls';
 import SpacingControls from './SpacingControls';
 import ToggleGroup from './ToggleGroup';
+import VisibilitySetting from './VisibilitySetting';
 import TypographyControls from './TypographyControls';
 import UIStateSelector from './UIStateSelector';
 
@@ -2414,6 +2416,14 @@ const RightSidebar = React.memo(function RightSidebar({
                   </div>
                 );
               })()}
+
+              {selectedLayer && (
+                <VisibilitySetting
+                  layer={selectedLayer}
+                  onLayerUpdate={handleLayerUpdate}
+                  disabled={isLockedByOther}
+                />
+              )}
             </div>
 
             {/* Content Panel - show for text-editable layers */}
@@ -3201,6 +3211,15 @@ const RightSidebar = React.memo(function RightSidebar({
                 </div>
               )}
             </SettingsPanel>
+            )}
+
+            {/* Advanced — hide while translating and for body */}
+            {!isLocalizing && selectedLayer && selectedLayerId !== 'body' && (
+              <AdvancedSettings
+                layer={selectedLayer}
+                onLayerUpdate={handleLayerUpdate}
+                disabled={isLockedByOther}
+              />
             )}
           </div>
         </TabsContent>

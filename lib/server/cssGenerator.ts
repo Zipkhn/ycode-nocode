@@ -14,6 +14,7 @@ import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { compile } from 'tailwindcss';
 import type { Layer, Component } from '@/types';
+import { collectKeptHiddenLayerIds } from '@/lib/animation-utils';
 import { DEFAULT_TEXT_STYLES } from '@/lib/text-format-utils';
 import { TAILWIND_CUSTOM_VARIANTS } from '@/lib/tailwind-custom-variants';
 import { getAllDraftLayers, getDraftLayers, getEmbeddedComponentIdsForCollections } from '@/lib/repositories/pageLayersRepository';
@@ -29,6 +30,8 @@ import { getSupabaseAdmin } from '@/lib/supabase-server';
 function extractClassesFromLayers(layers: Layer[]): Set<string> {
   const classes = new Set<string>();
   const processedComponentIds = new Set<string>();
+  // Hidden layers kept in HTML (reveal interaction / keepInHtml) render collapsed, so their classes are needed.
+  const keptHidden = collectKeptHiddenLayerIds(layers);
 
   const extractClasses = (classValue: string | string[] | undefined) => {
     if (!classValue) return;
@@ -45,7 +48,7 @@ function extractClassesFromLayers(layers: Layer[]): Set<string> {
   };
 
   function processLayer(layer: Layer): void {
-    if (layer.settings?.hidden) return;
+    if (layer.settings?.hidden && !keptHidden.has(layer.id)) return;
 
     if (layer.componentId) {
       if (processedComponentIds.has(layer.componentId)) return;

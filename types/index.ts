@@ -252,7 +252,8 @@ export interface SliderSettings {
 export interface LayerSettings {
   id?: string; // Custom element ID
   tag?: string; // HTML tag override (e.g., 'h1', 'h2', etc.)
-  hidden?: boolean; // Element visibility in canvas
+  hidden?: boolean; // Hidden everywhere (canvas + published) — not rendered unless kept in HTML
+  keepInHtml?: boolean; // When hidden, render collapsed (display: none) instead of omitting, so custom code / interactions can reveal it
   customAttributes?: Record<string, string>; // Custom HTML attributes { attributeName: attributeValue }
   locale?: {
     format?: 'locale' | 'code'; // Display format for `localeSelector` layers (locale => 'English', code => 'EN')

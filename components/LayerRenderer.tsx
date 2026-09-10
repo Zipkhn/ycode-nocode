@@ -51,7 +51,7 @@ import LocaleSelector from '@/components/layers/LocaleSelector';
 import { usePagesStore } from '@/stores/usePagesStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { generateLinkHref, resolveLinkAttrs, isLinkAtCollectionBoundary, isLinkToCurrentPage, type LinkResolutionContext } from '@/lib/link-utils';
-import { collectEditorHiddenLayerIds, type HiddenLayerInfo } from '@/lib/animation-utils';
+import { collectEditorHiddenLayerIds, collectKeptHiddenLayerIds, type HiddenLayerInfo } from '@/lib/animation-utils';
 import AnimationInitializer from '@/components/AnimationInitializer';
 import { transformLayerIdsForInstance, resolveVariableLinks } from '@/lib/resolve-components';
 
@@ -1399,6 +1399,22 @@ const LayerItemImpl: React.FC<{
     return merged;
   }, [transformedComponentLayers, editorHiddenLayerIds]);
 
+  // Same for kept-hidden layers inside the instance: the keep-in-DOM
+  // check reads `hiddenLayerInfo`, which was computed with the page-level ID
+  // transform, so add entries for the instance's transformed IDs.
+  const componentHiddenLayerInfo = useMemo(() => {
+    if (!transformedComponentLayers) return hiddenLayerInfo;
+    const kept = collectKeptHiddenLayerIds(transformedComponentLayers);
+    if (kept.size === 0) return hiddenLayerInfo;
+    const merged: HiddenLayerInfo[] = hiddenLayerInfo ? [...hiddenLayerInfo] : [];
+    kept.forEach((layerId) => {
+      if (!merged.some((info) => info.layerId === layerId)) {
+        merged.push({ layerId, breakpoints: null });
+      }
+    });
+    return merged;
+  }, [transformedComponentLayers, hiddenLayerInfo]);
+
   const collectionVariable = getCollectionVariable(layer);
   const isCollectionLayer = !!collectionVariable;
   const collectionId = collectionVariable?.id;
@@ -1966,8 +1982,10 @@ const LayerItemImpl: React.FC<{
     'ycode-layer'
   ) : clsx(classesString, paragraphClasses, SWIPER_CLASS_MAP[layer.name], isSlideChild && 'swiper-slide', buttonNeedsFit && 'w-fit', buttonNeedsTextCenter && 'text-center');
 
-  // Check if layer should be hidden (hide completely in both edit mode and public pages)
-  if (layer.settings?.hidden) {
+  // Hidden layers are omitted entirely (edit mode and public pages) unless kept
+  // in HTML (reveal interaction or settings.keepInHtml) — those are in
+  // `hiddenLayerInfo` and render collapsed instead.
+  if (layer.settings?.hidden && !hiddenLayerInfo?.some((info) => info.layerId === layer.id)) {
     return null;
   }
 
@@ -2072,6 +2090,7 @@ const LayerItemImpl: React.FC<{
           layers={layersWithInstanceId}
           {...sharedRendererProps}
           editorHiddenLayerIds={componentEditorHiddenLayerIds}
+          hiddenLayerInfo={componentHiddenLayerInfo}
           enableDragDrop={enableDragDrop}
           activeLayerId={activeLayerId}
           projected={projected}
@@ -2230,8 +2249,10 @@ const LayerItemImpl: React.FC<{
       }
     }
 
-    // Add data-gsap-hidden attribute for elements that should start hidden
-    const hiddenInfo = hiddenLayerInfo?.find(info => info.layerId === layer.id);
+    // Add data-gsap-hidden attribute for elements that should start hidden.
+    // Not in edit mode: canvas.css hides the attribute with !important, which
+    // would defeat the reveal-on-select handled via `editorHiddenLayerIds` below.
+    const hiddenInfo = isEditMode ? undefined : hiddenLayerInfo?.find(info => info.layerId === layer.id);
     if (hiddenInfo) {
       // Set breakpoints as value (e.g., "mobile" or "mobile tablet") or empty for all
       elementProps['data-gsap-hidden'] = hiddenInfo.breakpoints || '';

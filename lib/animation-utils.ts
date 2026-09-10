@@ -22,6 +22,12 @@ export function getEffectiveApplyStyle(
   propertyKey: TweenPropertyKey,
   applyStyles: InteractionTween['apply_styles'] | undefined
 ): ApplyStyles {
+  // `display` is toggled via `data-gsap-hidden`, not tweened. Applying a
+  // `from: hidden` state "on trigger" is a no-op — the timeline's onStart
+  // removes the attribute in the same tick — so the element would never be
+  // hidden and a Hidden → Visible reveal would appear to do nothing. Treat
+  // display as always on-load; a `from: visible` emits nothing on load anyway.
+  if (propertyKey === 'display') return 'on-load';
   const explicit = applyStyles?.[propertyKey];
   if (explicit) return explicit;
   if (IMPLICIT_ON_LOAD_TRIGGERS.includes(trigger)) return 'on-load';
@@ -543,6 +549,55 @@ export interface EditorHiddenLayerInfo {
 }
 
 /**
+ * Layer IDs that some interaction can reveal — targets of a tween whose `to`
+ * display is `visible`.
+ */
+export function collectRevealableLayerIds(layers: Layer[]): Set<string> {
+  const ids = new Set<string>();
+
+  const traverse = (layerList: Layer[]) => {
+    layerList.forEach((layer) => {
+      layer.interactions?.forEach((interaction) => {
+        (interaction.tweens || []).forEach((tween) => {
+          if (tween.to?.display === 'visible') ids.add(tween.layer_id);
+        });
+      });
+      if (layer.children) traverse(layer.children);
+    });
+  };
+
+  traverse(layers);
+  return ids;
+}
+
+/**
+ * Layers hidden via `settings.hidden` that must stay in the DOM.
+ *
+ * `settings.hidden` normally removes a layer from the output entirely. Two
+ * things keep it instead, rendered collapsed (`data-gsap-hidden`, every
+ * breakpoint) the same way a `from: hidden` display tween works:
+ * - an interaction targets it with Display → Visible (automatic), or
+ * - the layer opts in via `settings.keepInHtml` (for custom code reveals).
+ * Hidden layers matching neither stay out of the DOM.
+ */
+export function collectKeptHiddenLayerIds(layers: Layer[]): Set<string> {
+  const ids = new Set<string>();
+  const revealable = collectRevealableLayerIds(layers);
+
+  const traverse = (layerList: Layer[]) => {
+    layerList.forEach((layer) => {
+      if (layer.settings?.hidden && (layer.settings.keepInHtml || revealable.has(layer.id))) {
+        ids.add(layer.id);
+      }
+      if (layer.children) traverse(layer.children);
+    });
+  };
+
+  traverse(layers);
+  return ids;
+}
+
+/**
  * Whether a tween's on-load `from` state leaves the element hidden, so the
  * editor should hide it by default and reveal it on selection. Covers explicit
  * `display: hidden` (any trigger) plus toggle triggers (hover/click) whose
@@ -618,6 +673,13 @@ export function collectEditorHiddenLayerIds(layers: Layer[]): Map<string, Breakp
   };
 
   traverse(layers);
+
+  // Hidden layers kept in the DOM (reveal interaction / keepInHtml) are
+  // collapsed on every breakpoint, regardless of an interaction's own scope.
+  collectKeptHiddenLayerIds(layers).forEach((layerId) => {
+    hiddenLayerMap.set(layerId, []);
+  });
+
   return hiddenLayerMap;
 }
 
@@ -817,6 +879,19 @@ export function generateInitialAnimationCSS(layers: Layer[]): InitialAnimationRe
   };
 
   collectStyles(layers);
+
+  // Hidden layers kept in the DOM (reveal interaction / keepInHtml) start
+  // collapsed on every breakpoint. Replace any breakpoint-scoped entry so the unscoped one
+  // wins in the renderer's first-match lookup.
+  const keptHidden = collectKeptHiddenLayerIds(layers);
+  if (keptHidden.size > 0) {
+    for (let i = hiddenLayerInfo.length - 1; i >= 0; i--) {
+      if (keptHidden.has(hiddenLayerInfo[i].layerId)) hiddenLayerInfo.splice(i, 1);
+    }
+    keptHidden.forEach((layerId) => {
+      hiddenLayerInfo.push({ layerId, breakpoints: null });
+    });
+  }
 
   // Generate final CSS with media queries
   rulesByMediaQuery.forEach((rules, mediaQuery) => {

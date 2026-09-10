@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Empty, EmptyDescription } from '@/components/ui/empty';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Slider } from '@/components/ui/slider';
@@ -51,6 +52,7 @@ import { Separator } from '@/components/ui/separator';
 import ColorPicker from './ColorPicker';
 
 // 3. Utils
+import { hideGsapElement, resetGsapDisplay, showGsapElement } from '@/lib/animation-display';
 import { cn, generateId } from '@/lib/utils';
 import { findLayerById } from '@/lib/layer-utils';
 import { getLayerName, getLayerIcon } from '@/lib/layer-display-utils';
@@ -320,11 +322,11 @@ export default function InteractionsPanel({
       // Use GSAP to clear transforms
       gsap.set(element, { clearProps: 'all' });
       element.setAttribute('style', originalStyle);
-      // Restore original hidden state
+      // Restore original hidden state (attribute and any stripped `hidden` classes)
       if (wasHidden) {
-        element.setAttribute('data-gsap-hidden', '');
+        hideGsapElement(element);
       } else {
-        element.removeAttribute('data-gsap-hidden');
+        resetGsapDisplay(element);
       }
       previewedElementRef.current = null;
     }
@@ -429,11 +431,11 @@ export default function InteractionsPanel({
     previewedElementsRef.current.forEach(({ element, originalStyle, wasHidden }) => {
       gsap.set(element, { clearProps: 'all' });
       element.setAttribute('style', originalStyle);
-      // Restore original hidden state
+      // Restore original hidden state (attribute and any stripped `hidden` classes)
       if (wasHidden) {
-        element.setAttribute('data-gsap-hidden', '');
+        hideGsapElement(element);
       } else {
-        element.removeAttribute('data-gsap-hidden');
+        resetGsapDisplay(element);
       }
     });
     previewedElementsRef.current.clear();
@@ -529,14 +531,14 @@ export default function InteractionsPanel({
     // Handle display via data-gsap-hidden attribute (same as AnimationInitializer)
     // 'visible' = remove attribute, 'hidden' = add attribute
     if (displayStart === 'visible') {
-      element.removeAttribute('data-gsap-hidden');
+      showGsapElement(element);
     }
 
     // Play the animation using iframe's GSAP (same context as SplitText)
     const tl = iframeGsap.timeline({
       onComplete: () => {
         if (displayEnd === 'hidden') {
-          element.setAttribute('data-gsap-hidden', '');
+          hideGsapElement(element);
         }
       },
     });
@@ -776,7 +778,7 @@ export default function InteractionsPanel({
       }
       // Handle display via data-gsap-hidden attribute (same as AnimationInitializer)
       if (displayStart === 'visible') {
-        timeline.call(() => element.removeAttribute('data-gsap-hidden'), undefined, position);
+        timeline.call(() => showGsapElement(element), undefined, position);
       }
 
       // Add tween to timeline using shared utility
@@ -790,7 +792,7 @@ export default function InteractionsPanel({
         splitText: effectiveSplitText,
         splitElements,
         onComplete: displayEnd === 'hidden'
-          ? () => element.setAttribute('data-gsap-hidden', '')
+          ? () => hideGsapElement(element)
           : undefined,
       });
     });
@@ -1847,6 +1849,29 @@ export default function InteractionsPanel({
 
           <div className="flex flex-col gap-2 pb-4">
             {(() => {
+              // A layer hidden via Visibility is normally left out of the page.
+              // A tween ending in Display: Visible (or "Keep in HTML when hidden")
+              // keeps it in the DOM collapsed so the interaction has a target.
+              const targetLayer = findLayerById(allLayers, selectedTween.layer_id);
+              if (!targetLayer?.settings?.hidden) return null;
+              const revealsTarget = selectedTween.to?.display === 'visible';
+              const keptInHtml = !!targetLayer.settings?.keepInHtml;
+              let message: string;
+              if (revealsTarget) {
+                message = 'This layer is hidden. It stays in the page collapsed and is shown by this animation.';
+              } else if (keptInHtml) {
+                message = 'This layer is hidden and kept in HTML collapsed. Set Display to Visible in this animation to show it.';
+              } else {
+                message = 'This layer is hidden and is not rendered, so this animation has no effect. Set Display to Visible in this animation, or make the layer visible.';
+              }
+              return (
+                <Alert variant={revealsTarget ? 'default' : 'warning'}>
+                  <AlertDescription>{message}</AlertDescription>
+                </Alert>
+              );
+            })()}
+
+            {(() => {
               const isAtMode = typeof selectedTween.position === 'number';
               const selectValue = isAtMode ? 'at' : String(selectedTween.position);
 
@@ -2329,6 +2354,9 @@ export default function InteractionsPanel({
                             // only exist after SplitText runs client-side, so the on-load /
                             // on-trigger toggle is a no-op — they always behave as on-trigger.
                             const isNoOpForSplitText = !!selectedTween.splitText;
+                            // Display is always applied on load (see getEffectiveApplyStyle) —
+                            // a `from: hidden` applied on trigger would never hide the element.
+                            const isDisplayProp = prop.key === 'display';
                             const effectiveApplyStyle: ApplyStyles = isNoOpForSplitText
                               ? 'on-trigger'
                               : selectedInteraction
@@ -2344,7 +2372,7 @@ export default function InteractionsPanel({
                                       size="xs"
                                       variant="secondary"
                                       className="size-7 p-0 shrink-0 transition-none"
-                                      disabled={isFromCurrent || isNoOpForSplitText}
+                                      disabled={isFromCurrent || isNoOpForSplitText || isDisplayProp}
                                       onClick={() => {
                                         handleUpdateTween(selectedTween.id, {
                                           apply_styles: {
@@ -2360,9 +2388,11 @@ export default function InteractionsPanel({
                                   <TooltipContent side="top" align="start">
                                     {isNoOpForSplitText
                                       ? 'Text animations always apply styles on trigger'
-                                      : isOnLoad
-                                        ? 'Apply property style on page load'
-                                        : 'Apply property style on trigger'}
+                                      : isDisplayProp
+                                        ? 'Display is always applied on page load'
+                                        : isOnLoad
+                                          ? 'Apply property style on page load'
+                                          : 'Apply property style on trigger'}
                                   </TooltipContent>
                                 </Tooltip>
 

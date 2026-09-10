@@ -22,6 +22,22 @@ interface LayoutControlsProps {
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
 }
 
+type LayoutType = 'columns' | 'rows' | 'grid' | 'hidden';
+
+interface LayoutTypeOption {
+  value: LayoutType;
+  icon: React.ComponentProps<typeof Icon>['name'];
+  label: string;
+  description: string;
+}
+
+const LAYOUT_TYPE_OPTIONS: LayoutTypeOption[] = [
+  { value: 'columns', icon: 'columns', label: 'Columns', description: 'Flex row — children side by side' },
+  { value: 'rows', icon: 'rows', label: 'Rows', description: 'Flex column — children stacked' },
+  { value: 'grid', icon: 'grid', label: 'Grid', description: 'CSS grid with columns and rows' },
+  { value: 'hidden', icon: 'eye-off', label: 'None', description: 'display: none — hides the element on this breakpoint' },
+];
+
 const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: LayoutControlsProps) {
   const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
   const activeUIState = useEditorStore((s) => s.activeUIState);
@@ -107,7 +123,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
   const wrapMode = flexWrap === 'wrap' ? 'yes' : 'no';
 
   // Handle layout type change
-  const handleLayoutTypeChange = (type: 'columns' | 'rows' | 'grid' | 'hidden') => {
+  const handleLayoutTypeChange = (type: LayoutType) => {
     const updates = [];
 
     if (type === 'hidden') {
@@ -205,22 +221,26 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
               <div className="col-span-2">
                   <Tabs
                     value={layoutType}
-                    onValueChange={(value) => handleLayoutTypeChange(value as 'columns' | 'rows' | 'grid' | 'hidden')}
+                    onValueChange={(value) => handleLayoutTypeChange(value as LayoutType)}
                     className="w-full"
                   >
                       <TabsList className="w-full">
-                          <TabsTrigger value="columns">
-                              <Icon name="columns" />
-                          </TabsTrigger>
-                          <TabsTrigger value="rows">
-                              <Icon name="rows" />
-                          </TabsTrigger>
-                          <TabsTrigger value="grid">
-                              <Icon name="grid" />
-                          </TabsTrigger>
-                          <TabsTrigger value="hidden">
-                            Hide
-                          </TabsTrigger>
+                          {LAYOUT_TYPE_OPTIONS.map((option) => (
+                            <Tooltip key={option.value}>
+                                <TooltipTrigger asChild>
+                                    <TabsTrigger
+                                      value={option.value}
+                                      aria-label={option.label}
+                                    >
+                                        <Icon name={option.icon} />
+                                    </TabsTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>{option.label}</p>
+                                    <p className="text-muted-foreground">{option.description}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                          ))}
                       </TabsList>
                   </Tabs>
               </div>
