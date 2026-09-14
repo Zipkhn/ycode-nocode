@@ -31,8 +31,8 @@ interface LayoutTypeOption {
 }
 
 const LAYOUT_TYPE_OPTIONS: LayoutTypeOption[] = [
-  { value: 'columns', icon: 'columns', label: 'Flex row' },
-  { value: 'rows', icon: 'rows', label: 'Flex column' },
+  { value: 'columns', icon: 'columns', label: 'Flex horizontal' },
+  { value: 'rows', icon: 'rows', label: 'Flex vertical' },
   { value: 'grid', icon: 'grid', label: 'Grid' },
   { value: 'hidden', icon: 'eye-off', label: 'Display none' },
 ];
