@@ -425,44 +425,27 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                   <div className="col-span-2 flex items-center gap-2">
                       {gapModeToggle.mode === 'individual' ? (
                         <div className="flex-1 grid grid-cols-2 gap-2">
+                            {/* Compact X / Y prefixes so two-digit values fit in the narrow inputs */}
                             <InputGroup>
-                                <InputGroupAddon>
-                                    <div className="flex">
-                                        <Tooltip>
-                                            <TooltipTrigger tabIndex={-1}>
-                                                <Icon name="horizontalGap" className="size-3" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Columns</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                </InputGroupAddon>
+                                <InputGroupAddon className="pl-2 text-xs opacity-50">X</InputGroupAddon>
                                 <InputGroupInput
                                   stepper
                                   min="0"
                                   step="1"
+                                  aria-label="Column gap"
+                                  className="pl-1.5"
                                   value={columnGapInput}
                                   onChange={(e) => handleColumnGapChange(e.target.value)}
                                 />
                             </InputGroup>
                             <InputGroup>
-                                <InputGroupAddon>
-                                    <div className="flex">
-                                        <Tooltip>
-                                            <TooltipTrigger tabIndex={-1}>
-                                                <Icon name="verticalGap" className="size-3" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Rows</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </div>
-                                </InputGroupAddon>
+                                <InputGroupAddon className="pl-2 text-xs opacity-50">Y</InputGroupAddon>
                                 <InputGroupInput
                                   stepper
                                   min="0"
                                   step="1"
+                                  aria-label="Row gap"
+                                  className="pl-1.5"
                                   value={rowGapInput}
                                   onChange={(e) => handleRowGapChange(e.target.value)}
                                 />
