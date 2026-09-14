@@ -2050,10 +2050,15 @@ const RightSidebar = React.memo(function RightSidebar({
           <div className="overflow-y-auto no-scrollbar overflow-x-hidden divide-y ">
 
           {shouldShowControl('layout', selectedLayer) && !showTextStyleControls && (
-            <LayoutControls layer={controlLayer} onLayerUpdate={controlUpdate} />
+            <LayoutControls
+              layer={controlLayer}
+              parentLayer={selectedLayerParent}
+              onLayerUpdate={controlUpdate}
+            />
           )}
 
-          {!showTextStyleControls && (
+          {/* Layers without a Layout panel (text, images) still get Align self inside a flex/grid parent */}
+          {!shouldShowControl('layout', selectedLayer) && !showTextStyleControls && (
             <SelfLayoutControls
               layer={controlLayer} parentLayer={selectedLayerParent}
               onLayerUpdate={controlUpdate}

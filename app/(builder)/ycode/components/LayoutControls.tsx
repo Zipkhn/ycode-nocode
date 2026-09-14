@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlignSelfRow } from './SelfLayoutControls';
 import { useDesignSync } from '@/hooks/use-design-sync';
 import { useControlledInputs } from '@/hooks/use-controlled-input';
 import { useModeToggle } from '@/hooks/use-mode-toggle';
@@ -19,25 +20,71 @@ import type { Layer } from '@/types';
 
 interface LayoutControlsProps {
   layer: Layer | null;
+  parentLayer?: Layer | null;
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
 }
 
-type LayoutType = 'columns' | 'rows' | 'grid' | 'hidden';
+/** Display mode of the layer itself (maps to CSS `display`) */
+type LayoutType = 'block' | 'flex' | 'grid' | 'hidden';
+/** Flex main axis (maps to CSS `flex-direction`) */
+type FlexDirection = 'horizontal' | 'vertical';
 
-interface LayoutTypeOption {
-  value: LayoutType;
+interface IconOption<T extends string> {
+  value: T;
   icon: React.ComponentProps<typeof Icon>['name'];
   label: string;
 }
 
-const LAYOUT_TYPE_OPTIONS: LayoutTypeOption[] = [
-  { value: 'columns', icon: 'columns', label: 'Flex horizontal' },
-  { value: 'rows', icon: 'rows', label: 'Flex vertical' },
+const LAYOUT_TYPE_OPTIONS: IconOption<LayoutType>[] = [
+  { value: 'block', icon: 'block', label: 'Block' },
+  { value: 'flex', icon: 'flex', label: 'Flex' },
   { value: 'grid', icon: 'grid', label: 'Grid' },
   { value: 'hidden', icon: 'square-dashed', label: 'None' },
 ];
 
-const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: LayoutControlsProps) {
+const FLEX_DIRECTION_OPTIONS: IconOption<FlexDirection>[] = [
+  { value: 'horizontal', icon: 'columns', label: 'Horizontal' },
+  { value: 'vertical', icon: 'rows', label: 'Vertical' },
+];
+
+/** Icon-only tab group with a tooltip per option */
+function IconTabs<T extends string>({ value, options, onChange }: {
+  value: T;
+  options: IconOption<T>[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <Tabs
+      value={value}
+      onValueChange={(next) => onChange(next as T)}
+      className="w-full"
+    >
+        <TabsList className="w-full">
+            {options.map((option) => (
+              <Tooltip key={option.value}>
+                  {/* Wrap in a span: Tooltip and Tabs both write `data-state`, so
+                      sharing one element via asChild would drop the active tab style */}
+                  <TooltipTrigger asChild>
+                      <span className="flex flex-1 h-full">
+                          <TabsTrigger
+                            value={option.value}
+                            aria-label={option.label}
+                          >
+                              <Icon name={option.icon} />
+                          </TabsTrigger>
+                      </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                      <p>{option.label}</p>
+                  </TooltipContent>
+              </Tooltip>
+            ))}
+        </TabsList>
+    </Tabs>
+  );
+}
+
+const LayoutControls = memo(function LayoutControls({ layer, parentLayer = null, onLayerUpdate }: LayoutControlsProps) {
   const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
   const activeUIState = useEditorStore((s) => s.activeUIState);
   const { updateDesignProperty, updateDesignProperties, debouncedUpdateDesignProperty, getDesignProperty } = useDesignSync({
@@ -112,42 +159,43 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
     getCurrentValue: (prop: string) => getDesignProperty('layout', prop) || '',
   });
 
-  // Determine layout type from current values
-  const layoutType =
+  // Determine layout type from current values. Anything that is not flex,
+  // grid or hidden (including the unset default) behaves as block.
+  const layoutType: LayoutType =
       display === 'hidden' ? 'hidden' :
-        display === 'grid' ? 'grid' :
-          flexDirection === 'column' || flexDirection === 'column-reverse' ? 'rows' :
-            'columns';
+        display === 'grid' || display === 'inline-grid' ? 'grid' :
+          display === 'flex' || display === 'inline-flex' ? 'flex' :
+            'block';
+
+  const isFlex = layoutType === 'flex';
+  const isGrid = layoutType === 'grid';
+  const isColumnAxis = isFlex && (flexDirection === 'column' || flexDirection === 'column-reverse');
+  const direction: FlexDirection = isColumnAxis ? 'vertical' : 'horizontal';
 
   const wrapMode = flexWrap === 'wrap' ? 'yes' : 'no';
 
   // Handle layout type change
   const handleLayoutTypeChange = (type: LayoutType) => {
-    const updates = [];
-
-    if (type === 'hidden') {
-      updates.push(
-        { category: 'layout' as const, property: 'display', value: 'hidden' },
-        { category: 'layout' as const, property: 'flexDirection', value: null }
-      );
-    } else if (type === 'grid') {
-      updates.push(
-        { category: 'layout' as const, property: 'display', value: 'grid' },
-        { category: 'layout' as const, property: 'flexDirection', value: null }
-      );
-    } else {
-      updates.push(
-        { category: 'layout' as const, property: 'display', value: 'flex' }
-      );
-
-      if (type === 'columns') {
-        updates.push({ category: 'layout' as const, property: 'flexDirection', value: 'row' });
-      } else {
-        updates.push({ category: 'layout' as const, property: 'flexDirection', value: 'column' });
-      }
+    if (type === 'flex') {
+      // Keep an existing direction; default to a horizontal row otherwise
+      const hasDirection = ['row', 'row-reverse', 'column', 'column-reverse'].includes(flexDirection);
+      updateDesignProperties([
+        { category: 'layout', property: 'display', value: 'flex' },
+        ...(hasDirection ? [] : [{ category: 'layout' as const, property: 'flexDirection', value: 'row' }]),
+      ]);
+      return;
     }
 
-    updateDesignProperties(updates);
+    // block / grid / hidden: direction only applies to flex
+    updateDesignProperties([
+      { category: 'layout', property: 'display', value: type },
+      { category: 'layout', property: 'flexDirection', value: null },
+    ]);
+  };
+
+  // Handle flex direction change
+  const handleDirectionChange = (value: FlexDirection) => {
+    updateDesignProperty('layout', 'flexDirection', value === 'vertical' ? 'column' : 'row');
   };
 
   // Handle align items change
@@ -218,37 +266,28 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
           <div className="grid grid-cols-3">
               <Label variant="muted">Type</Label>
               <div className="col-span-2">
-                  <Tabs
+                  <IconTabs
                     value={layoutType}
-                    onValueChange={(value) => handleLayoutTypeChange(value as LayoutType)}
-                    className="w-full"
-                  >
-                      <TabsList className="w-full">
-                          {LAYOUT_TYPE_OPTIONS.map((option) => (
-                            <Tooltip key={option.value}>
-                                {/* Wrap in a span: Tooltip and Tabs both write `data-state`, so
-                                    sharing one element via asChild would drop the active tab style */}
-                                <TooltipTrigger asChild>
-                                    <span className="flex flex-1 h-full">
-                                        <TabsTrigger
-                                          value={option.value}
-                                          aria-label={option.label}
-                                        >
-                                            <Icon name={option.icon} />
-                                        </TabsTrigger>
-                                    </span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>{option.label}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                          ))}
-                      </TabsList>
-                  </Tabs>
+                    options={LAYOUT_TYPE_OPTIONS}
+                    onChange={handleLayoutTypeChange}
+                  />
               </div>
           </div>
 
-          {layoutType !== 'hidden' && (
+          {isFlex && (
+              <div className="grid grid-cols-3">
+                  <Label variant="muted">Direction</Label>
+                  <div className="col-span-2">
+                      <IconTabs
+                        value={direction}
+                        options={FLEX_DIRECTION_OPTIONS}
+                        onChange={handleDirectionChange}
+                      />
+                  </div>
+              </div>
+          )}
+
+          {(isFlex || isGrid) && (
               <>
                   <div className="grid grid-cols-3">
                       <Label variant="muted">Align</Label>
@@ -260,16 +299,16 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                           >
                               <TabsList className="w-full">
                                   <TabsTrigger value="start">
-                                      <Icon name="alignStart" className={layoutType === 'rows' ? '-rotate-90' : ''} />
+                                      <Icon name="alignStart" className={isColumnAxis ? '-rotate-90' : ''} />
                                   </TabsTrigger>
                                   <TabsTrigger value="center">
-                                      <Icon name="alignCenter" className={layoutType === 'rows' ? '-rotate-90' : ''} />
+                                      <Icon name="alignCenter" className={isColumnAxis ? '-rotate-90' : ''} />
                                   </TabsTrigger>
                                   <TabsTrigger value="end">
-                                      <Icon name="alignEnd" className={layoutType === 'rows' ? '-rotate-90' : ''} />
+                                      <Icon name="alignEnd" className={isColumnAxis ? '-rotate-90' : ''} />
                                   </TabsTrigger>
                                   <TabsTrigger value="stretch">
-                                      <Icon name="alignStretch" className={layoutType === 'rows' ? '-rotate-90' : ''} />
+                                      <Icon name="alignStretch" className={isColumnAxis ? '-rotate-90' : ''} />
                                   </TabsTrigger>
                               </TabsList>
                           </Tabs>
@@ -299,7 +338,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
               </>
           )}
 
-          {layoutType === 'grid' && (
+          {isGrid && (
               <div className="grid grid-cols-3">
                   <Label variant="muted">Grid</Label>
                   <div className="col-span-2 grid grid-cols-2 gap-2">
@@ -349,7 +388,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
               </div>
           )}
 
-          {layoutType === 'columns' && (
+          {isFlex && !isColumnAxis && (
               <div className="grid grid-cols-3">
                   <Label variant="muted">Wrap</Label>
                   <div className="col-span-2">
@@ -367,7 +406,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
               </div>
           )}
 
-          {layoutType !== 'hidden' && (
+          {(isFlex || isGrid) && (
               <div className="grid grid-cols-3 items-start">
                   <Label variant="muted" className="h-8">Gap</Label>
                   <div className="col-span-2 flex flex-col gap-2">
@@ -439,6 +478,13 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                   </div>
               </div>
           )}
+
+          {/* How this layer sits inside its flex/grid parent (renders nothing otherwise) */}
+          <AlignSelfRow
+            layer={layer}
+            parentLayer={parentLayer}
+            onLayerUpdate={onLayerUpdate}
+          />
 
       </div>
     </div>

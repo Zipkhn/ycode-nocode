@@ -19,7 +19,7 @@ export interface IconProps extends React.SVGProps<SVGSVGElement> {
     | 'slide-bullets' | 'slide-bullet' | 'slide-navigation' | 'slide-fraction' | 'loop-alternate' | 'loop-repeat' | 'listItem' | 'external-link'
     | 'settings' | 'center-block' | 'code-block' | 'table' | 'table-row' | 'table-cell' | 'add-column' | 'add-row' | 'delete-column' | 'delete-row' | 'delete-table' | 'header' | 'body'
     | 'webflow' | 'figma' | 'space' | 'sparkles'
-    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed'
+    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'flex'
     | 'claude' | 'openai' | 'gemini' | 'grok'
   );
 }
@@ -1120,6 +1120,14 @@ const ICONS: Record<IconProps['name'], React.ReactNode> = {
       <path d="M5,10 h2 v1 h-2 z" />
       <path d="M1,5 h1 v2 h-1 z" />
       <path d="M10,5 h1 v2 h-1 z" />
+    </>
+  ),
+  // Flex: three items of different sizes aligned along one axis.
+  flex: (
+    <>
+      <path d="M1.5,1 h1 a1,1 0 0 1 1,1 v8 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-8 a1,1 0 0 1 1,-1 z" />
+      <path d="M5.5,2.5 h1 a1,1 0 0 1 1,1 v5 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-5 a1,1 0 0 1 1,-1 z" />
+      <path d="M9.5,4 h1 a1,1 0 0 1 1,1 v2 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-2 a1,1 0 0 1 1,-1 z" />
     </>
   ),
   // Brand logos (0 0 24 24 source) scaled into the icon's 0 0 12 12 box.
