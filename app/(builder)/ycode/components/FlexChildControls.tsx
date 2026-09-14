@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import Icon from '@/components/ui/icon';
@@ -23,7 +23,8 @@ interface FlexChildControlsProps {
 
 /** Sizing presets, one per Tailwind `flex-*` utility (legacy: Initial / Expand / Auto / None) */
 type Sizing = 'shrink' | 'grow' | 'auto' | 'fixed';
-type OrderMode = 'default' | 'first' | 'last' | 'custom';
+/** Optional order override; added via "+" and removed with "x" */
+type OrderMode = 'first' | 'last' | 'custom';
 
 const SIZING_OPTIONS: IconOption<Sizing>[] = [
   { value: 'auto', label: 'Auto' },
@@ -51,11 +52,34 @@ const ALIGN_SELF_OPTIONS: IconOption<AlignSelf>[] = [
 ];
 
 const ORDER_OPTIONS: IconOption<OrderMode>[] = [
-  { value: 'default', icon: 'x', label: 'Default' },
   { value: 'first', label: 'First' },
   { value: 'last', label: 'Last' },
   { value: 'custom', icon: 'more', label: 'Custom' },
 ];
+
+/** Optional setting row with an "x" that removes it (same look as Sizing's Aspect ratio) */
+function RemovableRow({ label, onRemove, children }: {
+  label: string;
+  onRemove: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid grid-cols-3">
+      <Label variant="muted">{label}</Label>
+      <div className="col-span-2 flex items-center gap-2">
+        <div className="flex-1">{children}</div>
+        <button
+          type="button"
+          aria-label={`Remove ${label.toLowerCase()}`}
+          className="p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+          onClick={onRemove}
+        >
+          <Icon name="x" className="size-2.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Map the layer's flex classes to a preset. Individual grow/shrink classes
@@ -74,15 +98,16 @@ function resolveAlignSelf(alignSelf: string): AlignSelf | '' {
   return ALIGN_SELF_OPTIONS.some((option) => option.value === alignSelf) ? (alignSelf as AlignSelf) : '';
 }
 
-function resolveOrderMode(order: string, forceCustom: boolean): OrderMode {
+/** Empty when no order is set (row hidden); `order-none` selects nothing */
+function resolveOrderMode(order: string, forceCustom: boolean): OrderMode | '' {
   if (order === 'first' || order === 'last') return order;
   if (/^\d+$/.test(order) || forceCustom) return 'custom';
-  return 'default';
+  return '';
 }
 
 /**
  * "Flex child" section: how this layer behaves inside its flex parent
- * (sizing preset, order, optional align override). Renders nothing when the parent
+ * (sizing preset, optional align and order overrides). Renders nothing when the parent
  * is not a flex container.
  */
 const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer = null, onLayerUpdate }: FlexChildControlsProps) {
@@ -135,6 +160,8 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
     ]);
   };
 
+  const hasOrder = Boolean(order) || isCustomOrder;
+
   const handleOrderModeChange = (next: OrderMode) => {
     if (next === 'custom') {
       setIsCustomOrder(true);
@@ -145,9 +172,12 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
     }
 
     setIsCustomOrder(false);
-    updateDesignProperties([
-      { category: 'layout', property: 'order', value: next === 'default' ? null : next },
-    ]);
+    updateDesignProperties([{ category: 'layout', property: 'order', value: next }]);
+  };
+
+  const handleRemoveOrder = () => {
+    setIsCustomOrder(false);
+    updateDesignProperties([{ category: 'layout', property: 'order', value: null }]);
   };
 
   const handleOrderInputChange = (value: string) => {
@@ -178,6 +208,12 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
             >
               Align
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleOrderModeChange('first')}
+              disabled={hasOrder}
+            >
+              Order
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       }
@@ -193,16 +229,26 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
         </div>
       </div>
 
-      <div className="grid grid-cols-3">
-        <Label variant="muted">Order</Label>
-        <div className="col-span-2">
+      {hasAlignSelf && (
+        <RemovableRow label="Align" onRemove={() => handleAlignSelfChange(null)}>
+          <IconTabs
+            value={alignSelf}
+            options={ALIGN_SELF_OPTIONS}
+            onChange={handleAlignSelfChange}
+            iconClassName={isColumnAxis ? '-rotate-90' : undefined}
+          />
+        </RemovableRow>
+      )}
+
+      {hasOrder && (
+        <RemovableRow label="Order" onRemove={handleRemoveOrder}>
           <IconTabs
             value={orderMode}
             options={ORDER_OPTIONS}
             onChange={handleOrderModeChange}
           />
-        </div>
-      </div>
+        </RemovableRow>
+      )}
 
       {orderMode === 'custom' && (
         <div className="grid grid-cols-3">
@@ -218,30 +264,6 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
                 onChange={(e) => handleOrderInputChange(e.target.value)}
               />
             </InputGroup>
-          </div>
-        </div>
-      )}
-
-      {hasAlignSelf && (
-        <div className="grid grid-cols-3">
-          <Label variant="muted">Align</Label>
-          <div className="col-span-2 flex items-center gap-2">
-            <div className="flex-1">
-              <IconTabs
-                value={alignSelf}
-                options={ALIGN_SELF_OPTIONS}
-                onChange={handleAlignSelfChange}
-                iconClassName={isColumnAxis ? '-rotate-90' : undefined}
-              />
-            </div>
-            <button
-              type="button"
-              aria-label="Remove align override"
-              className="p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
-              onClick={() => handleAlignSelfChange(null)}
-            >
-              <Icon name="x" className="size-2.5" />
-            </button>
           </div>
         </div>
       )}
