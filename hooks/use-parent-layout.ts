@@ -13,6 +13,14 @@ export interface ParentLayout {
   isGrid: boolean;
   /** Parent is a flex container laid out on the column axis */
   isColumnAxis: boolean;
+  /** Parent's align-items, normalized to `start|center|end|stretch|baseline` (browser default: stretch) */
+  alignItems: string;
+}
+
+/** `items-*` classes may be stored as `flex-start`/`flex-end`; the browser default is `stretch` */
+function normalizeAlignItems(value: string): string {
+  if (!value) return 'stretch';
+  return value.replace(/^flex-/, '');
 }
 
 /**
@@ -32,6 +40,7 @@ export function useParentLayout(parentLayer: Layer | null): ParentLayout {
 
   const display = parentLayer ? (getDesignProperty('layout', 'display') || '') : '';
   const flexDirection = getDesignProperty('layout', 'flexDirection') || 'row';
+  const alignItems = normalizeAlignItems(getDesignProperty('layout', 'alignItems') || '');
   const isFlex = display === 'flex' || display === 'inline-flex';
   const isGrid = display === 'grid' || display === 'inline-grid';
 
@@ -39,5 +48,6 @@ export function useParentLayout(parentLayer: Layer | null): ParentLayout {
     isFlex,
     isGrid,
     isColumnAxis: isFlex && (flexDirection === 'column' || flexDirection === 'column-reverse'),
+    alignItems,
   };
 }

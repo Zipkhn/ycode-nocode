@@ -42,7 +42,10 @@ const SIZING_FLEX_VALUE: Record<Sizing, string> = {
   fixed: 'none',
 };
 
-/** Optional per-child override of the parent's Align; added via "+" and removed with "x" */
+/**
+ * Per-child override of the parent's Align. Always visible: with no override the
+ * parent's value is shown selected, and re-selecting it clears the override.
+ */
 type AlignSelf = 'start' | 'center' | 'end' | 'stretch';
 
 const ALIGN_SELF_OPTIONS: IconOption<AlignSelf>[] = [
@@ -106,8 +109,8 @@ function resolveOrderMode(order: string, forceCustom: boolean): OrderMode | '' {
 }
 
 /**
- * "Flex child" section: how this layer behaves inside its flex parent. Every row
- * (Sizing, Align, Order) is opt-in via "+"; with none added the browser defaults apply.
+ * "Flex child" section: how this layer behaves inside its flex parent. Align is always
+ * shown (inheriting from the parent unless overridden); Sizing and Order are opt-in via "+".
  * Renders nothing when the parent is not a flex container.
  */
 const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer = null, onLayerUpdate }: FlexChildControlsProps) {
@@ -119,7 +122,7 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
     activeBreakpoint,
     activeUIState,
   });
-  const { isFlex, isColumnAxis } = useParentLayout(parentLayer);
+  const { isFlex, isColumnAxis, alignItems } = useParentLayout(parentLayer);
 
   const flex = getDesignProperty('layout', 'flex') || '';
   const flexGrowRaw = getDesignProperty('layout', 'flexGrow') || '';
@@ -130,7 +133,6 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   // Rows added from "+" appear empty until the user picks a value, so track
   // "added" separately from "has a value"
   const [isSizingAdded, setIsSizingAdded] = useState(false);
-  const [isAlignAdded, setIsAlignAdded] = useState(false);
   const [isOrderAdded, setIsOrderAdded] = useState(false);
   // Custom order can be chosen before a number is typed
   const [isCustomOrder, setIsCustomOrder] = useState(false);
@@ -138,7 +140,6 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
 
   useEffect(() => {
     setIsSizingAdded(false);
-    setIsAlignAdded(false);
     setIsOrderAdded(false);
     setIsCustomOrder(false);
   }, [layer?.id]);
@@ -150,19 +151,27 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   if (!layer || !isFlex) return null;
 
   const sizing = resolveSizing(flex);
-  const alignSelf = resolveAlignSelf(alignSelfRaw);
   const orderMode = resolveOrderMode(order, isCustomOrder);
 
   const hasSizing = Boolean(flex || flexGrowRaw || flexShrinkRaw) || isSizingAdded;
-  const hasAlignSelf = Boolean(alignSelfRaw) || isAlignAdded;
 
+  // No override → show what the child actually gets from the parent (`baseline` has no tab)
+  const inheritedAlign = resolveAlignSelf(alignItems);
+  const ownAlign = resolveAlignSelf(alignSelfRaw);
+  const alignSelf = ownAlign || inheritedAlign;
+  const alignOptions: IconOption<AlignSelf>[] = ALIGN_SELF_OPTIONS.map((option) => (
+    option.value === inheritedAlign && !ownAlign
+      ? { ...option, label: `${option.label} (from parent)` }
+      : option
+  ));
+
+  // Picking the parent's value again drops the override so the child follows the parent
   const handleAlignSelfChange = (value: AlignSelf) => {
-    updateDesignProperties([{ category: 'layout', property: 'alignSelf', value }]);
-  };
-
-  const handleRemoveAlignSelf = () => {
-    setIsAlignAdded(false);
-    updateDesignProperties([{ category: 'layout', property: 'alignSelf', value: null }]);
+    updateDesignProperties([{
+      category: 'layout',
+      property: 'alignSelf',
+      value: value === inheritedAlign ? null : value,
+    }]);
   };
 
   // A preset replaces any individual grow/shrink classes so the two never conflict
@@ -184,8 +193,7 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   };
 
   const hasOrder = Boolean(order) || isOrderAdded || isCustomOrder;
-  const hasAnyRow = hasSizing || hasAlignSelf || hasOrder;
-  const canAdd = !hasSizing || !hasAlignSelf || !hasOrder;
+  const canAdd = !hasSizing || !hasOrder;
 
   const addButton = (
     <Button
@@ -225,7 +233,7 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   return (
     <SettingsPanel
       title="Flex child"
-      isOpen={hasAnyRow}
+      isOpen
       onToggle={noop}
       action={
         // Everything added: plain disabled button so no empty menu can open
@@ -240,12 +248,6 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
                 Sizing
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => setIsAlignAdded(true)}
-                disabled={hasAlignSelf}
-              >
-                Align
-              </DropdownMenuItem>
-              <DropdownMenuItem
                 onClick={() => setIsOrderAdded(true)}
                 disabled={hasOrder}
               >
@@ -256,23 +258,24 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
         ) : addButton
       }
     >
+      <div className="grid grid-cols-3">
+        <Label variant="muted">Align</Label>
+        <div className="col-span-2">
+          <IconTabs
+            value={alignSelf}
+            options={alignOptions}
+            onChange={handleAlignSelfChange}
+            iconClassName={isColumnAxis ? '-rotate-90' : undefined}
+          />
+        </div>
+      </div>
+
       {hasSizing && (
         <RemovableRow label="Sizing" onRemove={handleRemoveSizing}>
           <IconTabs
             value={sizing}
             options={SIZING_OPTIONS}
             onChange={handleSizingChange}
-          />
-        </RemovableRow>
-      )}
-
-      {hasAlignSelf && (
-        <RemovableRow label="Align" onRemove={handleRemoveAlignSelf}>
-          <IconTabs
-            value={alignSelf}
-            options={ALIGN_SELF_OPTIONS}
-            onChange={handleAlignSelfChange}
-            iconClassName={isColumnAxis ? '-rotate-90' : undefined}
           />
         </RemovableRow>
       )}
