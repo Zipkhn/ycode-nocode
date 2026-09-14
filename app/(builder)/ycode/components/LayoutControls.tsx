@@ -427,7 +427,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                         <div className="flex-1 grid grid-cols-2 gap-2">
                             {/* Compact X / Y prefixes so two-digit values fit in the narrow inputs */}
                             <InputGroup>
-                                <InputGroupAddon className="pl-2 text-xs opacity-50">X</InputGroupAddon>
+                                <InputGroupAddon className="pl-2 text-[10px] opacity-50">X</InputGroupAddon>
                                 <InputGroupInput
                                   stepper
                                   min="0"
@@ -439,7 +439,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                                 />
                             </InputGroup>
                             <InputGroup>
-                                <InputGroupAddon className="pl-2 text-xs opacity-50">Y</InputGroupAddon>
+                                <InputGroupAddon className="pl-2 text-[10px] opacity-50">Y</InputGroupAddon>
                                 <InputGroupInput
                                   stepper
                                   min="0"
