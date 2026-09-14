@@ -17,10 +17,12 @@ interface IconTabsProps<T extends string> {
   value: T | '';
   options: IconOption<T>[];
   onChange: (value: T) => void;
+  /** Applied to every icon, e.g. to rotate axis icons to match a flex direction */
+  iconClassName?: string;
 }
 
 /** Compact tab group: icon options get a tooltip, text options render their label */
-export default function IconTabs<T extends string>({ value, options, onChange }: IconTabsProps<T>) {
+export default function IconTabs<T extends string>({ value, options, onChange, iconClassName }: IconTabsProps<T>) {
   return (
     <Tabs
       value={value}
@@ -47,7 +49,7 @@ export default function IconTabs<T extends string>({ value, options, onChange }:
                               value={option.value}
                               aria-label={option.label}
                             >
-                                <Icon name={option.icon} />
+                                <Icon name={option.icon} className={iconClassName} />
                             </TabsTrigger>
                         </span>
                     </TooltipTrigger>

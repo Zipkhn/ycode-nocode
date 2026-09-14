@@ -34,6 +34,16 @@ const SIZING_FLEX_VALUE: Record<Sizing, string> = {
   fixed: 'none',
 };
 
+type AlignSelf = 'auto' | 'start' | 'center' | 'end' | 'stretch';
+
+const ALIGN_SELF_OPTIONS: IconOption<AlignSelf>[] = [
+  { value: 'auto', icon: 'x', label: 'Auto' },
+  { value: 'start', icon: 'alignStart', label: 'Start' },
+  { value: 'center', icon: 'alignCenter', label: 'Center' },
+  { value: 'end', icon: 'alignEnd', label: 'End' },
+  { value: 'stretch', icon: 'alignStretch', label: 'Stretch' },
+];
+
 const ORDER_OPTIONS: IconOption<OrderMode>[] = [
   { value: 'default', icon: 'x', label: 'Default' },
   { value: 'first', label: 'First' },
@@ -53,6 +63,13 @@ function resolveSizing(flex: string, hasIndividual: boolean): Sizing | '' {
   return 'shrink';
 }
 
+/** `self-baseline` has no tab, so it selects nothing rather than a wrong option */
+function resolveAlignSelf(alignSelf: string): AlignSelf | '' {
+  if (!alignSelf) return 'auto';
+  if (alignSelf === 'baseline') return '';
+  return alignSelf as AlignSelf;
+}
+
 function resolveOrderMode(order: string, forceCustom: boolean): OrderMode {
   if (order === 'first' || order === 'last') return order;
   if (/^\d+$/.test(order) || forceCustom) return 'custom';
@@ -61,7 +78,7 @@ function resolveOrderMode(order: string, forceCustom: boolean): OrderMode {
 
 /**
  * "Flex child" section: how this layer behaves inside its flex parent
- * (sizing preset, order). Renders nothing when the parent
+ * (sizing preset, align self, order). Renders nothing when the parent
  * is not a flex container.
  */
 const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer = null, onLayerUpdate }: FlexChildControlsProps) {
@@ -73,11 +90,12 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
     activeBreakpoint,
     activeUIState,
   });
-  const { isFlex } = useParentLayout(parentLayer);
+  const { isFlex, isColumnAxis } = useParentLayout(parentLayer);
 
   const flex = getDesignProperty('layout', 'flex') || '';
   const flexGrowRaw = getDesignProperty('layout', 'flexGrow') || '';
   const flexShrinkRaw = getDesignProperty('layout', 'flexShrink') || '';
+  const alignSelfRaw = getDesignProperty('layout', 'alignSelf') || '';
   const order = getDesignProperty('layout', 'order') || '';
 
   // Custom order can be chosen before a number is typed
@@ -95,7 +113,15 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   if (!layer || !isFlex) return null;
 
   const sizing = resolveSizing(flex, Boolean(flexGrowRaw || flexShrinkRaw));
+  const alignSelf = resolveAlignSelf(alignSelfRaw);
   const orderMode = resolveOrderMode(order, isCustomOrder);
+
+  // 'auto' clears the override to keep classes clean
+  const handleAlignSelfChange = (value: AlignSelf) => {
+    updateDesignProperties([
+      { category: 'layout', property: 'alignSelf', value: value === 'auto' ? null : value },
+    ]);
+  };
 
   // A preset replaces any individual grow/shrink classes so the two never conflict
   const handleSizingChange = (next: Sizing) => {
@@ -140,6 +166,18 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
                     value={sizing}
                     options={SIZING_OPTIONS}
                     onChange={handleSizingChange}
+                  />
+              </div>
+          </div>
+
+          <div className="grid grid-cols-3">
+              <Label variant="muted">Align</Label>
+              <div className="col-span-2">
+                  <IconTabs
+                    value={alignSelf}
+                    options={ALIGN_SELF_OPTIONS}
+                    onChange={handleAlignSelfChange}
+                    iconClassName={isColumnAxis ? '-rotate-90' : undefined}
                   />
               </div>
           </div>
