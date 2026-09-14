@@ -17,7 +17,7 @@ import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP, SLIDER_BUTTON_ARIA_LABELS, isSl
 import { getSliderPresizeVars } from '@/lib/slider-utils';
 import { useCanvasSlider } from '@/hooks/use-canvas-slider';
 import { resolveFieldFromSources } from '@/lib/cms-variables-utils';
-import { getDynamicTextContent, getImageUrlFromVariable, getVideoUrlFromVariable, getIframeUrlFromVariable, isFieldVariable, isAssetVariable, isStaticTextVariable, isDynamicTextVariable, getAssetId, getStaticTextContent, createAssetVariable, createDynamicTextVariable, resolveDesignStyles } from '@/lib/variable-utils';
+import { getDynamicTextContent, getImageUrlFromVariable, getVideoUrlFromVariable, getIframeUrlFromVariable, isFieldVariable, isAssetVariable, isStaticTextVariable, isDynamicTextVariable, getAssetId, getStaticTextContent, createAssetVariable, createDynamicTextVariable, resolveDesignStyles, getEffectiveHidden } from '@/lib/variable-utils';
 import { getTranslatedAssetId, getTranslatedText, applyCmsTranslations, injectTranslatedText } from '@/lib/localisation-utils';
 import { isValidLinkSettings } from '@/lib/link-utils';
 import { DEFAULT_ASSETS, ASSET_CATEGORIES, isAssetOfType } from '@/lib/asset-utils';
@@ -498,7 +498,15 @@ const LayerItemImpl: React.FC<{
   // effect at once even while the layer is selected. They still show while
   // their interaction is open (force-visible removes them from the map).
   const isEditorHidden = isEditMode && !!editorHiddenLayerIds?.has(layer.id);
-  const canRevealFromSelection = isEditorHidden && !layer.settings?.hidden;
+  // Visibility may be driven by a component variable (per-instance override or
+  // the variable's default while editing the component); SSR bakes this into
+  // `settings.hidden`, the canvas resolves it live here.
+  const isHidden = getEffectiveHidden(
+    layer,
+    parentComponentVariables || editingComponentVariables,
+    parentComponentOverrides,
+  );
+  const canRevealFromSelection = isEditorHidden && !isHidden;
   const revealFromSelection = useEditorStore((state) => {
     if (!canRevealFromSelection) return false;
     const sel = state.selectedLayerId;
@@ -1990,7 +1998,7 @@ const LayerItemImpl: React.FC<{
   // Hidden layers are omitted entirely (edit mode and public pages) unless kept
   // in HTML (reveal interaction or settings.keepInHtml) — those are in
   // `hiddenLayerInfo` and render collapsed instead.
-  if (layer.settings?.hidden && !hiddenLayerInfo?.some((info) => info.layerId === layer.id)) {
+  if (isHidden && !hiddenLayerInfo?.some((info) => info.layerId === layer.id)) {
     return null;
   }
 

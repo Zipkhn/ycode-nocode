@@ -2427,6 +2427,7 @@ const RightSidebar = React.memo(function RightSidebar({
                   layer={selectedLayer}
                   onLayerUpdate={handleLayerUpdate}
                   disabled={isLockedByOther}
+                  onOpenVariablesDialog={openVariablesDialog}
                 />
               )}
             </div>

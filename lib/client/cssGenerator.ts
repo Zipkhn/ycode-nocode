@@ -39,7 +39,9 @@ function extractClassesFromLayers(layers: Layer[]): Set<string> {
   };
 
   function processLayer(layer: Layer): void {
-    if (layer.settings?.hidden && !keptHidden.has(layer.id)) return;
+    // Variable-driven visibility differs per instance (and components are only
+    // walked once), so those layers always contribute their classes.
+    if (layer.settings?.hidden && !layer.settings.visibilityVariableId && !keptHidden.has(layer.id)) return;
 
     // Skip if we've already processed this component
     if (layer.componentId) {
