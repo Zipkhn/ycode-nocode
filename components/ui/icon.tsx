@@ -19,7 +19,7 @@ export interface IconProps extends React.SVGProps<SVGSVGElement> {
     | 'slide-bullets' | 'slide-bullet' | 'slide-navigation' | 'slide-fraction' | 'loop-alternate' | 'loop-repeat' | 'listItem' | 'external-link'
     | 'settings' | 'center-block' | 'code-block' | 'table' | 'table-row' | 'table-cell' | 'add-column' | 'add-row' | 'delete-column' | 'delete-row' | 'delete-table' | 'header' | 'body'
     | 'webflow' | 'figma' | 'space' | 'sparkles'
-    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle'
+    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed'
     | 'claude' | 'openai' | 'gemini' | 'grok'
   );
 }
@@ -1108,6 +1108,19 @@ const ICONS: Record<IconProps['name'], React.ReactNode> = {
         d="M2 12a10 10 0 1 0 20 0 10 10 0 1 0-20 0ZM5.5 12a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0Z"
       />
     </g>
+  ),
+  // Dashed 10x10 square (1px strokes): four corner L's plus a dash per edge.
+  'square-dashed': (
+    <>
+      <path d="M1,1 h2.5 v1 h-1.5 v1.5 h-1 z" />
+      <path d="M8.5,1 h2.5 v2.5 h-1 v-1.5 h-1.5 z" />
+      <path d="M10,8.5 h1 v2.5 h-2.5 v-1 h1.5 z" />
+      <path d="M1,8.5 h1 v1.5 h1.5 v1 h-2.5 z" />
+      <path d="M5,1 h2 v1 h-2 z" />
+      <path d="M5,10 h2 v1 h-2 z" />
+      <path d="M1,5 h1 v2 h-1 z" />
+      <path d="M10,5 h1 v2 h-1 z" />
+    </>
   ),
   // Brand logos (0 0 24 24 source) scaled into the icon's 0 0 12 12 box.
   claude: (
