@@ -350,7 +350,7 @@ const SizingControls = memo(function SizingControls({ layer, parentLayer = null,
       {parentIsGrid && layer && (
         <>
           <GridSpanRow
-            label="Column span"
+            label="Col span"
             layer={layer}
             property="gridColumnSpan"
             value={gridColumnSpan}

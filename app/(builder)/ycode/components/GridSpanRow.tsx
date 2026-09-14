@@ -53,7 +53,7 @@ interface GridSpanRowProps {
 }
 
 /**
- * One "Column span" / "Row span" row for a grid child. Shows 1 when unset (the browser
+ * One "Col span" / "Row span" row for a grid child. Shows 1 when unset (the browser
  * default) and accepts 1–12 or "full".
  */
 export default function GridSpanRow({ label, layer, property, value, onChange }: GridSpanRowProps) {
@@ -92,7 +92,7 @@ export default function GridSpanRow({ label, layer, property, value, onChange }:
             min="1"
             max={String(MAX_SPAN)}
             step="1"
-            aria-label={label}
+            aria-label={property === 'gridColumnSpan' ? 'Column span' : 'Row span'}
             value={input}
             onChange={(e) => handleChange(e.target.value)}
             onBlur={handleBlur}
