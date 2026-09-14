@@ -28,14 +28,13 @@ interface LayoutTypeOption {
   value: LayoutType;
   icon: React.ComponentProps<typeof Icon>['name'];
   label: string;
-  description: string;
 }
 
 const LAYOUT_TYPE_OPTIONS: LayoutTypeOption[] = [
-  { value: 'columns', icon: 'columns', label: 'Columns', description: 'Flex row — children side by side' },
-  { value: 'rows', icon: 'rows', label: 'Rows', description: 'Flex column — children stacked' },
-  { value: 'grid', icon: 'grid', label: 'Grid', description: 'CSS grid with columns and rows' },
-  { value: 'hidden', icon: 'eye-off', label: 'None', description: 'display: none — hides the element on this breakpoint' },
+  { value: 'columns', icon: 'columns', label: 'Flex row' },
+  { value: 'rows', icon: 'rows', label: 'Flex column' },
+  { value: 'grid', icon: 'grid', label: 'Grid' },
+  { value: 'hidden', icon: 'eye-off', label: 'Display none' },
 ];
 
 const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: LayoutControlsProps) {
@@ -227,17 +226,20 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                       <TabsList className="w-full">
                           {LAYOUT_TYPE_OPTIONS.map((option) => (
                             <Tooltip key={option.value}>
+                                {/* Wrap in a span: Tooltip and Tabs both write `data-state`, so
+                                    sharing one element via asChild would drop the active tab style */}
                                 <TooltipTrigger asChild>
-                                    <TabsTrigger
-                                      value={option.value}
-                                      aria-label={option.label}
-                                    >
-                                        <Icon name={option.icon} />
-                                    </TabsTrigger>
+                                    <span className="flex flex-1 h-full">
+                                        <TabsTrigger
+                                          value={option.value}
+                                          aria-label={option.label}
+                                        >
+                                            <Icon name={option.icon} />
+                                        </TabsTrigger>
+                                    </span>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                     <p>{option.label}</p>
-                                    <p className="text-muted-foreground">{option.description}</p>
                                 </TooltipContent>
                             </Tooltip>
                           ))}
