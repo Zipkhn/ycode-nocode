@@ -493,9 +493,14 @@ const LayerItemImpl: React.FC<{
   // descendant is selected. Subscribed reactively so a hidden ancestor updates
   // when a descendant is selected — its own `isSelected` wouldn't change then.
   // Returns a stable `false` for non-hidden layers, so it never re-renders them.
+  // Layers hidden explicitly via Visibility (`settings.hidden`) are exempt:
+  // the user asked for them to be hidden, so toggling visibility must take
+  // effect at once even while the layer is selected. They still show while
+  // their interaction is open (force-visible removes them from the map).
   const isEditorHidden = isEditMode && !!editorHiddenLayerIds?.has(layer.id);
+  const canRevealFromSelection = isEditorHidden && !layer.settings?.hidden;
   const revealFromSelection = useEditorStore((state) => {
-    if (!isEditorHidden) return false;
+    if (!canRevealFromSelection) return false;
     const sel = state.selectedLayerId;
     return sel ? containsLayerId(layer, sel) : false;
   });
