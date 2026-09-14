@@ -418,74 +418,82 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
           )}
 
           {(isFlex || isGrid) && (
-              <div className="grid grid-cols-3 items-start">
-                  <Label variant="muted" className="h-8">Gap</Label>
-                  <div className="col-span-2 flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                          <InputGroup className="flex-1">
-                              <InputGroupInput
-                                stepper
-                                min="0"
-                                step="1"
-                                disabled={gapModeToggle.mode === 'individual'}
-                                value={gapInput}
-                                onChange={(e) => handleGapChange(e.target.value)}
-                              />
-                          </InputGroup>
-                          <Button
-                            variant={gapModeToggle.mode === 'individual' ? 'secondary' : 'ghost'}
-                            size="sm"
-                            onClick={gapModeToggle.handleToggle}
-                          >
-                              <Icon name="link" />
-                          </Button>
-                      </div>
-                      {gapModeToggle.mode === 'individual' && (
-                           <div className="col-span-2 grid grid-cols-2 gap-2">
-                           <InputGroup>
-                               <InputGroupAddon>
-                                   <div className="flex">
-                                       <Tooltip>
-                                           <TooltipTrigger tabIndex={-1}>
-                                               <Icon name="horizontalGap" className="size-3" />
-                                           </TooltipTrigger>
-                                           <TooltipContent>
-                                               <p>Horizontal gap</p>
-                                           </TooltipContent>
-                                       </Tooltip>
-                                   </div>
-                               </InputGroupAddon>
-                               <InputGroupInput
-                                 stepper
-                                 min="0"
-                                 step="1"
-                                 value={columnGapInput}
-                                 onChange={(e) => handleColumnGapChange(e.target.value)}
-                               />
-                           </InputGroup>
-                           <InputGroup>
-                               <InputGroupAddon>
-                                   <div className="flex">
-                                       <Tooltip>
-                                           <TooltipTrigger tabIndex={-1}>
-                                               <Icon name="verticalGap" className="size-3" />
-                                           </TooltipTrigger>
-                                           <TooltipContent>
-                                               <p>Vertical gap</p>
-                                           </TooltipContent>
-                                       </Tooltip>
-                                   </div>
-                               </InputGroupAddon>
-                               <InputGroupInput
-                                 stepper
-                                 min="0"
-                                 step="1"
-                                 value={rowGapInput}
-                                 onChange={(e) => handleRowGapChange(e.target.value)}
-                               />
-                           </InputGroup>
-                       </div>
+              <div className="grid grid-cols-3">
+                  <Label variant="muted">Gap</Label>
+                  {/* Locked: one gap for both axes. Unlocked: the single input is
+                      replaced by Columns / Rows inputs (Webflow-style padlock). */}
+                  <div className="col-span-2 flex items-center gap-2">
+                      {gapModeToggle.mode === 'individual' ? (
+                        <div className="flex-1 grid grid-cols-2 gap-2">
+                            <InputGroup>
+                                <InputGroupAddon>
+                                    <div className="flex">
+                                        <Tooltip>
+                                            <TooltipTrigger tabIndex={-1}>
+                                                <Icon name="horizontalGap" className="size-3" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Columns</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                </InputGroupAddon>
+                                <InputGroupInput
+                                  stepper
+                                  min="0"
+                                  step="1"
+                                  value={columnGapInput}
+                                  onChange={(e) => handleColumnGapChange(e.target.value)}
+                                />
+                            </InputGroup>
+                            <InputGroup>
+                                <InputGroupAddon>
+                                    <div className="flex">
+                                        <Tooltip>
+                                            <TooltipTrigger tabIndex={-1}>
+                                                <Icon name="verticalGap" className="size-3" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Rows</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                </InputGroupAddon>
+                                <InputGroupInput
+                                  stepper
+                                  min="0"
+                                  step="1"
+                                  value={rowGapInput}
+                                  onChange={(e) => handleRowGapChange(e.target.value)}
+                                />
+                            </InputGroup>
+                        </div>
+                      ) : (
+                        <InputGroup className="flex-1">
+                            <InputGroupInput
+                              stepper
+                              min="0"
+                              step="1"
+                              value={gapInput}
+                              onChange={(e) => handleGapChange(e.target.value)}
+                            />
+                        </InputGroup>
                       )}
+                      <Tooltip>
+                          <TooltipTrigger asChild>
+                              <Button
+                                variant={gapModeToggle.mode === 'individual' ? 'secondary' : 'ghost'}
+                                size="sm"
+                                aria-label={gapModeToggle.mode === 'individual' ? 'Link column and row gap' : 'Unlink column and row gap'}
+                                onClick={gapModeToggle.handleToggle}
+                              >
+                                  <Icon name={gapModeToggle.mode === 'individual' ? 'unlock' : 'lock'} />
+                              </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                              <p>{gapModeToggle.mode === 'individual' ? 'Link gaps' : 'Unlink gaps'}</p>
+                          </TooltipContent>
+                      </Tooltip>
                   </div>
               </div>
           )}

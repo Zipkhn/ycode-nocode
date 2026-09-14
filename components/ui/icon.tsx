@@ -20,6 +20,7 @@ export interface IconProps extends React.SVGProps<SVGSVGElement> {
     | 'settings' | 'center-block' | 'code-block' | 'table' | 'table-row' | 'table-cell' | 'add-column' | 'add-row' | 'delete-column' | 'delete-row' | 'delete-table' | 'header' | 'body'
     | 'webflow' | 'figma' | 'space' | 'sparkles'
     | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'reverse-arrows' | 'arrow-horizontal' | 'arrow-vertical' | 'inline-block' | 'inline' | 'flex-fixed'
+    | 'lock' | 'unlock'
     | 'claude' | 'openai' | 'gemini' | 'grok'
   );
 }
@@ -1141,6 +1142,20 @@ const ICONS: Record<IconProps['name'], React.ReactNode> = {
     <>
       <path d="M0.5,0 C0.776,0 1,0.224 1,0.5 L1,11.5 C1,11.776 0.776,12 0.5,12 C0.224,12 0,11.776 0,11.5 L0,0.5 C0,0.224 0.224,0 0.5,0 Z M11.5,0 C11.776,0 12,0.224 12,0.5 L12,11.5 C12,11.776 11.776,12 11.5,12 C11.224,12 11,11.776 11,11.5 L11,0.5 C11,0.224 11.224,0 11.5,0 Z" />
       <path d="M4.35,3.65 L8.35,7.65 L7.65,8.35 L3.65,4.35 Z M7.65,3.65 L8.35,4.35 L4.35,8.35 L3.65,7.65 Z" />
+    </>
+  ),
+  // Padlock, closed: linked values (e.g. one gap for rows and columns).
+  lock: (
+    <>
+      <path d="M3.25,5.5 L3.25,3.75 C3.25,2.23 4.48,1 6,1 C7.52,1 8.75,2.23 8.75,3.75 L8.75,5.5 L7.75,5.5 L7.75,3.75 C7.75,2.78 6.97,2 6,2 C5.03,2 4.25,2.78 4.25,3.75 L4.25,5.5 Z" />
+      <path d="M3,5.5 L9,5.5 C9.55,5.5 10,5.95 10,6.5 L10,10.5 C10,11.05 9.55,11.5 9,11.5 L3,11.5 C2.45,11.5 2,11.05 2,10.5 L2,6.5 C2,5.95 2.45,5.5 3,5.5 Z" />
+    </>
+  ),
+  // Padlock, open (shackle lifted on the right): values edited independently.
+  unlock: (
+    <>
+      <path d="M3.25,5.5 L3.25,3.75 C3.25,2.23 4.48,1 6,1 C7.52,1 8.75,2.23 8.75,3.75 L7.75,3.75 C7.75,2.78 6.97,2 6,2 C5.03,2 4.25,2.78 4.25,3.75 L4.25,5.5 Z" />
+      <path d="M3,5.5 L9,5.5 C9.55,5.5 10,5.95 10,6.5 L10,10.5 C10,11.05 9.55,11.5 9,11.5 L3,11.5 C2.45,11.5 2,11.05 2,10.5 L2,6.5 C2,5.95 2.45,5.5 3,5.5 Z" />
     </>
   ),
   // Double-headed arrows (0 0 24 24 source, same stroke weight as 'arrow-left') — flex direction.
