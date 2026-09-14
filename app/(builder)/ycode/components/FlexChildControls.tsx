@@ -1,13 +1,19 @@
 'use client';
 
 import { memo, useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import Icon from '@/components/ui/icon';
 import { InputGroup, InputGroupInput } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
 import IconTabs, { type IconOption } from './IconTabs';
+import SettingsPanel from './SettingsPanel';
 import { useDesignSync } from '@/hooks/use-design-sync';
 import { useParentLayout } from '@/hooks/use-parent-layout';
 import { useEditorStore } from '@/stores/useEditorStore';
 import type { Layer } from '@/types';
+
+const noop = () => {};
 
 interface FlexChildControlsProps {
   layer: Layer | null;
@@ -34,10 +40,10 @@ const SIZING_FLEX_VALUE: Record<Sizing, string> = {
   fixed: 'none',
 };
 
-type AlignSelf = 'auto' | 'start' | 'center' | 'end' | 'stretch';
+/** Optional per-child override of the parent's Align; added via "+" and removed with "x" */
+type AlignSelf = 'start' | 'center' | 'end' | 'stretch';
 
 const ALIGN_SELF_OPTIONS: IconOption<AlignSelf>[] = [
-  { value: 'auto', label: 'Auto' },
   { value: 'start', icon: 'alignStart', label: 'Start' },
   { value: 'center', icon: 'alignCenter', label: 'Center' },
   { value: 'end', icon: 'alignEnd', label: 'End' },
@@ -63,11 +69,9 @@ function resolveSizing(flex: string, hasIndividual: boolean): Sizing | '' {
   return 'shrink';
 }
 
-/** `self-baseline` has no tab, so it selects nothing rather than a wrong option */
+/** `self-auto`/`self-baseline` have no tab, so they select nothing rather than a wrong option */
 function resolveAlignSelf(alignSelf: string): AlignSelf | '' {
-  if (!alignSelf) return 'auto';
-  if (alignSelf === 'baseline') return '';
-  return alignSelf as AlignSelf;
+  return ALIGN_SELF_OPTIONS.some((option) => option.value === alignSelf) ? (alignSelf as AlignSelf) : '';
 }
 
 function resolveOrderMode(order: string, forceCustom: boolean): OrderMode {
@@ -78,7 +82,7 @@ function resolveOrderMode(order: string, forceCustom: boolean): OrderMode {
 
 /**
  * "Flex child" section: how this layer behaves inside its flex parent
- * (sizing preset, align self, order). Renders nothing when the parent
+ * (sizing preset, order, optional align override). Renders nothing when the parent
  * is not a flex container.
  */
 const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer = null, onLayerUpdate }: FlexChildControlsProps) {
@@ -116,11 +120,10 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   const alignSelf = resolveAlignSelf(alignSelfRaw);
   const orderMode = resolveOrderMode(order, isCustomOrder);
 
-  // 'auto' clears the override to keep classes clean
-  const handleAlignSelfChange = (value: AlignSelf) => {
-    updateDesignProperties([
-      { category: 'layout', property: 'alignSelf', value: value === 'auto' ? null : value },
-    ]);
+  const hasAlignSelf = Boolean(alignSelfRaw);
+
+  const handleAlignSelfChange = (value: AlignSelf | null) => {
+    updateDesignProperties([{ category: 'layout', property: 'alignSelf', value }]);
   };
 
   // A preset replaces any individual grow/shrink classes so the two never conflict
@@ -154,64 +157,95 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   };
 
   return (
-    <div className="py-5">
-      <header className="py-4 -mt-4">
-        <Label>Flex child</Label>
-      </header>
-      <div className="flex flex-col gap-2">
-          <div className="grid grid-cols-3">
-              <Label variant="muted">Sizing</Label>
-              <div className="col-span-2">
-                  <IconTabs
-                    value={sizing}
-                    options={SIZING_OPTIONS}
-                    onChange={handleSizingChange}
-                  />
-              </div>
-          </div>
-
-          <div className="grid grid-cols-3">
-              <Label variant="muted">Align</Label>
-              <div className="col-span-2">
-                  <IconTabs
-                    value={alignSelf}
-                    options={ALIGN_SELF_OPTIONS}
-                    onChange={handleAlignSelfChange}
-                    iconClassName={isColumnAxis ? '-rotate-90' : undefined}
-                  />
-              </div>
-          </div>
-
-          <div className="grid grid-cols-3">
-              <Label variant="muted">Order</Label>
-              <div className="col-span-2">
-                  <IconTabs
-                    value={orderMode}
-                    options={ORDER_OPTIONS}
-                    onChange={handleOrderModeChange}
-                  />
-              </div>
-          </div>
-
-          {orderMode === 'custom' && (
-              <div className="grid grid-cols-3">
-                  <Label variant="muted">Position</Label>
-                  <div className="col-span-2">
-                      <InputGroup>
-                          <InputGroupInput
-                            stepper
-                            min="0"
-                            step="1"
-                            placeholder="0"
-                            value={orderInput}
-                            onChange={(e) => handleOrderInputChange(e.target.value)}
-                          />
-                      </InputGroup>
-                  </div>
-              </div>
-          )}
+    <SettingsPanel
+      title="Flex child"
+      isOpen
+      onToggle={noop}
+      action={
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost" size="xs"
+              aria-label="Add flex child option"
+            >
+              <Icon name="plus" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => handleAlignSelfChange('start')}
+              disabled={hasAlignSelf}
+            >
+              Align
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      }
+    >
+      <div className="grid grid-cols-3">
+        <Label variant="muted">Sizing</Label>
+        <div className="col-span-2">
+          <IconTabs
+            value={sizing}
+            options={SIZING_OPTIONS}
+            onChange={handleSizingChange}
+          />
+        </div>
       </div>
-    </div>
+
+      <div className="grid grid-cols-3">
+        <Label variant="muted">Order</Label>
+        <div className="col-span-2">
+          <IconTabs
+            value={orderMode}
+            options={ORDER_OPTIONS}
+            onChange={handleOrderModeChange}
+          />
+        </div>
+      </div>
+
+      {orderMode === 'custom' && (
+        <div className="grid grid-cols-3">
+          <Label variant="muted">Position</Label>
+          <div className="col-span-2">
+            <InputGroup>
+              <InputGroupInput
+                stepper
+                min="0"
+                step="1"
+                placeholder="0"
+                value={orderInput}
+                onChange={(e) => handleOrderInputChange(e.target.value)}
+              />
+            </InputGroup>
+          </div>
+        </div>
+      )}
+
+      {hasAlignSelf && (
+        <div className="grid grid-cols-3">
+          <Label variant="muted">Align</Label>
+          <div className="col-span-2 flex items-center gap-2">
+            <div className="flex-1">
+              <IconTabs
+                value={alignSelf}
+                options={ALIGN_SELF_OPTIONS}
+                onChange={handleAlignSelfChange}
+                iconClassName={isColumnAxis ? '-rotate-90' : undefined}
+              />
+            </div>
+            <button
+              type="button"
+              aria-label="Remove align override"
+              className="p-0.5 rounded-sm opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+              onClick={() => handleAlignSelfChange(null)}
+            >
+              <Icon name="x" className="size-2.5" />
+            </button>
+          </div>
+        </div>
+      )}
+    </SettingsPanel>
   );
 });
 
