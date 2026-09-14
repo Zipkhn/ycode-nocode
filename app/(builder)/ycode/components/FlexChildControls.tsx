@@ -1,9 +1,9 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
+import { InputGroup, InputGroupInput } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import IconTabs, { type IconOption } from './IconTabs';
 import { useDesignSync } from '@/hooks/use-design-sync';
 import { useParentLayout } from '@/hooks/use-parent-layout';
 import { useEditorStore } from '@/stores/useEditorStore';
@@ -15,58 +15,64 @@ interface FlexChildControlsProps {
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
 }
 
-/** Sentinel for "no class set" in selects (Radix Select disallows an empty string value) */
-const DEFAULT_VALUE = 'default';
+/** Sizing presets (Webflow-style); "custom" exposes grow/shrink individually */
+type Sizing = 'shrink' | 'grow' | 'fixed' | 'custom';
+type OrderMode = 'default' | 'first' | 'last' | 'custom';
 
-const FLEX_OPTIONS = [
-  { value: DEFAULT_VALUE, label: 'Default' },
-  { value: '1', label: 'Expand' },
-  { value: 'auto', label: 'Auto' },
-  { value: 'initial', label: 'Initial' },
-  { value: 'none', label: 'None' },
+const SIZING_OPTIONS: IconOption<Sizing>[] = [
+  { value: 'shrink', icon: 'minSize', label: 'Shrink if needed' },
+  { value: 'grow', icon: 'maxSize', label: 'Grow if possible' },
+  { value: 'fixed', icon: 'flex-fixed', label: "Don't shrink or grow" },
+  { value: 'custom', icon: 'more', label: 'Custom' },
 ];
 
-const ORDER_OPTIONS = [
-  { value: DEFAULT_VALUE, label: 'Default' },
+/** Preset → `flex` shorthand value (initial = 0 1 auto, 1 = 1 1 0%, none = 0 0 auto) */
+const SIZING_FLEX_VALUE: Record<Exclude<Sizing, 'custom'>, string> = {
+  shrink: 'initial',
+  grow: '1',
+  fixed: 'none',
+};
+
+const ORDER_OPTIONS: IconOption<OrderMode>[] = [
+  { value: 'default', icon: 'x', label: 'Default' },
   { value: 'first', label: 'First' },
   { value: 'last', label: 'Last' },
-  ...Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) })),
+  { value: 'custom', icon: 'more', label: 'Custom' },
 ];
 
-/** Yes/No toggle bound to a '1' | '0' design value */
-function BooleanRow({ label, value, onChange }: {
-  label: string;
-  value: '1' | '0';
-  onChange: (value: '1' | '0') => void;
-}) {
-  return (
-    <div className="grid grid-cols-3">
-        <Label variant="muted">{label}</Label>
-        <div className="col-span-2">
-            <Tabs
-              value={value}
-              onValueChange={(next) => onChange(next as '1' | '0')}
-              className="w-full"
-            >
-                <TabsList className="w-full">
-                    <TabsTrigger value="1">Yes</TabsTrigger>
-                    <TabsTrigger value="0">No</TabsTrigger>
-                </TabsList>
-            </Tabs>
-        </div>
-    </div>
-  );
+const YES_NO_OPTIONS: IconOption<'1' | '0'>[] = [
+  { value: '1', label: 'Yes' },
+  { value: '0', label: 'No' },
+];
+
+function resolveSizing(flex: string, hasIndividual: boolean, forceCustom: boolean): Sizing {
+  if (flex === '1') return 'grow';
+  if (flex === 'none') return 'fixed';
+  if (flex === 'auto' || hasIndividual || forceCustom) return 'custom';
+  return 'shrink';
+}
+
+/** Effective grow for the custom row: flex-auto is 1 1 auto, browser default is 0 1 auto */
+function resolveGrow(flexGrow: string, flex: string): '1' | '0' {
+  if (flexGrow) return flexGrow === '1' ? '1' : '0';
+  return flex === 'auto' ? '1' : '0';
+}
+
+function resolveOrderMode(order: string, forceCustom: boolean): OrderMode {
+  if (order === 'first' || order === 'last') return order;
+  if (/^\d+$/.test(order) || forceCustom) return 'custom';
+  return 'default';
 }
 
 /**
  * "Flex child" section: how this layer behaves inside its flex parent
- * (flex shorthand, grow/shrink, order). Renders nothing when the parent
+ * (sizing presets, grow/shrink, order). Renders nothing when the parent
  * is not a flex container.
  */
 const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer = null, onLayerUpdate }: FlexChildControlsProps) {
   const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
   const activeUIState = useEditorStore((s) => s.activeUIState);
-  const { updateDesignProperty, getDesignProperty } = useDesignSync({
+  const { updateDesignProperties, debouncedUpdateDesignProperty, getDesignProperty } = useDesignSync({
     layer,
     onLayerUpdate,
     activeBreakpoint,
@@ -74,20 +80,82 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   });
   const { isFlex } = useParentLayout(parentLayer);
 
+  const flex = getDesignProperty('layout', 'flex') || '';
+  const flexGrowRaw = getDesignProperty('layout', 'flexGrow') || '';
+  const flexShrinkRaw = getDesignProperty('layout', 'flexShrink') || '';
+  const order = getDesignProperty('layout', 'order') || '';
+
+  // "Custom" can be chosen before any individual value is set
+  const [isCustomSizing, setIsCustomSizing] = useState(false);
+  const [isCustomOrder, setIsCustomOrder] = useState(false);
+  const [orderInput, setOrderInput] = useState(/^\d+$/.test(order) ? order : '');
+
+  useEffect(() => {
+    setIsCustomSizing(false);
+    setIsCustomOrder(false);
+  }, [layer?.id]);
+
+  useEffect(() => {
+    setOrderInput(/^\d+$/.test(order) ? order : '');
+  }, [order]);
+
   if (!layer || !isFlex) return null;
 
-  const flex = getDesignProperty('layout', 'flex') || DEFAULT_VALUE;
-  // Browser defaults: flex-grow 0, flex-shrink 1
-  const flexGrow = getDesignProperty('layout', 'flexGrow') === '1' ? '1' : '0';
-  const flexShrink = getDesignProperty('layout', 'flexShrink') === '0' ? '0' : '1';
-  const order = getDesignProperty('layout', 'order') || DEFAULT_VALUE;
+  const sizing = resolveSizing(flex, Boolean(flexGrowRaw || flexShrinkRaw), isCustomSizing);
+  const orderMode = resolveOrderMode(order, isCustomOrder);
 
-  const handleFlexChange = (value: string) => {
-    updateDesignProperty('layout', 'flex', value === DEFAULT_VALUE ? null : value);
+  const flexGrow = resolveGrow(flexGrowRaw, flex);
+  const flexShrink: '1' | '0' = flexShrinkRaw === '0' ? '0' : '1';
+
+  const handleSizingChange = (next: Sizing) => {
+    if (next === 'custom') {
+      setIsCustomSizing(true);
+      updateDesignProperties([{ category: 'layout', property: 'flex', value: null }]);
+      return;
+    }
+
+    setIsCustomSizing(false);
+    updateDesignProperties([
+      { category: 'layout', property: 'flex', value: SIZING_FLEX_VALUE[next] },
+      { category: 'layout', property: 'flexGrow', value: null },
+      { category: 'layout', property: 'flexShrink', value: null },
+    ]);
   };
 
-  const handleOrderChange = (value: string) => {
-    updateDesignProperty('layout', 'order', value === DEFAULT_VALUE ? null : value);
+  // Individual grow/shrink replace the shorthand so the two never conflict
+  const handleGrowChange = (value: '1' | '0') => {
+    updateDesignProperties([
+      { category: 'layout', property: 'flex', value: null },
+      { category: 'layout', property: 'flexGrow', value },
+    ]);
+  };
+
+  const handleShrinkChange = (value: '1' | '0') => {
+    updateDesignProperties([
+      { category: 'layout', property: 'flex', value: null },
+      { category: 'layout', property: 'flexShrink', value },
+    ]);
+  };
+
+  const handleOrderModeChange = (next: OrderMode) => {
+    if (next === 'custom') {
+      setIsCustomOrder(true);
+      if (!/^\d+$/.test(order)) {
+        updateDesignProperties([{ category: 'layout', property: 'order', value: null }]);
+      }
+      return;
+    }
+
+    setIsCustomOrder(false);
+    updateDesignProperties([
+      { category: 'layout', property: 'order', value: next === 'default' ? null : next },
+    ]);
+  };
+
+  const handleOrderInputChange = (value: string) => {
+    if (value !== '' && !/^\d+$/.test(value)) return;
+    setOrderInput(value);
+    debouncedUpdateDesignProperty('layout', 'order', value || null);
   };
 
   return (
@@ -97,52 +165,69 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
       </header>
       <div className="flex flex-col gap-2">
           <div className="grid grid-cols-3">
-              <Label variant="muted">Flex</Label>
+              <Label variant="muted">Sizing</Label>
               <div className="col-span-2">
-                  <Select value={flex} onValueChange={handleFlexChange}>
-                      <SelectTrigger>
-                          <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                          <SelectGroup>
-                              {FLEX_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                              ))}
-                          </SelectGroup>
-                      </SelectContent>
-                  </Select>
+                  <IconTabs
+                    value={sizing}
+                    options={SIZING_OPTIONS}
+                    onChange={handleSizingChange}
+                  />
               </div>
           </div>
 
-          <BooleanRow
-            label="Grow"
-            value={flexGrow}
-            onChange={(value) => updateDesignProperty('layout', 'flexGrow', value)}
-          />
-
-          <BooleanRow
-            label="Shrink"
-            value={flexShrink}
-            onChange={(value) => updateDesignProperty('layout', 'flexShrink', value)}
-          />
+          {sizing === 'custom' && (
+              <>
+                  <div className="grid grid-cols-3">
+                      <Label variant="muted">Grow</Label>
+                      <div className="col-span-2">
+                          <IconTabs
+                            value={flexGrow}
+                            options={YES_NO_OPTIONS}
+                            onChange={handleGrowChange}
+                          />
+                      </div>
+                  </div>
+                  <div className="grid grid-cols-3">
+                      <Label variant="muted">Shrink</Label>
+                      <div className="col-span-2">
+                          <IconTabs
+                            value={flexShrink}
+                            options={YES_NO_OPTIONS}
+                            onChange={handleShrinkChange}
+                          />
+                      </div>
+                  </div>
+              </>
+          )}
 
           <div className="grid grid-cols-3">
               <Label variant="muted">Order</Label>
               <div className="col-span-2">
-                  <Select value={order} onValueChange={handleOrderChange}>
-                      <SelectTrigger>
-                          <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                          <SelectGroup>
-                              {ORDER_OPTIONS.map((option) => (
-                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                              ))}
-                          </SelectGroup>
-                      </SelectContent>
-                  </Select>
+                  <IconTabs
+                    value={orderMode}
+                    options={ORDER_OPTIONS}
+                    onChange={handleOrderModeChange}
+                  />
               </div>
           </div>
+
+          {orderMode === 'custom' && (
+              <div className="grid grid-cols-3">
+                  <Label variant="muted">Position</Label>
+                  <div className="col-span-2">
+                      <InputGroup>
+                          <InputGroupInput
+                            stepper
+                            min="0"
+                            step="1"
+                            placeholder="0"
+                            value={orderInput}
+                            onChange={(e) => handleOrderInputChange(e.target.value)}
+                          />
+                      </InputGroup>
+                  </div>
+              </div>
+          )}
       </div>
     </div>
   );

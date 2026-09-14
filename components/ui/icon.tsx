@@ -19,7 +19,7 @@ export interface IconProps extends React.SVGProps<SVGSVGElement> {
     | 'slide-bullets' | 'slide-bullet' | 'slide-navigation' | 'slide-fraction' | 'loop-alternate' | 'loop-repeat' | 'listItem' | 'external-link'
     | 'settings' | 'center-block' | 'code-block' | 'table' | 'table-row' | 'table-cell' | 'add-column' | 'add-row' | 'delete-column' | 'delete-row' | 'delete-table' | 'header' | 'body'
     | 'webflow' | 'figma' | 'space' | 'sparkles'
-    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'reverse-arrows' | 'arrow-horizontal' | 'arrow-vertical' | 'inline-block' | 'inline'
+    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'reverse-arrows' | 'arrow-horizontal' | 'arrow-vertical' | 'inline-block' | 'inline' | 'flex-fixed'
     | 'claude' | 'openai' | 'gemini' | 'grok'
   );
 }
@@ -1134,6 +1134,13 @@ const ICONS: Record<IconProps['name'], React.ReactNode> = {
     <>
       <path d="M0,0 L1.5,0 L1.5,12 L0,12 Z M10.5,0 L12,0 L12,12 L10.5,12 Z" />
       <path d="M4,0 L8,0 C8.55228475,0 9,0.44771525 9,1 L9,11 C9,11.5522847 8.55228475,12 8,12 L4,12 C3.44771525,12 3,11.5522847 3,11 L3,1 C3,0.44771525 3.44771525,0 4,0 Z" />
+    </>
+  ),
+  // Flex child that neither grows nor shrinks: bars with an x (pairs with minSize / maxSize).
+  'flex-fixed': (
+    <>
+      <path d="M0.5,0 C0.776,0 1,0.224 1,0.5 L1,11.5 C1,11.776 0.776,12 0.5,12 C0.224,12 0,11.776 0,11.5 L0,0.5 C0,0.224 0.224,0 0.5,0 Z M11.5,0 C11.776,0 12,0.224 12,0.5 L12,11.5 C12,11.776 11.776,12 11.5,12 C11.224,12 11,11.776 11,11.5 L11,0.5 C11,0.224 11.224,0 11.5,0 Z" />
+      <path d="M4.35,3.65 L8.35,7.65 L7.65,8.35 L3.65,4.35 Z M7.65,3.65 L8.35,4.35 L4.35,8.35 L3.65,7.65 Z" />
     </>
   ),
   // Double-headed arrows (0 0 24 24 source, same stroke weight as 'arrow-left') — flex direction.

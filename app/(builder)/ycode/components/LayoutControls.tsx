@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import IconTabs, { type IconOption } from './IconTabs';
 import { useDesignSync } from '@/hooks/use-design-sync';
 import { useControlledInputs } from '@/hooks/use-controlled-input';
 import { useModeToggle } from '@/hooks/use-mode-toggle';
@@ -27,12 +28,6 @@ interface LayoutControlsProps {
 type LayoutType = 'block' | 'inline-block' | 'inline' | 'flex' | 'grid' | 'hidden';
 /** Flex main axis (maps to CSS `flex-direction`) */
 type FlexDirection = 'horizontal' | 'vertical';
-
-interface IconOption<T extends string> {
-  value: T;
-  icon: React.ComponentProps<typeof Icon>['name'];
-  label: string;
-}
 
 const LAYOUT_TYPE_OPTION: Record<LayoutType, IconOption<LayoutType>> = {
   'block': { value: 'block', icon: 'block', label: 'Block' },
@@ -69,43 +64,6 @@ const FLEX_DIRECTION_OPTIONS: IconOption<FlexDirection>[] = [
   { value: 'horizontal', icon: 'arrow-horizontal', label: 'Horizontal' },
   { value: 'vertical', icon: 'arrow-vertical', label: 'Vertical' },
 ];
-
-/** Icon-only tab group with a tooltip per option */
-function IconTabs<T extends string>({ value, options, onChange }: {
-  value: T;
-  options: IconOption<T>[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <Tabs
-      value={value}
-      onValueChange={(next) => onChange(next as T)}
-      className="w-full"
-    >
-        <TabsList className="w-full">
-            {options.map((option) => (
-              <Tooltip key={option.value}>
-                  {/* Wrap in a span: Tooltip and Tabs both write `data-state`, so
-                      sharing one element via asChild would drop the active tab style */}
-                  <TooltipTrigger asChild>
-                      <span className="flex flex-1 h-full">
-                          <TabsTrigger
-                            value={option.value}
-                            aria-label={option.label}
-                          >
-                              <Icon name={option.icon} />
-                          </TabsTrigger>
-                      </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                      <p>{option.label}</p>
-                  </TooltipContent>
-              </Tooltip>
-            ))}
-        </TabsList>
-    </Tabs>
-  );
-}
 
 const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: LayoutControlsProps) {
   const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
