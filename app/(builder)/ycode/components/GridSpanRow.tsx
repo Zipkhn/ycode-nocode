@@ -62,7 +62,10 @@ export default function GridSpanRow({ label, layer, property, value, onChange }:
       <Label variant="muted">{label}</Label>
       <div className="col-span-2">
         <Select value={toSelectValue(value)} onValueChange={handleChange}>
-          <SelectTrigger aria-label={property === 'gridColumnSpan' ? 'Column span' : 'Row span'}>
+          <SelectTrigger
+            className="w-full"
+            aria-label={property === 'gridColumnSpan' ? 'Column span' : 'Row span'}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
