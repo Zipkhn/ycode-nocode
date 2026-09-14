@@ -21,23 +21,24 @@ interface FlexChildControlsProps {
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
 }
 
-/** Sizing presets, one per Tailwind `flex-*` utility (legacy: Initial / Expand / Auto / None) */
-type Sizing = 'shrink' | 'grow' | 'auto' | 'fixed';
+/**
+ * Optional sizing override; added via "+" and removed with "x". Without it the
+ * browser default (`0 1 auto`) applies, so no "auto" preset is needed.
+ */
+type Sizing = 'shrink' | 'grow' | 'fixed';
 /** Optional order override; added via "+" and removed with "x" */
 type OrderMode = 'first' | 'last' | 'custom';
 
 const SIZING_OPTIONS: IconOption<Sizing>[] = [
-  { value: 'auto', label: 'Auto' },
   { value: 'shrink', icon: 'minSize', label: 'Shrink if needed' },
   { value: 'grow', icon: 'maxSize', label: 'Grow equally' },
   { value: 'fixed', icon: 'flex-fixed', label: "Don't shrink or grow" },
 ];
 
-/** Preset → `flex` shorthand (initial = 0 1 auto, 1 = 1 1 0%, auto = 1 1 auto, none = 0 0 auto) */
+/** Preset → `flex` shorthand (initial = 0 1 auto, 1 = 1 1 0%, none = 0 0 auto) */
 const SIZING_FLEX_VALUE: Record<Sizing, string> = {
   shrink: 'initial',
   grow: '1',
-  auto: 'auto',
   fixed: 'none',
 };
 
@@ -82,15 +83,14 @@ function RemovableRow({ label, onRemove, children }: {
 }
 
 /**
- * Map the layer's flex classes to a preset. Individual grow/shrink classes
- * (from imports or the AI) have no preset, so no tab is selected for them.
+ * Map the layer's `flex` shorthand to a preset. `flex-auto` and individual
+ * grow/shrink classes (from imports or the AI) have no preset, so no tab is selected.
  */
-function resolveSizing(flex: string, hasIndividual: boolean): Sizing | '' {
+function resolveSizing(flex: string): Sizing | '' {
+  if (flex === 'initial') return 'shrink';
   if (flex === '1') return 'grow';
-  if (flex === 'auto') return 'auto';
   if (flex === 'none') return 'fixed';
-  if (hasIndividual) return '';
-  return 'shrink';
+  return '';
 }
 
 /** `self-auto`/`self-baseline` have no tab, so they select nothing rather than a wrong option */
@@ -106,9 +106,9 @@ function resolveOrderMode(order: string, forceCustom: boolean): OrderMode | '' {
 }
 
 /**
- * "Flex child" section: how this layer behaves inside its flex parent
- * (sizing preset, optional align and order overrides). Renders nothing when the parent
- * is not a flex container.
+ * "Flex child" section: how this layer behaves inside its flex parent. Every row
+ * (Sizing, Align, Order) is opt-in via "+"; with none added the browser defaults apply.
+ * Renders nothing when the parent is not a flex container.
  */
 const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer = null, onLayerUpdate }: FlexChildControlsProps) {
   const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
@@ -129,6 +129,7 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
 
   // Rows added from "+" appear empty until the user picks a value, so track
   // "added" separately from "has a value"
+  const [isSizingAdded, setIsSizingAdded] = useState(false);
   const [isAlignAdded, setIsAlignAdded] = useState(false);
   const [isOrderAdded, setIsOrderAdded] = useState(false);
   // Custom order can be chosen before a number is typed
@@ -136,6 +137,7 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   const [orderInput, setOrderInput] = useState(/^\d+$/.test(order) ? order : '');
 
   useEffect(() => {
+    setIsSizingAdded(false);
     setIsAlignAdded(false);
     setIsOrderAdded(false);
     setIsCustomOrder(false);
@@ -147,10 +149,11 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
 
   if (!layer || !isFlex) return null;
 
-  const sizing = resolveSizing(flex, Boolean(flexGrowRaw || flexShrinkRaw));
+  const sizing = resolveSizing(flex);
   const alignSelf = resolveAlignSelf(alignSelfRaw);
   const orderMode = resolveOrderMode(order, isCustomOrder);
 
+  const hasSizing = Boolean(flex || flexGrowRaw || flexShrinkRaw) || isSizingAdded;
   const hasAlignSelf = Boolean(alignSelfRaw) || isAlignAdded;
 
   const handleAlignSelfChange = (value: AlignSelf) => {
@@ -171,7 +174,28 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
     ]);
   };
 
+  const handleRemoveSizing = () => {
+    setIsSizingAdded(false);
+    updateDesignProperties([
+      { category: 'layout', property: 'flex', value: null },
+      { category: 'layout', property: 'flexGrow', value: null },
+      { category: 'layout', property: 'flexShrink', value: null },
+    ]);
+  };
+
   const hasOrder = Boolean(order) || isOrderAdded || isCustomOrder;
+  const hasAnyRow = hasSizing || hasAlignSelf || hasOrder;
+  const canAdd = !hasSizing || !hasAlignSelf || !hasOrder;
+
+  const addButton = (
+    <Button
+      variant="ghost" size="xs"
+      aria-label="Add flex child option"
+      disabled={!canAdd}
+    >
+      <Icon name="plus" />
+    </Button>
+  );
 
   const handleOrderModeChange = (next: OrderMode) => {
     if (next === 'custom') {
@@ -201,45 +225,46 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   return (
     <SettingsPanel
       title="Flex child"
-      isOpen
+      isOpen={hasAnyRow}
       onToggle={noop}
       action={
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost" size="xs"
-              aria-label="Add flex child option"
-            >
-              <Icon name="plus" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => setIsAlignAdded(true)}
-              disabled={hasAlignSelf}
-            >
-              Align
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => setIsOrderAdded(true)}
-              disabled={hasOrder}
-            >
-              Order
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        // Everything added: plain disabled button so no empty menu can open
+        canAdd ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>{addButton}</DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => setIsSizingAdded(true)}
+                disabled={hasSizing}
+              >
+                Sizing
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setIsAlignAdded(true)}
+                disabled={hasAlignSelf}
+              >
+                Align
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setIsOrderAdded(true)}
+                disabled={hasOrder}
+              >
+                Order
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : addButton
       }
     >
-      <div className="grid grid-cols-3">
-        <Label variant="muted">Sizing</Label>
-        <div className="col-span-2">
+      {hasSizing && (
+        <RemovableRow label="Sizing" onRemove={handleRemoveSizing}>
           <IconTabs
             value={sizing}
             options={SIZING_OPTIONS}
             onChange={handleSizingChange}
           />
-        </div>
-      </div>
+        </RemovableRow>
+      )}
 
       {hasAlignSelf && (
         <RemovableRow label="Align" onRemove={handleRemoveAlignSelf}>
