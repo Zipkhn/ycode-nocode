@@ -157,7 +157,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
   const isReverse = flexDirection === 'row-reverse' || flexDirection === 'column-reverse';
   const direction: FlexDirection = isColumnAxis ? 'vertical' : 'horizontal';
 
-  const wrapMode = flexWrap === 'wrap' ? 'yes' : 'no';
+  const isWrap = flexWrap === 'wrap' || flexWrap === 'wrap-reverse';
 
   // Handle layout type change
   const handleLayoutTypeChange = (type: LayoutType) => {
@@ -201,9 +201,10 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
     updateDesignProperty('layout', 'justifyContent', value);
   };
 
-  // Handle wrap mode change
-  const handleWrapChange = (value: 'yes' | 'no') => {
-    updateDesignProperty('layout', 'flexWrap', value === 'yes' ? 'wrap' : 'nowrap');
+  // Toggle wrapping. Off writes an explicit nowrap (not null) so a smaller
+  // breakpoint can override a wrapping desktop value.
+  const handleWrapToggle = () => {
+    updateDesignProperty('layout', 'flexWrap', isWrap ? 'nowrap' : 'wrap');
   };
 
   // Handle gap changes (debounced for text input)
@@ -292,6 +293,23 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                           </TooltipTrigger>
                           <TooltipContent>
                               <p>Reverse</p>
+                          </TooltipContent>
+                      </Tooltip>
+                      {/* Wrap lives here with direction and reverse: together they are `flex-flow` */}
+                      <Tooltip>
+                          <TooltipTrigger asChild>
+                              <Button
+                                variant={isWrap ? 'secondary' : 'ghost'}
+                                size="sm"
+                                aria-pressed={isWrap}
+                                aria-label="Wrap items"
+                                onClick={handleWrapToggle}
+                              >
+                                  <Icon name="wrap" />
+                              </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                              <p>Wrap</p>
                           </TooltipContent>
                       </Tooltip>
                   </div>
@@ -395,24 +413,6 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                             onChange={(e) => handleGridRowsChange(e.target.value)}
                           />
                       </InputGroup>
-                  </div>
-              </div>
-          )}
-
-          {isFlex && (
-              <div className="grid grid-cols-3">
-                  <Label variant="muted">Wrap</Label>
-                  <div className="col-span-2">
-                      <Tabs
-                        value={wrapMode}
-                        onValueChange={(value) => handleWrapChange(value as 'yes' | 'no')}
-                        className="w-full"
-                      >
-                          <TabsList className="w-full">
-                              <TabsTrigger value="yes">Yes</TabsTrigger>
-                              <TabsTrigger value="no">No</TabsTrigger>
-                          </TabsList>
-                      </Tabs>
                   </div>
               </div>
           )}

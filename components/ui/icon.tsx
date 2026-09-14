@@ -20,7 +20,7 @@ export interface IconProps extends React.SVGProps<SVGSVGElement> {
     | 'settings' | 'center-block' | 'code-block' | 'table' | 'table-row' | 'table-cell' | 'add-column' | 'add-row' | 'delete-column' | 'delete-row' | 'delete-table' | 'header' | 'body'
     | 'webflow' | 'figma' | 'space' | 'sparkles'
     | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'reverse-arrows' | 'arrow-horizontal' | 'arrow-vertical' | 'inline-block' | 'inline' | 'flex-fixed'
-    | 'lock' | 'unlock'
+    | 'lock' | 'unlock' | 'wrap'
     | 'claude' | 'openai' | 'gemini' | 'grok'
   );
 }
@@ -1162,6 +1162,13 @@ const ICONS: Record<IconProps['name'], React.ReactNode> = {
         fillRule="evenodd"
         d="M2.5,5 L9.5,5 C10.05,5 10.5,5.45 10.5,6 L10.5,10.5 C10.5,11.05 10.05,11.5 9.5,11.5 L2.5,11.5 C1.95,11.5 1.5,11.05 1.5,10.5 L1.5,6 C1.5,5.45 1.95,5 2.5,5 Z M2.5,6 L2.5,10.5 L9.5,10.5 L9.5,6 Z"
       />
+    </>
+  ),
+  // Flex wrap: a line that runs right, turns down and returns to the next line with an arrow.
+  wrap: (
+    <>
+      <path d="M1,2 L11,2 L11,3 L1,3 Z" />
+      <path d="M1,5.5 L8,5.5 C9.38,5.5 10.5,6.62 10.5,8 C10.5,9.38 9.38,10.5 8,10.5 L4.5,10.5 L4.5,11.5 L1,10 L4.5,8.5 L4.5,9.5 L8,9.5 C8.83,9.5 9.5,8.83 9.5,8 C9.5,7.17 8.83,6.5 8,6.5 L1,6.5 Z" />
     </>
   ),
   // Double-headed arrows (0 0 24 24 source, same stroke weight as 'arrow-left') — flex direction.
