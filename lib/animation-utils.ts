@@ -22,12 +22,11 @@ export function getEffectiveApplyStyle(
   propertyKey: TweenPropertyKey,
   applyStyles: InteractionTween['apply_styles'] | undefined
 ): ApplyStyles {
-  // `display` is toggled via `data-gsap-hidden`, not tweened. Applying a
-  // `from: hidden` state "on trigger" is a no-op — the timeline's onStart
-  // removes the attribute in the same tick — so the element would never be
-  // hidden and a Hidden → Visible reveal would appear to do nothing. Treat
-  // display as always on-load; a `from: visible` emits nothing on load anyway.
-  if (propertyKey === 'display') return 'on-load';
+  // Note: a Display `from: hidden` applied on trigger is a no-op (the timeline
+  // removes `data-gsap-hidden` in the same tick), so the user must opt into
+  // on-load for click/hover reveals. Forcing on-load here was tried and rejected:
+  // an unscoped reveal would hide its target on every breakpoint at load, which
+  // breaks e.g. a desktop nav whose menu is only revealed by a mobile hamburger.
   const explicit = applyStyles?.[propertyKey];
   if (explicit) return explicit;
   if (IMPLICIT_ON_LOAD_TRIGGERS.includes(trigger)) return 'on-load';

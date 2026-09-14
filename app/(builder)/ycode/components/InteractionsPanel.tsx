@@ -2354,9 +2354,6 @@ export default function InteractionsPanel({
                             // only exist after SplitText runs client-side, so the on-load /
                             // on-trigger toggle is a no-op — they always behave as on-trigger.
                             const isNoOpForSplitText = !!selectedTween.splitText;
-                            // Display is always applied on load (see getEffectiveApplyStyle) —
-                            // a `from: hidden` applied on trigger would never hide the element.
-                            const isDisplayProp = prop.key === 'display';
                             const effectiveApplyStyle: ApplyStyles = isNoOpForSplitText
                               ? 'on-trigger'
                               : selectedInteraction
@@ -2372,7 +2369,7 @@ export default function InteractionsPanel({
                                       size="xs"
                                       variant="secondary"
                                       className="size-7 p-0 shrink-0 transition-none"
-                                      disabled={isFromCurrent || isNoOpForSplitText || isDisplayProp}
+                                      disabled={isFromCurrent || isNoOpForSplitText}
                                       onClick={() => {
                                         handleUpdateTween(selectedTween.id, {
                                           apply_styles: {
@@ -2388,11 +2385,9 @@ export default function InteractionsPanel({
                                   <TooltipContent side="top" align="start">
                                     {isNoOpForSplitText
                                       ? 'Text animations always apply styles on trigger'
-                                      : isDisplayProp
-                                        ? 'Display is always applied on page load'
-                                        : isOnLoad
-                                          ? 'Apply property style on page load'
-                                          : 'Apply property style on trigger'}
+                                      : isOnLoad
+                                        ? 'Apply property style on page load'
+                                        : 'Apply property style on trigger'}
                                   </TooltipContent>
                                 </Tooltip>
 
