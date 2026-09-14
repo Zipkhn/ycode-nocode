@@ -80,8 +80,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
   const flexDirection = getDesignProperty('layout', 'flexDirection') || 'row';
   const alignItems = getDesignProperty('layout', 'alignItems') || '';
   const justifyContent = getDesignProperty('layout', 'justifyContent') || 'start';
-  const flexWrapRaw = getDesignProperty('layout', 'flexWrap') || '';
-  const flexWrap = flexWrapRaw || 'nowrap';
+  const flexWrap = getDesignProperty('layout', 'flexWrap') || 'nowrap';
   const gap = getDesignProperty('layout', 'gap') || '';
   const columnGap = getDesignProperty('layout', 'columnGap') || '';
   const rowGap = getDesignProperty('layout', 'rowGap') || '';
@@ -163,12 +162,11 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
   // Handle layout type change
   const handleLayoutTypeChange = (type: LayoutType) => {
     if (type === 'flex') {
-      // Keep an existing direction/wrap; otherwise default to a wrapping horizontal row
+      // Keep an existing direction; default to a horizontal row otherwise
       const hasDirection = ['row', 'row-reverse', 'column', 'column-reverse'].includes(flexDirection);
       updateDesignProperties([
         { category: 'layout', property: 'display', value: 'flex' },
         ...(hasDirection ? [] : [{ category: 'layout' as const, property: 'flexDirection', value: 'row' }]),
-        ...(flexWrapRaw ? [] : [{ category: 'layout' as const, property: 'flexWrap', value: 'wrap' }]),
       ]);
       return;
     }
