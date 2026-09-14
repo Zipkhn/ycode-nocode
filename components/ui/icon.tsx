@@ -19,7 +19,7 @@ export interface IconProps extends React.SVGProps<SVGSVGElement> {
     | 'slide-bullets' | 'slide-bullet' | 'slide-navigation' | 'slide-fraction' | 'loop-alternate' | 'loop-repeat' | 'listItem' | 'external-link'
     | 'settings' | 'center-block' | 'code-block' | 'table' | 'table-row' | 'table-cell' | 'add-column' | 'add-row' | 'delete-column' | 'delete-row' | 'delete-table' | 'header' | 'body'
     | 'webflow' | 'figma' | 'space' | 'sparkles'
-    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'flex' | 'reverse-arrows'
+    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'reverse-arrows' | 'arrow-horizontal' | 'arrow-vertical'
     | 'claude' | 'openai' | 'gemini' | 'grok'
   );
 }
@@ -1122,13 +1122,16 @@ const ICONS: Record<IconProps['name'], React.ReactNode> = {
       <path d="M10,5 h1 v2 h-1 z" />
     </>
   ),
-  // Flex: three items of different sizes aligned along one axis.
-  flex: (
-    <>
-      <path d="M1.5,1 h1 a1,1 0 0 1 1,1 v8 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-8 a1,1 0 0 1 1,-1 z" />
-      <path d="M5.5,2.5 h1 a1,1 0 0 1 1,1 v5 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-5 a1,1 0 0 1 1,-1 z" />
-      <path d="M9.5,4 h1 a1,1 0 0 1 1,1 v2 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-2 a1,1 0 0 1 1,-1 z" />
-    </>
+  // Double-headed arrows (0 0 24 24 source, same stroke weight as 'arrow-left') — flex direction.
+  'arrow-horizontal': (
+    <g transform="scale(0.5)">
+      <path d="M4.83,11 L7.7,8.13 L6.29,6.71 L1,12 L6.29,17.29 L7.7,15.87 L4.83,13 L19.17,13 L16.3,15.87 L17.71,17.29 L23,12 L17.71,6.71 L16.3,8.13 L19.17,11 Z" />
+    </g>
+  ),
+  'arrow-vertical': (
+    <g transform="scale(0.5)">
+      <path d="M4.83,11 L7.7,8.13 L6.29,6.71 L1,12 L6.29,17.29 L7.7,15.87 L4.83,13 L19.17,13 L16.3,15.87 L17.71,17.29 L23,12 L17.71,6.71 L16.3,8.13 L19.17,11 Z" transform="rotate(90 12 12)" />
+    </g>
   ),
   // Two opposing arrows (ported from the legacy builder) — used for flex-direction reverse.
   'reverse-arrows': (

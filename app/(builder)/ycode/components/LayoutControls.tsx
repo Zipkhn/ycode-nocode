@@ -37,14 +37,14 @@ interface IconOption<T extends string> {
 
 const LAYOUT_TYPE_OPTIONS: IconOption<LayoutType>[] = [
   { value: 'block', icon: 'block', label: 'Block' },
-  { value: 'flex', icon: 'flex', label: 'Flex' },
+  { value: 'flex', icon: 'columns', label: 'Flex' },
   { value: 'grid', icon: 'grid', label: 'Grid' },
   { value: 'hidden', icon: 'square-dashed', label: 'None' },
 ];
 
 const FLEX_DIRECTION_OPTIONS: IconOption<FlexDirection>[] = [
-  { value: 'horizontal', icon: 'columns', label: 'Horizontal' },
-  { value: 'vertical', icon: 'rows', label: 'Vertical' },
+  { value: 'horizontal', icon: 'arrow-horizontal', label: 'Horizontal' },
+  { value: 'vertical', icon: 'arrow-vertical', label: 'Vertical' },
 ];
 
 /** Icon-only tab group with a tooltip per option */
