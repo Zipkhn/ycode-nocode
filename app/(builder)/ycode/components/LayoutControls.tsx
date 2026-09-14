@@ -170,6 +170,7 @@ const LayoutControls = memo(function LayoutControls({ layer, parentLayer = null,
   const isFlex = layoutType === 'flex';
   const isGrid = layoutType === 'grid';
   const isColumnAxis = isFlex && (flexDirection === 'column' || flexDirection === 'column-reverse');
+  const isReverse = flexDirection === 'row-reverse' || flexDirection === 'column-reverse';
   const direction: FlexDirection = isColumnAxis ? 'vertical' : 'horizontal';
 
   const wrapMode = flexWrap === 'wrap' ? 'yes' : 'no';
@@ -193,9 +194,16 @@ const LayoutControls = memo(function LayoutControls({ layer, parentLayer = null,
     ]);
   };
 
-  // Handle flex direction change
+  // Handle flex direction change (keeps the current reverse state)
   const handleDirectionChange = (value: FlexDirection) => {
-    updateDesignProperty('layout', 'flexDirection', value === 'vertical' ? 'column' : 'row');
+    const axis = value === 'vertical' ? 'column' : 'row';
+    updateDesignProperty('layout', 'flexDirection', isReverse ? `${axis}-reverse` : axis);
+  };
+
+  // Toggle reverse on the current axis (row ↔ row-reverse, column ↔ column-reverse)
+  const handleReverseToggle = () => {
+    const axis = isColumnAxis ? 'column' : 'row';
+    updateDesignProperty('layout', 'flexDirection', isReverse ? axis : `${axis}-reverse`);
   };
 
   // Handle align items change
@@ -277,12 +285,30 @@ const LayoutControls = memo(function LayoutControls({ layer, parentLayer = null,
           {isFlex && (
               <div className="grid grid-cols-3">
                   <Label variant="muted">Direction</Label>
-                  <div className="col-span-2">
-                      <IconTabs
-                        value={direction}
-                        options={FLEX_DIRECTION_OPTIONS}
-                        onChange={handleDirectionChange}
-                      />
+                  <div className="col-span-2 flex items-center gap-2">
+                      <div className="flex-1">
+                          <IconTabs
+                            value={direction}
+                            options={FLEX_DIRECTION_OPTIONS}
+                            onChange={handleDirectionChange}
+                          />
+                      </div>
+                      <Tooltip>
+                          <TooltipTrigger asChild>
+                              <Button
+                                variant={isReverse ? 'secondary' : 'ghost'}
+                                size="sm"
+                                aria-pressed={isReverse}
+                                aria-label="Reverse direction"
+                                onClick={handleReverseToggle}
+                              >
+                                  <Icon name="reverse-arrows" />
+                              </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                              <p>Reverse</p>
+                          </TooltipContent>
+                      </Tooltip>
                   </div>
               </div>
           )}
@@ -388,7 +414,7 @@ const LayoutControls = memo(function LayoutControls({ layer, parentLayer = null,
               </div>
           )}
 
-          {isFlex && !isColumnAxis && (
+          {isFlex && (
               <div className="grid grid-cols-3">
                   <Label variant="muted">Wrap</Label>
                   <div className="col-span-2">
