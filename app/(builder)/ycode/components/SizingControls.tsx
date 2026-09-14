@@ -347,13 +347,23 @@ const SizingControls = memo(function SizingControls({ layer, parentLayer = null,
         </DropdownMenu>
       }
     >
-      {parentIsGrid && (
-        <GridSpanRow
-          columnSpan={gridColumnSpan}
-          rowSpan={gridRowSpan}
-          onColumnSpanChange={(value) => updateDesignProperty('sizing', 'gridColumnSpan', value)}
-          onRowSpanChange={(value) => updateDesignProperty('sizing', 'gridRowSpan', value)}
-        />
+      {parentIsGrid && layer && (
+        <>
+          <GridSpanRow
+            label="Column span"
+            layer={layer}
+            property="gridColumnSpan"
+            value={gridColumnSpan}
+            onChange={(property, value) => updateDesignProperty('sizing', property, value)}
+          />
+          <GridSpanRow
+            label="Row span"
+            layer={layer}
+            property="gridRowSpan"
+            value={gridRowSpan}
+            onChange={(property, value) => updateDesignProperty('sizing', property, value)}
+          />
+        </>
       )}
 
       {aspectRatio && (
