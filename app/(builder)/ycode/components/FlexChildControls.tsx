@@ -37,7 +37,7 @@ const SIZING_FLEX_VALUE: Record<Sizing, string> = {
 type AlignSelf = 'auto' | 'start' | 'center' | 'end' | 'stretch';
 
 const ALIGN_SELF_OPTIONS: IconOption<AlignSelf>[] = [
-  { value: 'auto', icon: 'x', label: 'Auto' },
+  { value: 'auto', label: 'Auto' },
   { value: 'start', icon: 'alignStart', label: 'Start' },
   { value: 'center', icon: 'alignCenter', label: 'Center' },
   { value: 'end', icon: 'alignEnd', label: 'End' },
