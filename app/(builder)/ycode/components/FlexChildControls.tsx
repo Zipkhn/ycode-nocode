@@ -20,9 +20,9 @@ type Sizing = 'shrink' | 'grow' | 'auto' | 'fixed';
 type OrderMode = 'default' | 'first' | 'last' | 'custom';
 
 const SIZING_OPTIONS: IconOption<Sizing>[] = [
+  { value: 'auto', label: 'Auto' },
   { value: 'shrink', icon: 'minSize', label: 'Shrink if needed' },
   { value: 'grow', icon: 'maxSize', label: 'Grow equally' },
-  { value: 'auto', label: 'Auto' },
   { value: 'fixed', icon: 'flex-fixed', label: "Don't shrink or grow" },
 ];
 
