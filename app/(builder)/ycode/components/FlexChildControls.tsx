@@ -127,11 +127,17 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   const alignSelfRaw = getDesignProperty('layout', 'alignSelf') || '';
   const order = getDesignProperty('layout', 'order') || '';
 
+  // Rows added from "+" appear empty until the user picks a value, so track
+  // "added" separately from "has a value"
+  const [isAlignAdded, setIsAlignAdded] = useState(false);
+  const [isOrderAdded, setIsOrderAdded] = useState(false);
   // Custom order can be chosen before a number is typed
   const [isCustomOrder, setIsCustomOrder] = useState(false);
   const [orderInput, setOrderInput] = useState(/^\d+$/.test(order) ? order : '');
 
   useEffect(() => {
+    setIsAlignAdded(false);
+    setIsOrderAdded(false);
     setIsCustomOrder(false);
   }, [layer?.id]);
 
@@ -145,10 +151,15 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   const alignSelf = resolveAlignSelf(alignSelfRaw);
   const orderMode = resolveOrderMode(order, isCustomOrder);
 
-  const hasAlignSelf = Boolean(alignSelfRaw);
+  const hasAlignSelf = Boolean(alignSelfRaw) || isAlignAdded;
 
-  const handleAlignSelfChange = (value: AlignSelf | null) => {
+  const handleAlignSelfChange = (value: AlignSelf) => {
     updateDesignProperties([{ category: 'layout', property: 'alignSelf', value }]);
+  };
+
+  const handleRemoveAlignSelf = () => {
+    setIsAlignAdded(false);
+    updateDesignProperties([{ category: 'layout', property: 'alignSelf', value: null }]);
   };
 
   // A preset replaces any individual grow/shrink classes so the two never conflict
@@ -160,7 +171,7 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
     ]);
   };
 
-  const hasOrder = Boolean(order) || isCustomOrder;
+  const hasOrder = Boolean(order) || isOrderAdded || isCustomOrder;
 
   const handleOrderModeChange = (next: OrderMode) => {
     if (next === 'custom') {
@@ -176,6 +187,7 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   };
 
   const handleRemoveOrder = () => {
+    setIsOrderAdded(false);
     setIsCustomOrder(false);
     updateDesignProperties([{ category: 'layout', property: 'order', value: null }]);
   };
@@ -203,13 +215,13 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              onClick={() => handleAlignSelfChange('start')}
+              onClick={() => setIsAlignAdded(true)}
               disabled={hasAlignSelf}
             >
               Align
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => handleOrderModeChange('first')}
+              onClick={() => setIsOrderAdded(true)}
               disabled={hasOrder}
             >
               Order
@@ -230,7 +242,7 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
       </div>
 
       {hasAlignSelf && (
-        <RemovableRow label="Align" onRemove={() => handleAlignSelfChange(null)}>
+        <RemovableRow label="Align" onRemove={handleRemoveAlignSelf}>
           <IconTabs
             value={alignSelf}
             options={ALIGN_SELF_OPTIONS}
