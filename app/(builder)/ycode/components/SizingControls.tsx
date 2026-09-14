@@ -16,15 +16,19 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import GridSpanRow from './GridSpanRow';
 import SettingsPanel from './SettingsPanel';
 import { useDesignSync } from '@/hooks/use-design-sync';
 import { useControlledInputs } from '@/hooks/use-controlled-input';
+import { useParentLayout } from '@/hooks/use-parent-layout';
 import { useEditorStore } from '@/stores/useEditorStore';
 import { extractMeasurementValue, formatMeasurementValue } from '@/lib/measurement-utils';
 import type { Layer } from '@/types';
 
 interface SizingControlsProps {
   layer: Layer | null;
+  /** Needed to show the grid Span row, which only applies inside a grid parent */
+  parentLayer?: Layer | null;
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
 }
 
@@ -49,7 +53,7 @@ const OBJECT_POSITIONS: { value: string; label: string; icon: React.ComponentPro
   { value: 'right-bottom', label: 'Bottom right', icon: 'arrow-right-down' },
 ];
 
-const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: SizingControlsProps) {
+const SizingControls = memo(function SizingControls({ layer, parentLayer = null, onLayerUpdate }: SizingControlsProps) {
   const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
   const activeUIState = useEditorStore((s) => s.activeUIState);
   const { updateDesignProperty, debouncedUpdateDesignProperty, getDesignProperty } = useDesignSync({
@@ -58,6 +62,7 @@ const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: Si
     activeBreakpoint,
     activeUIState,
   });
+  const { isGrid: parentIsGrid } = useParentLayout(parentLayer);
 
   const [isOpen, setIsOpen] = useState(true);
 
@@ -72,6 +77,8 @@ const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: Si
   const aspectRatio = getDesignProperty('sizing', 'aspectRatio') || '';
   const objectFit = getDesignProperty('sizing', 'objectFit') || '';
   const objectPosition = getDesignProperty('sizing', 'objectPosition') || '';
+  const gridColumnSpan = getDesignProperty('sizing', 'gridColumnSpan') || '';
+  const gridRowSpan = getDesignProperty('sizing', 'gridRowSpan') || '';
 
   // Extract aspect ratio value for display (remove brackets)
   const extractAspectRatioValue = (value: string): string => {
@@ -340,6 +347,15 @@ const SizingControls = memo(function SizingControls({ layer, onLayerUpdate }: Si
         </DropdownMenu>
       }
     >
+      {parentIsGrid && (
+        <GridSpanRow
+          columnSpan={gridColumnSpan}
+          rowSpan={gridRowSpan}
+          onColumnSpanChange={(value) => updateDesignProperty('sizing', 'gridColumnSpan', value)}
+          onRowSpanChange={(value) => updateDesignProperty('sizing', 'gridRowSpan', value)}
+        />
+      )}
+
       {aspectRatio && (
         <div className="grid grid-cols-3 items-start">
           <Label variant="muted" className="h-8">Aspect ratio</Label>

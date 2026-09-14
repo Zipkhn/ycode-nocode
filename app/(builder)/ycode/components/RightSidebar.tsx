@@ -64,7 +64,6 @@ import RichTextEditor from './RichTextEditor';
 import ComponentVariableLabel, { VARIABLE_TYPE_ICONS } from './ComponentVariableLabel';
 import InteractionsPanel from './InteractionsPanel';
 import FlexChildControls from './FlexChildControls';
-import GridChildControls from './GridChildControls';
 import LayoutControls from './LayoutControls';
 import LayerStylesPanel from './LayerStylesPanel';
 import PositionControls from './PositionControls';
@@ -2066,15 +2065,6 @@ const RightSidebar = React.memo(function RightSidebar({
             />
           )}
 
-          {/* Column/row span inside a grid parent (renders nothing otherwise) */}
-          {!showTextStyleControls && (
-            <GridChildControls
-              layer={controlLayer}
-              parentLayer={selectedLayerParent}
-              onLayerUpdate={controlUpdate}
-            />
-          )}
-
           {shouldShowControl('spacing', selectedLayer) && (
             <SpacingControls
               layer={controlLayer}
@@ -2084,7 +2074,11 @@ const RightSidebar = React.memo(function RightSidebar({
           )}
 
           {shouldShowControl('sizing', selectedLayer) && !showTextStyleControls && (
-            <SizingControls layer={controlLayer} onLayerUpdate={controlUpdate} />
+            <SizingControls
+              layer={controlLayer}
+              parentLayer={selectedLayerParent}
+              onLayerUpdate={controlUpdate}
+            />
           )}
 
           {shouldShowControl('position', selectedLayer) && !showTextStyleControls && (
