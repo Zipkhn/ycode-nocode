@@ -19,7 +19,7 @@ export interface IconProps extends React.SVGProps<SVGSVGElement> {
     | 'slide-bullets' | 'slide-bullet' | 'slide-navigation' | 'slide-fraction' | 'loop-alternate' | 'loop-repeat' | 'listItem' | 'external-link'
     | 'settings' | 'center-block' | 'code-block' | 'table' | 'table-row' | 'table-cell' | 'add-column' | 'add-row' | 'delete-column' | 'delete-row' | 'delete-table' | 'header' | 'body'
     | 'webflow' | 'figma' | 'space' | 'sparkles'
-    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'reverse-arrows' | 'arrow-horizontal' | 'arrow-vertical'
+    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'reverse-arrows' | 'arrow-horizontal' | 'arrow-vertical' | 'inline-block'
     | 'claude' | 'openai' | 'gemini' | 'grok'
   );
 }
@@ -1120,6 +1120,13 @@ const ICONS: Record<IconProps['name'], React.ReactNode> = {
       <path d="M5,10 h2 v1 h-2 z" />
       <path d="M1,5 h1 v2 h-1 z" />
       <path d="M10,5 h1 v2 h-1 z" />
+    </>
+  ),
+  // Inline block: a box sitting between neighbours on the same line (legacy display-inline-block).
+  'inline-block': (
+    <>
+      <path d="M0,0 L1.5,0 L1.5,12 L0,12 Z M10.5,0 L12,0 L12,12 L10.5,12 Z" />
+      <path d="M4,3 L8,3 C8.55228475,3 9,3.44771525 9,4 L9,8 C9,8.55228475 8.55228475,9 8,9 L4,9 C3.44771525,9 3,8.55228475 3,8 L3,4 C3,3.44771525 3.44771525,3 4,3 Z" />
     </>
   ),
   // Double-headed arrows (0 0 24 24 source, same stroke weight as 'arrow-left') — flex direction.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
@@ -13,6 +13,7 @@ import { useDesignSync } from '@/hooks/use-design-sync';
 import { useControlledInputs } from '@/hooks/use-controlled-input';
 import { useModeToggle } from '@/hooks/use-mode-toggle';
 import { useEditorStore } from '@/stores/useEditorStore';
+import { isLeafLayer } from '@/lib/layer-utils';
 import { extractMeasurementValue } from '@/lib/measurement-utils';
 import { removeSpaces } from '@/lib/utils';
 import type { Layer } from '@/types';
@@ -23,7 +24,7 @@ interface LayoutControlsProps {
 }
 
 /** Display mode of the layer itself (maps to CSS `display`) */
-type LayoutType = 'block' | 'flex' | 'grid' | 'hidden';
+type LayoutType = 'block' | 'inline-block' | 'flex' | 'grid' | 'hidden';
 /** Flex main axis (maps to CSS `flex-direction`) */
 type FlexDirection = 'horizontal' | 'vertical';
 
@@ -33,12 +34,29 @@ interface IconOption<T extends string> {
   label: string;
 }
 
-const LAYOUT_TYPE_OPTIONS: IconOption<LayoutType>[] = [
-  { value: 'block', icon: 'block', label: 'Block' },
-  { value: 'flex', icon: 'columns', label: 'Flex' },
-  { value: 'grid', icon: 'grid', label: 'Grid' },
-  { value: 'hidden', icon: 'square-dashed', label: 'None' },
-];
+const LAYOUT_TYPE_OPTION: Record<LayoutType, IconOption<LayoutType>> = {
+  'block': { value: 'block', icon: 'block', label: 'Block' },
+  'inline-block': { value: 'inline-block', icon: 'inline-block', label: 'Inline block' },
+  'flex': { value: 'flex', icon: 'columns', label: 'Flex' },
+  'grid': { value: 'grid', icon: 'grid', label: 'Grid' },
+  'hidden': { value: 'hidden', icon: 'square-dashed', label: 'None' },
+};
+
+/** Elements that can hold children: full set */
+const CONTAINER_LAYOUT_TYPES: LayoutType[] = ['block', 'flex', 'grid', 'hidden'];
+/** Leaf elements (text, icon, video, inputs…): no flex/grid, but can flow inline */
+const LEAF_LAYOUT_TYPES: LayoutType[] = ['block', 'inline-block', 'hidden'];
+/** Replaced media (image, map): inline-block only adds baseline gaps, so block or none */
+const MEDIA_LAYOUT_TYPES: LayoutType[] = ['block', 'hidden'];
+
+function getLayoutTypeOptions(layer: Layer | null): IconOption<LayoutType>[] {
+  let types = CONTAINER_LAYOUT_TYPES;
+  if (layer && isLeafLayer(layer)) {
+    const isMedia = layer.name === 'image' || layer.name === 'map' || layer.settings?.tag === 'img';
+    types = isMedia ? MEDIA_LAYOUT_TYPES : LEAF_LAYOUT_TYPES;
+  }
+  return types.map((type) => LAYOUT_TYPE_OPTION[type]);
+}
 
 const FLEX_DIRECTION_OPTIONS: IconOption<FlexDirection>[] = [
   { value: 'horizontal', icon: 'arrow-horizontal', label: 'Horizontal' },
@@ -157,13 +175,16 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
     getCurrentValue: (prop: string) => getDesignProperty('layout', prop) || '',
   });
 
+  const layoutTypeOptions = useMemo(() => getLayoutTypeOptions(layer), [layer]);
+
   // Determine layout type from current values. Anything that is not flex,
-  // grid or hidden (including the unset default) behaves as block.
+  // grid, inline-block or hidden (including the unset default) behaves as block.
   const layoutType: LayoutType =
       display === 'hidden' ? 'hidden' :
         display === 'grid' || display === 'inline-grid' ? 'grid' :
           display === 'flex' || display === 'inline-flex' ? 'flex' :
-            'block';
+            display === 'inline-block' ? 'inline-block' :
+              'block';
 
   const isFlex = layoutType === 'flex';
   const isGrid = layoutType === 'grid';
@@ -185,7 +206,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
       return;
     }
 
-    // block / grid / hidden: direction only applies to flex
+    // block / inline-block / grid / hidden: direction only applies to flex
     updateDesignProperties([
       { category: 'layout', property: 'display', value: type },
       { category: 'layout', property: 'flexDirection', value: null },
@@ -274,7 +295,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
               <div className="col-span-2">
                   <IconTabs
                     value={layoutType}
-                    options={LAYOUT_TYPE_OPTIONS}
+                    options={layoutTypeOptions}
                     onChange={handleLayoutTypeChange}
                   />
               </div>

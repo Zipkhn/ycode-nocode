@@ -586,9 +586,9 @@ const RightSidebar = React.memo(function RightSidebar({
       case 'layout':
         // In text style mode, hide layout controls
         if (showTextStyleControls) return false;
-        // Layout controls: show for containers, hide for text-only and image elements
-        if (isImageLayer(layer)) return false;
-        return !isTextLayer(layer) || isButtonLayer(layer);
+        // Layout controls: every element gets a Type row; LayoutControls
+        // narrows the options for leaf elements (no flex/grid, inline block)
+        return true;
 
       case 'spacing':
         // Spacing controls (padding/margin): show for all elements
