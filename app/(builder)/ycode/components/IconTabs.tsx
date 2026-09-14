@@ -13,7 +13,8 @@ export interface IconOption<T extends string> {
 }
 
 interface IconTabsProps<T extends string> {
-  value: T;
+  /** Current option; an empty string selects nothing (value has no preset) */
+  value: T | '';
   options: IconOption<T>[];
   onChange: (value: T) => void;
 }

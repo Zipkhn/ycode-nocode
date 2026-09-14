@@ -15,21 +15,22 @@ interface FlexChildControlsProps {
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
 }
 
-/** Sizing presets (Webflow-style); "custom" exposes grow/shrink individually */
-type Sizing = 'shrink' | 'grow' | 'fixed' | 'custom';
+/** Sizing presets, one per Tailwind `flex-*` utility (legacy: Initial / Expand / Auto / None) */
+type Sizing = 'shrink' | 'grow' | 'auto' | 'fixed';
 type OrderMode = 'default' | 'first' | 'last' | 'custom';
 
 const SIZING_OPTIONS: IconOption<Sizing>[] = [
   { value: 'shrink', icon: 'minSize', label: 'Shrink if needed' },
-  { value: 'grow', icon: 'maxSize', label: 'Grow if possible' },
+  { value: 'grow', icon: 'maxSize', label: 'Grow equally' },
+  { value: 'auto', label: 'Auto' },
   { value: 'fixed', icon: 'flex-fixed', label: "Don't shrink or grow" },
-  { value: 'custom', icon: 'more', label: 'Custom' },
 ];
 
-/** Preset → `flex` shorthand value (initial = 0 1 auto, 1 = 1 1 0%, none = 0 0 auto) */
-const SIZING_FLEX_VALUE: Record<Exclude<Sizing, 'custom'>, string> = {
+/** Preset → `flex` shorthand (initial = 0 1 auto, 1 = 1 1 0%, auto = 1 1 auto, none = 0 0 auto) */
+const SIZING_FLEX_VALUE: Record<Sizing, string> = {
   shrink: 'initial',
   grow: '1',
+  auto: 'auto',
   fixed: 'none',
 };
 
@@ -40,22 +41,16 @@ const ORDER_OPTIONS: IconOption<OrderMode>[] = [
   { value: 'custom', icon: 'more', label: 'Custom' },
 ];
 
-const YES_NO_OPTIONS: IconOption<'1' | '0'>[] = [
-  { value: '1', label: 'Yes' },
-  { value: '0', label: 'No' },
-];
-
-function resolveSizing(flex: string, hasIndividual: boolean, forceCustom: boolean): Sizing {
+/**
+ * Map the layer's flex classes to a preset. Individual grow/shrink classes
+ * (from imports or the AI) have no preset, so no tab is selected for them.
+ */
+function resolveSizing(flex: string, hasIndividual: boolean): Sizing | '' {
   if (flex === '1') return 'grow';
+  if (flex === 'auto') return 'auto';
   if (flex === 'none') return 'fixed';
-  if (flex === 'auto' || hasIndividual || forceCustom) return 'custom';
+  if (hasIndividual) return '';
   return 'shrink';
-}
-
-/** Effective grow for the custom row: flex-auto is 1 1 auto, browser default is 0 1 auto */
-function resolveGrow(flexGrow: string, flex: string): '1' | '0' {
-  if (flexGrow) return flexGrow === '1' ? '1' : '0';
-  return flex === 'auto' ? '1' : '0';
 }
 
 function resolveOrderMode(order: string, forceCustom: boolean): OrderMode {
@@ -66,7 +61,7 @@ function resolveOrderMode(order: string, forceCustom: boolean): OrderMode {
 
 /**
  * "Flex child" section: how this layer behaves inside its flex parent
- * (sizing presets, grow/shrink, order). Renders nothing when the parent
+ * (sizing preset, order). Renders nothing when the parent
  * is not a flex container.
  */
 const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer = null, onLayerUpdate }: FlexChildControlsProps) {
@@ -85,13 +80,11 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
   const flexShrinkRaw = getDesignProperty('layout', 'flexShrink') || '';
   const order = getDesignProperty('layout', 'order') || '';
 
-  // "Custom" can be chosen before any individual value is set
-  const [isCustomSizing, setIsCustomSizing] = useState(false);
+  // Custom order can be chosen before a number is typed
   const [isCustomOrder, setIsCustomOrder] = useState(false);
   const [orderInput, setOrderInput] = useState(/^\d+$/.test(order) ? order : '');
 
   useEffect(() => {
-    setIsCustomSizing(false);
     setIsCustomOrder(false);
   }, [layer?.id]);
 
@@ -101,39 +94,15 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
 
   if (!layer || !isFlex) return null;
 
-  const sizing = resolveSizing(flex, Boolean(flexGrowRaw || flexShrinkRaw), isCustomSizing);
+  const sizing = resolveSizing(flex, Boolean(flexGrowRaw || flexShrinkRaw));
   const orderMode = resolveOrderMode(order, isCustomOrder);
 
-  const flexGrow = resolveGrow(flexGrowRaw, flex);
-  const flexShrink: '1' | '0' = flexShrinkRaw === '0' ? '0' : '1';
-
+  // A preset replaces any individual grow/shrink classes so the two never conflict
   const handleSizingChange = (next: Sizing) => {
-    if (next === 'custom') {
-      setIsCustomSizing(true);
-      updateDesignProperties([{ category: 'layout', property: 'flex', value: null }]);
-      return;
-    }
-
-    setIsCustomSizing(false);
     updateDesignProperties([
       { category: 'layout', property: 'flex', value: SIZING_FLEX_VALUE[next] },
       { category: 'layout', property: 'flexGrow', value: null },
       { category: 'layout', property: 'flexShrink', value: null },
-    ]);
-  };
-
-  // Individual grow/shrink replace the shorthand so the two never conflict
-  const handleGrowChange = (value: '1' | '0') => {
-    updateDesignProperties([
-      { category: 'layout', property: 'flex', value: null },
-      { category: 'layout', property: 'flexGrow', value },
-    ]);
-  };
-
-  const handleShrinkChange = (value: '1' | '0') => {
-    updateDesignProperties([
-      { category: 'layout', property: 'flex', value: null },
-      { category: 'layout', property: 'flexShrink', value },
     ]);
   };
 
@@ -174,31 +143,6 @@ const FlexChildControls = memo(function FlexChildControls({ layer, parentLayer =
                   />
               </div>
           </div>
-
-          {sizing === 'custom' && (
-              <>
-                  <div className="grid grid-cols-3">
-                      <Label variant="muted">Grow</Label>
-                      <div className="col-span-2">
-                          <IconTabs
-                            value={flexGrow}
-                            options={YES_NO_OPTIONS}
-                            onChange={handleGrowChange}
-                          />
-                      </div>
-                  </div>
-                  <div className="grid grid-cols-3">
-                      <Label variant="muted">Shrink</Label>
-                      <div className="col-span-2">
-                          <IconTabs
-                            value={flexShrink}
-                            options={YES_NO_OPTIONS}
-                            onChange={handleShrinkChange}
-                          />
-                      </div>
-                  </div>
-              </>
-          )}
 
           <div className="grid grid-cols-3">
               <Label variant="muted">Order</Label>
