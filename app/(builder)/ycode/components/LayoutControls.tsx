@@ -24,7 +24,7 @@ interface LayoutControlsProps {
 }
 
 /** Display mode of the layer itself (maps to CSS `display`) */
-type LayoutType = 'block' | 'inline-block' | 'flex' | 'grid' | 'hidden';
+type LayoutType = 'block' | 'inline-block' | 'inline' | 'flex' | 'grid' | 'hidden';
 /** Flex main axis (maps to CSS `flex-direction`) */
 type FlexDirection = 'horizontal' | 'vertical';
 
@@ -37,6 +37,7 @@ interface IconOption<T extends string> {
 const LAYOUT_TYPE_OPTION: Record<LayoutType, IconOption<LayoutType>> = {
   'block': { value: 'block', icon: 'block', label: 'Block' },
   'inline-block': { value: 'inline-block', icon: 'inline-block', label: 'Inline block' },
+  'inline': { value: 'inline', icon: 'inline', label: 'Inline' },
   'flex': { value: 'flex', icon: 'columns', label: 'Flex' },
   'grid': { value: 'grid', icon: 'grid', label: 'Grid' },
   'hidden': { value: 'hidden', icon: 'square-dashed', label: 'None' },
@@ -44,18 +45,24 @@ const LAYOUT_TYPE_OPTION: Record<LayoutType, IconOption<LayoutType>> = {
 
 /** Elements that can hold children: full set */
 const CONTAINER_LAYOUT_TYPES: LayoutType[] = ['block', 'flex', 'grid', 'hidden'];
-/** Leaf elements (text, icon, video, inputs…): no flex/grid, but can flow inline */
+/** Text elements: can flow inline with surrounding text */
+const TEXT_LAYOUT_TYPES: LayoutType[] = ['block', 'inline-block', 'inline', 'hidden'];
+/** Other leaf elements (icon, video, inputs…): no flex/grid, but can sit inline as a box */
 const LEAF_LAYOUT_TYPES: LayoutType[] = ['block', 'inline-block', 'hidden'];
 /** Replaced media (image, map): inline-block only adds baseline gaps, so block or none */
 const MEDIA_LAYOUT_TYPES: LayoutType[] = ['block', 'hidden'];
 
+const TEXT_LAYER_NAMES = new Set(['heading', 'text', 'span', 'label']);
+
+function getLayoutTypes(layer: Layer | null): LayoutType[] {
+  if (!layer || !isLeafLayer(layer)) return CONTAINER_LAYOUT_TYPES;
+  if (layer.name === 'image' || layer.name === 'map' || layer.settings?.tag === 'img') return MEDIA_LAYOUT_TYPES;
+  if (TEXT_LAYER_NAMES.has(layer.name ?? '')) return TEXT_LAYOUT_TYPES;
+  return LEAF_LAYOUT_TYPES;
+}
+
 function getLayoutTypeOptions(layer: Layer | null): IconOption<LayoutType>[] {
-  let types = CONTAINER_LAYOUT_TYPES;
-  if (layer && isLeafLayer(layer)) {
-    const isMedia = layer.name === 'image' || layer.name === 'map' || layer.settings?.tag === 'img';
-    types = isMedia ? MEDIA_LAYOUT_TYPES : LEAF_LAYOUT_TYPES;
-  }
-  return types.map((type) => LAYOUT_TYPE_OPTION[type]);
+  return getLayoutTypes(layer).map((type) => LAYOUT_TYPE_OPTION[type]);
 }
 
 const FLEX_DIRECTION_OPTIONS: IconOption<FlexDirection>[] = [
@@ -178,12 +185,12 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
   const layoutTypeOptions = useMemo(() => getLayoutTypeOptions(layer), [layer]);
 
   // Determine layout type from current values. Anything that is not flex,
-  // grid, inline-block or hidden (including the unset default) behaves as block.
+  // grid, inline(-block) or hidden (including the unset default) behaves as block.
   const layoutType: LayoutType =
       display === 'hidden' ? 'hidden' :
         display === 'grid' || display === 'inline-grid' ? 'grid' :
           display === 'flex' || display === 'inline-flex' ? 'flex' :
-            display === 'inline-block' ? 'inline-block' :
+            display === 'inline-block' || display === 'inline' ? display :
               'block';
 
   const isFlex = layoutType === 'flex';
@@ -206,7 +213,7 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
       return;
     }
 
-    // block / inline-block / grid / hidden: direction only applies to flex
+    // block / inline(-block) / grid / hidden: direction only applies to flex
     updateDesignProperties([
       { category: 'layout', property: 'display', value: type },
       { category: 'layout', property: 'flexDirection', value: null },

@@ -19,7 +19,7 @@ export interface IconProps extends React.SVGProps<SVGSVGElement> {
     | 'slide-bullets' | 'slide-bullet' | 'slide-navigation' | 'slide-fraction' | 'loop-alternate' | 'loop-repeat' | 'listItem' | 'external-link'
     | 'settings' | 'center-block' | 'code-block' | 'table' | 'table-row' | 'table-cell' | 'add-column' | 'add-row' | 'delete-column' | 'delete-row' | 'delete-table' | 'header' | 'body'
     | 'webflow' | 'figma' | 'space' | 'sparkles'
-    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'reverse-arrows' | 'arrow-horizontal' | 'arrow-vertical' | 'inline-block'
+    | 'arrow-left-up' | 'arrow-up' | 'arrow-right-up' | 'arrow-left' | 'arrow-right' | 'arrow-left-down' | 'arrow-down' | 'arrow-right-down' | 'circle' | 'square-dashed' | 'reverse-arrows' | 'arrow-horizontal' | 'arrow-vertical' | 'inline-block' | 'inline'
     | 'claude' | 'openai' | 'gemini' | 'grok'
   );
 }
@@ -1127,6 +1127,13 @@ const ICONS: Record<IconProps['name'], React.ReactNode> = {
     <>
       <path d="M0,0 L1.5,0 L1.5,12 L0,12 Z M10.5,0 L12,0 L12,12 L10.5,12 Z" />
       <path d="M4,3 L8,3 C8.55228475,3 9,3.44771525 9,4 L9,8 C9,8.55228475 8.55228475,9 8,9 L4,9 C3.44771525,9 3,8.55228475 3,8 L3,4 C3,3.44771525 3.44771525,3 4,3 Z" />
+    </>
+  ),
+  // Inline: flows with its neighbours, taking the full line height (legacy display-inline).
+  inline: (
+    <>
+      <path d="M0,0 L1.5,0 L1.5,12 L0,12 Z M10.5,0 L12,0 L12,12 L10.5,12 Z" />
+      <path d="M4,0 L8,0 C8.55228475,0 9,0.44771525 9,1 L9,11 C9,11.5522847 8.55228475,12 8,12 L4,12 C3.44771525,12 3,11.5522847 3,11 L3,1 C3,0.44771525 3.44771525,0 4,0 Z" />
     </>
   ),
   // Double-headed arrows (0 0 24 24 source, same stroke weight as 'arrow-left') — flex direction.
