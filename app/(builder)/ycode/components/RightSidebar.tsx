@@ -63,8 +63,8 @@ import ExpandableRichTextEditor from './ExpandableRichTextEditor';
 import RichTextEditor from './RichTextEditor';
 import ComponentVariableLabel, { VARIABLE_TYPE_ICONS } from './ComponentVariableLabel';
 import InteractionsPanel from './InteractionsPanel';
+import FlexChildControls from './FlexChildControls';
 import LayoutControls from './LayoutControls';
-import SelfLayoutControls from './SelfLayoutControls';
 import LayerStylesPanel from './LayerStylesPanel';
 import PositionControls from './PositionControls';
 import TransformControls from './TransformControls';
@@ -2052,15 +2052,15 @@ const RightSidebar = React.memo(function RightSidebar({
           {shouldShowControl('layout', selectedLayer) && !showTextStyleControls && (
             <LayoutControls
               layer={controlLayer}
-              parentLayer={selectedLayerParent}
               onLayerUpdate={controlUpdate}
             />
           )}
 
-          {/* Layers without a Layout panel (text, images) still get Align self inside a flex/grid parent */}
-          {!shouldShowControl('layout', selectedLayer) && !showTextStyleControls && (
-            <SelfLayoutControls
-              layer={controlLayer} parentLayer={selectedLayerParent}
+          {/* How this layer behaves inside a flex parent (renders nothing otherwise) */}
+          {!showTextStyleControls && (
+            <FlexChildControls
+              layer={controlLayer}
+              parentLayer={selectedLayerParent}
               onLayerUpdate={controlUpdate}
             />
           )}

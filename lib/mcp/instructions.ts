@@ -115,6 +115,9 @@ Each layer's \`design\` object controls its appearance. Use update_layer_design 
 - justifyContent: "start" | "end" | "center" | "between" | "around" | "evenly"
 - alignItems: "start" | "end" | "center" | "baseline" | "stretch"
 - alignSelf: "auto" | "start" | "end" | "center" | "stretch" | "baseline" — overrides the parent's alignItems for one child. Flex children stretch full-width by default, so badges, pills, and buttons inside a flex column need alignSelf "start"/"center" (or alignItems on the parent) to hug their content
+- flex: "1" | "auto" | "initial" | "none" — flex child shorthand; "1" fills the remaining space of the flex parent
+- flexGrow / flexShrink: "1" | "0" — allow or prevent a flex child from growing / shrinking
+- order: "first" | "last" | "none" | "1".."12" — visual order of a flex child
 - gap: CSS value ("16px", "1rem")
 - gridTemplateColumns: "4" (bare integer count, normalized to repeat(N, 1fr)), "1fr 1fr 1fr", "repeat(3, 1fr)"
 

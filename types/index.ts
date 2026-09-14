@@ -18,6 +18,11 @@ export interface LayoutDesign {
   justifyContent?: string;
   alignItems?: string;
   alignSelf?: string;
+  // Flex child (how this layer behaves inside a flex parent)
+  flex?: string; // '1' | 'auto' | 'initial' | 'none'
+  flexGrow?: string; // '1' | '0'
+  flexShrink?: string; // '1' | '0'
+  order?: string; // 'first' | 'last' | 'none' | '1'..'12'
   gap?: string;
   columnGap?: string;
   rowGap?: string;

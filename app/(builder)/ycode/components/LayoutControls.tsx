@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlignSelfRow } from './SelfLayoutControls';
 import { useDesignSync } from '@/hooks/use-design-sync';
 import { useControlledInputs } from '@/hooks/use-controlled-input';
 import { useModeToggle } from '@/hooks/use-mode-toggle';
@@ -20,7 +19,6 @@ import type { Layer } from '@/types';
 
 interface LayoutControlsProps {
   layer: Layer | null;
-  parentLayer?: Layer | null;
   onLayerUpdate: (layerId: string, updates: Partial<Layer>) => void;
 }
 
@@ -84,7 +82,7 @@ function IconTabs<T extends string>({ value, options, onChange }: {
   );
 }
 
-const LayoutControls = memo(function LayoutControls({ layer, parentLayer = null, onLayerUpdate }: LayoutControlsProps) {
+const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: LayoutControlsProps) {
   const activeBreakpoint = useEditorStore((s) => s.activeBreakpoint);
   const activeUIState = useEditorStore((s) => s.activeUIState);
   const { updateDesignProperty, updateDesignProperties, debouncedUpdateDesignProperty, getDesignProperty } = useDesignSync({
@@ -504,14 +502,6 @@ const LayoutControls = memo(function LayoutControls({ layer, parentLayer = null,
                   </div>
               </div>
           )}
-
-          {/* How this layer sits inside its flex/grid parent (renders nothing otherwise) */}
-          <AlignSelfRow
-            layer={layer}
-            parentLayer={parentLayer}
-            onLayerUpdate={onLayerUpdate}
-          />
-
       </div>
     </div>
   );
