@@ -425,27 +425,25 @@ const LayoutControls = memo(function LayoutControls({ layer, onLayerUpdate }: La
                   <div className="col-span-2 flex items-center gap-2">
                       {gapModeToggle.mode === 'individual' ? (
                         <div className="flex-1 grid grid-cols-2 gap-2">
-                            {/* Compact X / Y prefixes so two-digit values fit in the narrow inputs */}
+                            {/* Compact X / Y prefixes, no stepper, minimal padding so three digits fit */}
                             <InputGroup>
-                                <InputGroupAddon className="pl-2 text-[10px] opacity-50">X</InputGroupAddon>
+                                <InputGroupAddon className="pl-1.5 text-[10px] opacity-50">X</InputGroupAddon>
                                 <InputGroupInput
-                                  stepper
                                   min="0"
                                   step="1"
                                   aria-label="Column gap"
-                                  className="pl-1.5"
+                                  className="px-1!"
                                   value={columnGapInput}
                                   onChange={(e) => handleColumnGapChange(e.target.value)}
                                 />
                             </InputGroup>
                             <InputGroup>
-                                <InputGroupAddon className="pl-2 text-[10px] opacity-50">Y</InputGroupAddon>
+                                <InputGroupAddon className="pl-1.5 text-[10px] opacity-50">Y</InputGroupAddon>
                                 <InputGroupInput
-                                  stepper
                                   min="0"
                                   step="1"
                                   aria-label="Row gap"
-                                  className="pl-1.5"
+                                  className="px-1!"
                                   value={rowGapInput}
                                   onChange={(e) => handleRowGapChange(e.target.value)}
                                 />
