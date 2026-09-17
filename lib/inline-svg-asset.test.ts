@@ -5,8 +5,10 @@ import {
   INLINE_SVG_MAX_BYTES,
   generateImageSrcset,
   getInlineSvgAssetUrl,
+  getInlineSvgAssetVersion,
   getOptimizedImageUrl,
   resolveInlineSvgAssetSrc,
+  withSvgIntrinsicSize,
 } from './asset-utils';
 
 const ASSET_ID = '6dd2b750-3757-4c8c-ad6c-c6adca2d0af6';
@@ -21,14 +23,10 @@ test('small inline SVGs stay embedded as data URIs', () => {
 
 test('large inline SVGs resolve to a versioned /a/ proxy URL', () => {
   assert.ok(largeSvg.length > INLINE_SVG_MAX_BYTES);
-  const src = resolveInlineSvgAssetSrc({
-    id: ASSET_ID,
-    filename: 'ai_licia background.svg',
-    content: largeSvg,
-    content_hash: 'abcdef1234567890',
-  });
-  assert.equal(src, getInlineSvgAssetUrl({ id: ASSET_ID, filename: 'ai_licia background.svg', content_hash: 'abcdef1234567890' }));
-  assert.match(src ?? '', /^\/a\/[A-Za-z0-9]{22}\/ai-licia-background\.svg\?v=abcdef12$/);
+  const asset = { id: ASSET_ID, filename: 'ai_licia background.svg', content: largeSvg, width: 649, height: 450 };
+  const src = resolveInlineSvgAssetSrc(asset);
+  assert.equal(src, getInlineSvgAssetUrl(asset));
+  assert.match(src ?? '', /^\/a\/[A-Za-z0-9]{22}\/ai-licia-background\.svg\?v=[0-9a-f]{8}$/);
 });
 
 test('large inline SVGs fall back to a data URI when the asset cannot be addressed', () => {
@@ -37,8 +35,27 @@ test('large inline SVGs fall back to a data URI when the asset cannot be address
   assert.equal(resolveInlineSvgAssetSrc({ id: ASSET_ID, filename: 'x.svg', content: null }), null);
 });
 
-test('proxy URL omits the version when no content hash is known', () => {
+test('proxy URL is versioned from the markup even without a stored content hash', () => {
+  const url = getInlineSvgAssetUrl({ id: ASSET_ID, filename: 'logo.svg', content: largeSvg });
+  assert.match(url, /^\/a\/[A-Za-z0-9]{22}\/logo\.svg\?v=[0-9a-f]{8}$/);
   assert.match(getInlineSvgAssetUrl({ id: ASSET_ID, filename: 'logo.svg' }), /^\/a\/[A-Za-z0-9]{22}\/logo\.svg$/);
+});
+
+test('proxy version changes when the served bytes change (content or dimensions)', () => {
+  const base = getInlineSvgAssetVersion({ content: largeSvg, width: 649, height: 450 });
+  assert.equal(base, getInlineSvgAssetVersion({ content: largeSvg, width: 649, height: 450 }));
+  assert.notEqual(base, getInlineSvgAssetVersion({ content: largeSvg, width: 100, height: 100 }));
+  assert.notEqual(base, getInlineSvgAssetVersion({ content: `${largeSvg} `, width: 649, height: 450 }));
+  assert.equal(getInlineSvgAssetVersion({ content: null }), null);
+});
+
+test('withSvgIntrinsicSize injects missing width/height so viewBox-only SVGs keep an intrinsic size', () => {
+  const sized = withSvgIntrinsicSize(smallSvg, 148, 28);
+  assert.match(sized, /^<svg width="148" height="28" xmlns=/);
+  // Existing dimensions are left alone, and unknown dimensions change nothing.
+  const explicit = '<svg width="10" height="10" viewBox="0 0 10 10"></svg>';
+  assert.equal(withSvgIntrinsicSize(explicit, 148, 28), explicit);
+  assert.equal(withSvgIntrinsicSize(smallSvg, null, 28), smallSvg);
 });
 
 test('svg proxy URLs are never given resize params or a srcset ladder', () => {

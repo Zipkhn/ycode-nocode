@@ -4,27 +4,40 @@
  */
 
 /**
- * Build a data URL for inline SVG content. When `width`/`height` are provided
- * and the SVG root lacks them, they're injected so `<img>` consumers get
- * intrinsic dimensions — otherwise browsers fall back to 300×150 for SVGs
- * that only carry a viewBox, breaking CSS `w-auto`/`h-auto` sizing.
+ * Ensure inline SVG markup carries intrinsic dimensions. When `width`/`height`
+ * are known and the SVG root lacks them, they're injected so `<img>` consumers
+ * get an intrinsic size — otherwise browsers treat a viewBox-only SVG as having
+ * no dimensions (300×150 fallback, or 0×0 inside flex/`w-auto h-auto`
+ * layouts), which makes the image invisible.
+ *
+ * Every path that hands inline SVG content to an `<img>` must go through this:
+ * data URIs, the `/a/` proxy response and static-export files.
+ */
+export function withSvgIntrinsicSize(
+  content: string,
+  width?: number | null,
+  height?: number | null
+): string {
+  if (!width || !height) return content;
+  return content.replace(/<svg\b([^>]*)>/i, (match, attrs: string) => {
+    const hasWidth = /\swidth\s*=/i.test(attrs);
+    const hasHeight = /\sheight\s*=/i.test(attrs);
+    if (hasWidth && hasHeight) return match;
+    const injected = `${!hasWidth ? ` width="${width}"` : ''}${!hasHeight ? ` height="${height}"` : ''}`;
+    return `<svg${injected}${attrs}>`;
+  });
+}
+
+/**
+ * Build a data URL for inline SVG content, with intrinsic dimensions injected
+ * (see {@link withSvgIntrinsicSize}).
  */
 export function buildSvgDataUrl(
   content: string,
   width?: number | null,
   height?: number | null
 ): string {
-  let svg = content;
-  if (width && height) {
-    svg = svg.replace(/<svg\b([^>]*)>/i, (match, attrs: string) => {
-      const hasWidth = /\swidth\s*=/i.test(attrs);
-      const hasHeight = /\sheight\s*=/i.test(attrs);
-      if (hasWidth && hasHeight) return match;
-      const injected = `${!hasWidth ? ` width="${width}"` : ''}${!hasHeight ? ` height="${height}"` : ''}`;
-      return `<svg${injected}${attrs}>`;
-    });
-  }
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  return `data:image/svg+xml,${encodeURIComponent(withSvgIntrinsicSize(content, width, height))}`;
 }
 
 /**
@@ -404,18 +417,50 @@ export interface InlineSvgAssetLike {
 }
 
 /**
+ * 32-bit FNV-1a hash of a string, as 8 lowercase hex chars. Dependency-free so
+ * it runs identically in the browser (canvas) and on the server (SSR, proxy).
+ */
+function fnv1a32Hex(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+/**
+ * Cache-busting version for an inline-SVG asset's `/a/` URL.
+ *
+ * `/a/*` responses are cached immutably, so the version must change whenever
+ * the served bytes change. The proxy serves `content` with the asset's
+ * `width`/`height` injected (see {@link withSvgIntrinsicSize}), so both feed
+ * the hash. Derived from the markup itself rather than `content_hash` because
+ * many existing assets have no stored hash, and an unversioned URL can never
+ * be busted once a browser has cached it. Returns null without content.
+ */
+export function getInlineSvgAssetVersion(
+  asset: Pick<InlineSvgAssetLike, 'content' | 'width' | 'height'>,
+): string | null {
+  if (!asset.content) return null;
+  return fnv1a32Hex(`${asset.content}|${asset.width ?? ''}|${asset.height ?? ''}`);
+}
+
+/**
  * Build the `/a/` proxy URL for an inline-SVG asset (one with `content` but no
  * storage_path). The proxy serves `content` with an `image/svg+xml` header.
  *
- * `/a/*` responses are cached immutably, but SVG content can be edited in
- * place, so a short content-hash version is appended to bust the cache and
- * let the proxy pick the row (draft vs published) that matches.
+ * A `?v=` version (see {@link getInlineSvgAssetVersion}) is appended so edits
+ * bust the immutable cache and let the proxy pick the row (draft vs published)
+ * whose bytes match.
  */
-export function getInlineSvgAssetUrl(asset: { id: string; filename: string; content_hash?: string | null }): string {
+export function getInlineSvgAssetUrl(
+  asset: { id: string; filename: string } & Pick<InlineSvgAssetLike, 'content' | 'width' | 'height'>,
+): string {
   const hash = uuidToBase62(asset.id);
   const slug = sanitizeSlug(asset.filename.replace(/\.[^/.]+$/, '')) || 'file';
-  const version = asset.content_hash ? `?v=${asset.content_hash.slice(0, 8)}` : '';
-  return `/a/${hash}/${slug}.svg${version}`;
+  const version = getInlineSvgAssetVersion(asset);
+  return `/a/${hash}/${slug}.svg${version ? `?v=${version}` : ''}`;
 }
 
 /**
@@ -429,7 +474,13 @@ export function resolveInlineSvgAssetSrc(asset: InlineSvgAssetLike): string | nu
   if (asset.content.length <= INLINE_SVG_MAX_BYTES || !asset.id || !asset.filename) {
     return buildSvgDataUrl(asset.content, asset.width, asset.height);
   }
-  return getInlineSvgAssetUrl({ id: asset.id, filename: asset.filename, content_hash: asset.content_hash });
+  return getInlineSvgAssetUrl({
+    id: asset.id,
+    filename: asset.filename,
+    content: asset.content,
+    width: asset.width,
+    height: asset.height,
+  });
 }
 
 /**
