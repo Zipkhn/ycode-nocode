@@ -12,7 +12,7 @@ import { getTranslatableKey, slimTranslations } from '@/lib/locale-runtime';
 import type { Page, PageFolder, PageLayers, Component, ComponentVariable, CollectionItemWithValues, CollectionField, Layer, CollectionPaginationMeta, Translation, Locale } from '@/types';
 import { getCollectionVariable, resolveFieldValue, evaluateVisibility, evaluateCollectionFilters, evaluateCondition, getLayerHtmlTag, filterDisabledSliderLayers, type VisibilityContext } from '@/lib/layer-utils';
 import { isFieldVariable, isAssetVariable, createDynamicTextVariable, createDynamicRichTextVariable, createAssetVariable, getDynamicTextContent, getVariableStringValue, getAssetId, resolveDesignStyles } from '@/lib/variable-utils';
-import { buildImageSizes, generateImageSrcset, getOptimizedImageUrl, getAssetProxyUrl, DEFAULT_ASSETS, collectLayerAssetIds, buildSvgDataUrl, parseImageDimension, getSvgAspectRatioStyle } from '@/lib/asset-utils';
+import { buildImageSizes, generateImageSrcset, getOptimizedImageUrl, getAssetProxyUrl, DEFAULT_ASSETS, collectLayerAssetIds, resolveInlineSvgAssetSrc, parseImageDimension, getSvgAspectRatioStyle } from '@/lib/asset-utils';
 import { resolveComponents, applyComponentOverrides } from '@/lib/resolve-components';
 import { getComponentVariantLayers } from '@/lib/component-variant-utils';
 import { isTiptapDoc, hasBlockElementsWithResolver } from '@/lib/tiptap-utils';
@@ -30,8 +30,8 @@ export interface PaginationContext {
 
 import { resolveRefCollectionItemId, generateLinkHref, isLinkAtCollectionBoundary, isLinkToCurrentPage, parseCollectionLinkValue, extractCrossCollectionItemIds } from '@/lib/link-utils';
 import type { LinkResolutionContext } from '@/lib/link-utils';
-import { getLinkSettingsFromMark } from '@/lib/tiptap-extensions/rich-text-link';
-import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/slider-constants';
+import { getLinkSettingsFromMark } from '@/lib/tiptap-extensions/link-settings';
+import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP, SLIDER_BUTTON_ARIA_LABELS, isSliderChromeButton } from '@/lib/slider-constants';
 import { resolveInlineVariables, resolveInlineVariablesFromData } from '@/lib/inline-variables';
 import { buildPaginationNumbers, getPaginationLayerKind, hasPaginationVariables, paginationTextVariableToTemplate, resolvePaginationTextVariable } from '@/lib/pagination-text-utils';
 import { formatFieldValue, resolveFieldFromSources } from '@/lib/cms-variables-utils';
@@ -4275,6 +4275,21 @@ async function injectCollectionDataForHtml(
 }
 
 /**
+ * Asset fields needed to resolve a layer's asset variables to URLs. `id`,
+ * `filename` and `content_hash` let inline-SVG assets route through the
+ * `/a/` proxy instead of being embedded as data URIs.
+ */
+export type AssetMapEntry = {
+  id?: string;
+  filename?: string;
+  public_url: string | null;
+  content?: string | null;
+  content_hash?: string | null;
+  width?: number | null;
+  height?: number | null;
+};
+
+/**
  * Resolve all AssetVariables in layer tree to DynamicTextVariables with public URLs
  * This ensures assets are resolved server-side before rendering
  * Should be called after all other layer processing (collections, components, etc.)
@@ -4285,7 +4300,7 @@ export async function resolveAllAssets(
   layers: Layer[],
   isPublished: boolean = true,
   components?: Component[],
-): Promise<{ layers: Layer[]; assetMap: Record<string, { public_url: string | null; content?: string | null; width?: number | null; height?: number | null }> }> {
+): Promise<{ layers: Layer[]; assetMap: Record<string, AssetMapEntry> }> {
   const { getAssetsByIds } = await import('@/lib/repositories/assetRepository');
 
   // Step 1: Collect all asset IDs from the layer tree
@@ -4313,7 +4328,7 @@ export async function resolveAllAssets(
  */
 function resolveLayerAssets(
   layer: Layer,
-  assetMap: Record<string, { public_url: string | null; content?: string | null; width?: number | null; height?: number | null }>,
+  assetMap: Record<string, AssetMapEntry>,
 ): Layer {
   const variableUpdates: Partial<Layer['variables']> = {};
 
@@ -4324,12 +4339,7 @@ function resolveLayerAssets(
     const assetId = getAssetId(imageSrc);
     if (assetId) {
       const asset = assetMap[assetId];
-      let resolvedUrl = '';
-      if (asset?.public_url) {
-        resolvedUrl = asset.public_url;
-      } else if (asset?.content) {
-        resolvedUrl = buildSvgDataUrl(asset.content, asset.width, asset.height);
-      }
+      const resolvedUrl = asset?.public_url || (asset && resolveInlineSvgAssetSrc(asset)) || '';
       variableUpdates.image = {
         src: createDynamicTextVariable(resolvedUrl),
         alt: layer.variables?.image?.alt || createDynamicTextVariable(''),
@@ -4382,11 +4392,7 @@ function resolveLayerAssets(
     let resolvedUrl = '';
     if (assetId) {
       const asset = assetMap[assetId];
-      if (asset?.public_url) {
-        resolvedUrl = asset.public_url;
-      } else if (asset?.content) {
-        resolvedUrl = buildSvgDataUrl(asset.content, asset.width, asset.height);
-      }
+      resolvedUrl = asset?.public_url || (asset && resolveInlineSvgAssetSrc(asset)) || '';
     } else {
       resolvedUrl = DEFAULT_ASSETS.IMAGE;
     }
@@ -4773,6 +4779,8 @@ export interface PageLinkContext {
    * no hydration, so an iframe with no `height` clips the user's content.
    */
   isStaticExport?: boolean;
+  /** Immediate parent layer name — used to coerce slider nav children to span. */
+  parentLayerName?: string;
 }
 
 /** Build an `assetMap`-backed `getAsset` callback compatible with `generateLinkHref`. */
@@ -4798,7 +4806,7 @@ export function layerToHtml(
   anchorMap?: Record<string, string>,
   collectionItemData?: Record<string, string>,
   pageCollectionItemData?: Record<string, string>,
-  assetMap?: Record<string, { public_url: string | null; content?: string | null; width?: number | null; height?: number | null }>,
+  assetMap?: Record<string, AssetMapEntry>,
   layerDataMap?: Record<string, Record<string, string>>,
   components?: Component[],
   ancestorComponentIds?: Set<string>,
@@ -4847,7 +4855,7 @@ export function layerToHtml(
     });
 
   // Get the HTML tag
-  let tag = getLayerHtmlTag(layer);
+  let tag = getLayerHtmlTag(layer, pageLinkContext?.parentLayerName);
 
   // Buttons with link settings render as <a> directly instead of being
   // wrapped in <a><button></button></a> which is invalid HTML
@@ -4918,6 +4926,13 @@ export function layerToHtml(
   // Add data attributes for slider nav/pagination elements (used by SliderInitializer)
   if (SWIPER_DATA_ATTR_MAP[layer.name]) {
     attrs.push(SWIPER_DATA_ATTR_MAP[layer.name]);
+  }
+
+  if (isSliderChromeButton(layer.name)) {
+    attrs.push('type="button"');
+    if (!layer.settings?.customAttributes?.['aria-label']) {
+      attrs.push(`aria-label="${escapeHtml(SLIDER_BUTTON_ARIA_LABELS[layer.name])}"`);
+    }
   }
 
   // Add slider settings as data attribute on the root slider layer
@@ -5076,10 +5091,11 @@ export function layerToHtml(
     attrs.push('data-layer-type="image"');
 
     const imageAlt = layer.variables?.image?.alt;
+    let resolvedAlt = '';
     if (imageAlt && imageAlt.type === 'dynamic_text') {
-      const resolvedAlt = resolveInlineVariablesFromData(imageAlt.data.content, effectiveCollectionItemData, pageCollectionItemData, 'UTC', effectiveLayerDataMap);
-      attrs.push(`alt="${escapeHtml(resolvedAlt)}"`);
+      resolvedAlt = resolveInlineVariablesFromData(imageAlt.data.content, effectiveCollectionItemData, pageCollectionItemData, 'UTC', effectiveLayerDataMap);
     }
+    attrs.push(`alt="${escapeHtml(resolvedAlt)}"`);
 
     if (intrinsicWidth) attrs.push(`width="${intrinsicWidth}"`);
     if (intrinsicHeight) attrs.push(`height="${intrinsicHeight}"`);
@@ -5108,7 +5124,8 @@ export function layerToHtml(
       const embedUrl = `https://www.${domain}/embed/${videoId}${params.length > 0 ? '?' + params.join('&') : ''}`;
 
       attrs.push(`src="${escapeHtml(embedUrl)}"`);
-      attrs.push('frameborder="0"');
+      attrs.push('title="YouTube video"');
+      attrs.push('loading="lazy"');
       attrs.push('allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"');
       attrs.push('allowfullscreen');
       attrs.push('data-layer-type="video"');
@@ -5144,7 +5161,7 @@ export function layerToHtml(
         return `<div${attrsStr}><iframe src="${escapeHtml(iframeProps.src)}" referrerpolicy="no-referrer-when-downgrade" loading="lazy" style="width:100%;height:100%;border:none;display:block" title="Map"></iframe></div>`;
       }
       const escapedSrcdoc = escapeHtml(iframeProps.srcDoc);
-      return `<div${attrsStr}><iframe srcdoc="${escapedSrcdoc}" sandbox="allow-scripts allow-same-origin" style="width:100%;height:100%;border:none;display:block" title="Map"></iframe></div>`;
+      return `<div${attrsStr}><iframe srcdoc="${escapedSrcdoc}" sandbox="allow-scripts allow-same-origin" loading="lazy" style="width:100%;height:100%;border:none;display:block" title="Map"></iframe></div>`;
     }
 
     const attrsStr = attrs.length > 0 ? ' ' + attrs.join(' ') : '';
@@ -5210,6 +5227,10 @@ export function layerToHtml(
     }
     // Add data-icon attribute to trigger CSS styling
     attrs.push('data-icon="true"');
+    const iconAttrs = layer.settings?.customAttributes;
+    if (!iconAttrs?.['aria-hidden'] && !iconAttrs?.['aria-label']) {
+      attrs.push('aria-hidden="true"');
+    }
   }
 
   // Handle Code Embed layers - render as iframe for SSR
@@ -5256,7 +5277,8 @@ export function layerToHtml(
     attrs.push(`srcdoc="${escapedIframeContent}"`);
     attrs.push('sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"');
     attrs.push('style="width: 100%; border: none; display: block;"');
-    attrs.push(`title="Code Embed ${layer.id}"`);
+    attrs.push('title="Code embed"');
+    attrs.push('loading="lazy"');
 
     const attrsStr = attrs.length > 0 ? ' ' + attrs.join(' ') : '';
     return `<iframe${attrsStr}></iframe>`;
@@ -5363,10 +5385,11 @@ export function layerToHtml(
     : layer.children;
 
   // Render children
+  const childLinkContext: PageLinkContext = { ...pageLinkContext, parentLayerName: layer.name };
   const childrenHtml = effectiveChildren
     ? effectiveChildren
       .map((child) =>
-        layerToHtml(child, effectiveCollectionItemId, pages, folders, collectionItemSlugs, locale, translations, anchorMap, effectiveCollectionItemData, pageCollectionItemData, assetMap, effectiveLayerDataMap, components, ancestorComponentIds, layer.name === 'slides', pageLinkContext)
+        layerToHtml(child, effectiveCollectionItemId, pages, folders, collectionItemSlugs, locale, translations, anchorMap, effectiveCollectionItemData, pageCollectionItemData, assetMap, effectiveLayerDataMap, components, ancestorComponentIds, layer.name === 'slides', childLinkContext)
       )
       .join('')
     : '';

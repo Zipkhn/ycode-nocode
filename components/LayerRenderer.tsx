@@ -13,11 +13,11 @@ import type { UseLiveComponentUpdatesReturn } from '@/hooks/use-live-component-u
 import { getLayerHtmlTag, getClassesString, getText, resolveFieldValue, isTextEditable, isTextContentLayer, isRichTextLayer, getCollectionVariable, evaluateVisibility, evaluateCollectionFilters, findAncestorByName, filterDisabledSliderLayers, getLayerCmsFieldBinding, findLayerById, applyCustomAttributes, containsLayerId } from '@/lib/layer-utils';
 import { getMapIframeProps, DEFAULT_MAP_SETTINGS, resolveMarkerColor } from '@/lib/map-utils';
 import { HTML_TO_REACT_ATTRS } from '@/lib/parse-head-html';
-import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP } from '@/lib/slider-constants';
+import { SWIPER_CLASS_MAP, SWIPER_DATA_ATTR_MAP, SLIDER_BUTTON_ARIA_LABELS, isSliderChromeButton } from '@/lib/slider-constants';
 import { getSliderPresizeVars } from '@/lib/slider-utils';
 import { useCanvasSlider } from '@/hooks/use-canvas-slider';
 import { resolveFieldFromSources } from '@/lib/cms-variables-utils';
-import { getDynamicTextContent, getImageUrlFromVariable, getVideoUrlFromVariable, getIframeUrlFromVariable, isFieldVariable, isAssetVariable, isStaticTextVariable, isDynamicTextVariable, getAssetId, getStaticTextContent, createAssetVariable, createDynamicTextVariable, resolveDesignStyles } from '@/lib/variable-utils';
+import { getDynamicTextContent, getImageUrlFromVariable, getVideoUrlFromVariable, getIframeUrlFromVariable, isFieldVariable, isAssetVariable, isStaticTextVariable, isDynamicTextVariable, getAssetId, getStaticTextContent, createAssetVariable, createDynamicTextVariable, resolveDesignStyles, getEffectiveHidden, getEffectiveId } from '@/lib/variable-utils';
 import { getTranslatedAssetId, getTranslatedText, applyCmsTranslations, injectTranslatedText } from '@/lib/localisation-utils';
 import { isValidLinkSettings } from '@/lib/link-utils';
 import { DEFAULT_ASSETS, ASSET_CATEGORIES, isAssetOfType } from '@/lib/asset-utils';
@@ -52,7 +52,7 @@ import LocaleSelector from '@/components/layers/LocaleSelector';
 import { usePagesStore } from '@/stores/usePagesStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { generateLinkHref, resolveLinkAttrs, isLinkAtCollectionBoundary, isLinkToCurrentPage, type LinkResolutionContext } from '@/lib/link-utils';
-import { collectEditorHiddenLayerIds, type HiddenLayerInfo } from '@/lib/animation-utils';
+import { collectEditorHiddenLayerIds, collectKeptHiddenLayerIds, type HiddenLayerInfo } from '@/lib/animation-utils';
 import AnimationInitializer from '@/components/AnimationInitializer';
 import { transformLayerIdsForInstance, resolveVariableLinks } from '@/lib/resolve-components';
 import dynamic from 'next/dynamic';
@@ -147,6 +147,8 @@ interface LayerRendererProps {
    * over the rest of the page. Computed server-side by PageRenderer.
    */
   lcpCandidateLayerId?: string | null;
+  /** Immediate parent layer name — used to coerce slider nav children to span. */
+  parentLayerName?: string;
 }
 
 const LayerRenderer: React.FC<LayerRendererProps> = ({
@@ -198,6 +200,7 @@ const LayerRenderer: React.FC<LayerRendererProps> = ({
   componentRootContextMenu,
   onComponentEdit,
   lcpCandidateLayerId,
+  parentLayerName,
 }) => {
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState<string>('');
@@ -350,6 +353,7 @@ const LayerRenderer: React.FC<LayerRendererProps> = ({
         componentRootContextMenu={componentRootContextMenu}
         onComponentEdit={onComponentEdit}
         lcpCandidateLayerId={lcpCandidateLayerId}
+        parentLayerName={parentLayerName}
       />
     );
   };
@@ -418,6 +422,7 @@ const LayerItemImpl: React.FC<{
   componentRootContextMenu?: boolean;
   onComponentEdit?: (componentId: string, instanceLayerId: string) => void;
   lcpCandidateLayerId?: string | null;
+  parentLayerName?: string;
 }> = ({
   layer,
   isEditMode,
@@ -473,6 +478,7 @@ const LayerItemImpl: React.FC<{
   serverSettings,
   componentRootContextMenu,
   lcpCandidateLayerId,
+  parentLayerName,
 }) => {
   // Subscribe to selection state from the store for reactive updates without
   // forcing the entire LayerRenderer tree to re-render when selection changes
@@ -498,9 +504,29 @@ const LayerItemImpl: React.FC<{
   // descendant is selected. Subscribed reactively so a hidden ancestor updates
   // when a descendant is selected — its own `isSelected` wouldn't change then.
   // Returns a stable `false` for non-hidden layers, so it never re-renders them.
+  // Layers hidden explicitly via Visibility (`settings.hidden`) are exempt:
+  // the user asked for them to be hidden, so toggling visibility must take
+  // effect at once even while the layer is selected. They still show while
+  // their interaction is open (force-visible removes them from the map).
   const isEditorHidden = isEditMode && !!editorHiddenLayerIds?.has(layer.id);
+  // Visibility may be driven by a component variable (per-instance override or
+  // the variable's default while editing the component); SSR bakes this into
+  // `settings.hidden`, the canvas resolves it live here.
+  const isHidden = getEffectiveHidden(
+    layer,
+    parentComponentVariables || editingComponentVariables,
+    parentComponentOverrides,
+  );
+  // Same for the HTML `id` attribute: an 'id' component variable can give each
+  // instance its own element id (SSR bakes it into `settings.id`).
+  const effectiveId = getEffectiveId(
+    layer,
+    parentComponentVariables || editingComponentVariables,
+    parentComponentOverrides,
+  );
+  const canRevealFromSelection = isEditorHidden && !isHidden;
   const revealFromSelection = useEditorStore((state) => {
-    if (!isEditorHidden) return false;
+    if (!canRevealFromSelection) return false;
     const sel = state.selectedLayerId;
     return sel ? containsLayerId(layer, sel) : false;
   });
@@ -663,7 +689,7 @@ const LayerItemImpl: React.FC<{
     [layer.id, sharedRendererProps, isEditMode, currentLocale, translations, pageId]
   );
 
-  let htmlTag = getLayerHtmlTag(layer);
+  let htmlTag = getLayerHtmlTag(layer, parentLayerName);
 
   const isSimpleTextLayer = isTextContentLayer(layer);
 
@@ -1249,8 +1275,8 @@ const LayerItemImpl: React.FC<{
   // (e.g. legacy data), extract its text instead of stringifying to "[object Object]".
   const rawImageAltContent = getDynamicTextContent(effectiveImageSettings?.alt) as unknown;
   const rawImageAlt = typeof rawImageAltContent === 'object' && rawImageAltContent !== null
-    ? (extractPlainTextFromTiptap(rawImageAltContent) || 'Image')
-    : String(rawImageAltContent || 'Image');
+    ? (extractPlainTextFromTiptap(rawImageAltContent) || '')
+    : String(rawImageAltContent || '');
   const originalImageAlt = rawImageAlt.includes('<ycode-inline-variable>')
     ? resolveInlineVariablesFromData(rawImageAlt, collectionLayerData, pageCollectionItemData ?? undefined, timezone, effectiveLayerDataMap)
     : rawImageAlt;
@@ -1260,7 +1286,7 @@ const LayerItemImpl: React.FC<{
     translations,
     pageId,
     layer._masterComponentId
-  ) || 'Image';
+  ) || '';
   const imageAlt = translatedImageAlt;
 
   // Resolve audio source - check for linked component variable first
@@ -1404,6 +1430,22 @@ const LayerItemImpl: React.FC<{
     });
     return merged;
   }, [transformedComponentLayers, editorHiddenLayerIds]);
+
+  // Same for kept-hidden layers inside the instance: the keep-in-DOM
+  // check reads `hiddenLayerInfo`, which was computed with the page-level ID
+  // transform, so add entries for the instance's transformed IDs.
+  const componentHiddenLayerInfo = useMemo(() => {
+    if (!transformedComponentLayers) return hiddenLayerInfo;
+    const kept = collectKeptHiddenLayerIds(transformedComponentLayers);
+    if (kept.size === 0) return hiddenLayerInfo;
+    const merged: HiddenLayerInfo[] = hiddenLayerInfo ? [...hiddenLayerInfo] : [];
+    kept.forEach((layerId) => {
+      if (!merged.some((info) => info.layerId === layerId)) {
+        merged.push({ layerId, breakpoints: null });
+      }
+    });
+    return merged;
+  }, [transformedComponentLayers, hiddenLayerInfo]);
 
   const collectionVariable = getCollectionVariable(layer);
   const isCollectionLayer = !!collectionVariable;
@@ -2029,8 +2071,10 @@ const LayerItemImpl: React.FC<{
     'ycode-layer'
   ) : clsx(classesString, paragraphClasses, SWIPER_CLASS_MAP[layer.name], isSlideChild && 'swiper-slide', buttonNeedsFit && 'w-fit', buttonNeedsTextCenter && 'text-center');
 
-  // Check if layer should be hidden (hide completely in both edit mode and public pages)
-  if (layer.settings?.hidden) {
+  // Hidden layers are omitted entirely (edit mode and public pages) unless kept
+  // in HTML (reveal interaction or settings.keepInHtml) — those are in
+  // `hiddenLayerInfo` and render collapsed instead.
+  if (isHidden && !hiddenLayerInfo?.some((info) => info.layerId === layer.id)) {
     return null;
   }
 
@@ -2152,6 +2196,7 @@ const LayerItemImpl: React.FC<{
           layers={layersWithInstanceId}
           {...sharedRendererProps}
           editorHiddenLayerIds={componentEditorHiddenLayerIds}
+          hiddenLayerInfo={componentHiddenLayerInfo}
           enableDragDrop={enableDragDrop}
           activeLayerId={activeLayerId}
           projected={projected}
@@ -2310,8 +2355,10 @@ const LayerItemImpl: React.FC<{
       }
     }
 
-    // Add data-gsap-hidden attribute for elements that should start hidden
-    const hiddenInfo = hiddenLayerInfo?.find(info => info.layerId === layer.id);
+    // Add data-gsap-hidden attribute for elements that should start hidden.
+    // Not in edit mode: canvas.css hides the attribute with !important, which
+    // would defeat the reveal-on-select handled via `editorHiddenLayerIds` below.
+    const hiddenInfo = isEditMode ? undefined : hiddenLayerInfo?.find(info => info.layerId === layer.id);
     if (hiddenInfo) {
       // Set breakpoints as value (e.g., "mobile" or "mobile tablet") or empty for all
       elementProps['data-gsap-hidden'] = hiddenInfo.breakpoints || '';
@@ -2343,6 +2390,12 @@ const LayerItemImpl: React.FC<{
       }
       if (SWIPER_DATA_ATTR_MAP[layer.name]) {
         elementProps[SWIPER_DATA_ATTR_MAP[layer.name]] = '';
+      }
+      if (isSliderChromeButton(layer.name)) {
+        elementProps.type = 'button';
+        if (!elementProps['aria-label']) {
+          elementProps['aria-label'] = SLIDER_BUTTON_ARIA_LABELS[layer.name];
+        }
       }
 
       // Lightbox data attributes (LightboxInitializer)
@@ -2404,9 +2457,9 @@ const LayerItemImpl: React.FC<{
       }
     }
 
-    // Apply custom ID from settings or attributes
-    if (layer.settings?.id) {
-      elementProps.id = layer.settings.id;
+    // Apply custom ID from settings (or a linked component variable) or attributes
+    if (effectiveId) {
+      elementProps.id = effectiveId;
     } else if (layer.attributes?.id) {
       elementProps.id = layer.attributes.id;
     }
@@ -2689,7 +2742,7 @@ const LayerItemImpl: React.FC<{
     if (htmlTag === 'input') {
       // Auto-set name attribute for form inputs if not already set
       if (isInsideForm && !elementProps.name) {
-        elementProps.name = layer.settings?.id || layer.id;
+        elementProps.name = effectiveId || layer.id;
       }
       // Checkbox/radio: set value="true" so FormData gets name=true when checked
       if (isInsideForm && (normalizedAttributes.type === 'checkbox' || normalizedAttributes.type === 'radio')) {
@@ -2721,7 +2774,7 @@ const LayerItemImpl: React.FC<{
     // Handle textarea - auto-set name for form submission and return early (no children)
     if (htmlTag === 'textarea') {
       if (isInsideForm && !elementProps.name) {
-        elementProps.name = layer.settings?.id || layer.id;
+        elementProps.name = effectiveId || layer.id;
       }
       // Use defaultValue instead of value to keep textareas uncontrolled
       if ('value' in elementProps) {
@@ -2734,7 +2787,7 @@ const LayerItemImpl: React.FC<{
     // Handle select - auto-set name for form submission
     if (htmlTag === 'select') {
       if (isInsideForm && !elementProps.name) {
-        elementProps.name = layer.settings?.id || layer.id;
+        elementProps.name = effectiveId || layer.id;
       }
 
       // Drop null/undefined value so the select can fall back to defaultValue
@@ -2774,7 +2827,7 @@ const LayerItemImpl: React.FC<{
     }
 
     // Handle button inside form - set type="submit" only when not in edit mode (preview and published)
-    if (htmlTag === 'button' && isInsideForm && !isEditMode) {
+    if (htmlTag === 'button' && isInsideForm && !isEditMode && !isSliderChromeButton(layer.name)) {
       // Only override if type is not explicitly set or is 'button'
       if (!normalizedAttributes.type || normalizedAttributes.type === 'button') {
         elementProps.type = 'submit';
@@ -2790,7 +2843,7 @@ const LayerItemImpl: React.FC<{
 
     // Handle form submission when not in edit mode (preview and published)
     if (htmlTag === 'form' && !isEditMode) {
-      const formId = layer.settings?.id;
+      const formId = effectiveId;
       const formSettings = layer.settings?.form;
 
       elementProps.onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -2973,6 +3026,9 @@ const LayerItemImpl: React.FC<{
       // instead of collapsing. Inert when both dimensions are explicitly set.
       const iconAspectRatio = getSvgAspectRatioStyle(iconHtml);
       const iconElementStyle = (typeof elementProps.style === 'object' && elementProps.style) || undefined;
+      if (elementProps['aria-hidden'] == null && elementProps['aria-label'] == null) {
+        elementProps['aria-hidden'] = true;
+      }
 
       return (
         <Tag
@@ -3035,7 +3091,8 @@ const LayerItemImpl: React.FC<{
             display: 'block',
             ...mergedStyle,
           }}
-          title={`Code Embed ${layer.id}`}
+          title={layer.customName || 'Code embed'}
+          loading="lazy"
         />
       );
     }
@@ -3096,7 +3153,8 @@ const LayerItemImpl: React.FC<{
               border: 'none',
               display: 'block',
             }}
-            title="Map"
+            title={layer.customName || 'Map'}
+            loading="lazy"
             suppressHydrationWarning
           />
         </div>
@@ -3135,7 +3193,8 @@ const LayerItemImpl: React.FC<{
             className: fullClassName,
             style: mergedStyle,
             src: embedUrl,
-            frameBorder: '0',
+            title: layer.customName || 'YouTube video',
+            loading: 'lazy',
             allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture',
             allowFullScreen: true,
           };
@@ -3356,6 +3415,7 @@ const LayerItemImpl: React.FC<{
               isSlideChild={layer.name === 'slides'}
               serverSettings={serverSettings}
               lcpCandidateLayerId={lcpCandidateLayerId}
+              parentLayerName={layer.name}
             />
           )}
         </>
@@ -3688,6 +3748,7 @@ const LayerItemImpl: React.FC<{
                     serverSettings={serverSettings}
                     onComponentEdit={onComponentEdit}
                     lcpCandidateLayerId={lcpCandidateLayerId}
+                    parentLayerName={layer.name}
                   />
                 )}
               </Tag>
@@ -3759,6 +3820,7 @@ const LayerItemImpl: React.FC<{
               serverSettings={serverSettings}
               onComponentEdit={onComponentEdit}
               lcpCandidateLayerId={lcpCandidateLayerId}
+              parentLayerName={layer.name}
             />
           )}
 
@@ -3836,6 +3898,7 @@ const LayerItemImpl: React.FC<{
             serverSettings={serverSettings}
             onComponentEdit={onComponentEdit}
             lcpCandidateLayerId={lcpCandidateLayerId}
+            parentLayerName={layer.name}
           />
         )}
       </Tag>

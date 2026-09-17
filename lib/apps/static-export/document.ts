@@ -11,24 +11,16 @@
 import { layerToHtml, buildAnchorMap } from '@/lib/page-fetcher'
 import type { PageData } from '@/lib/page-fetcher'
 import type { FontPreload } from '@/lib/font-utils'
-import { getClassesString } from '@/lib/layer-utils'
+import { htmlDirFromLang } from '@/lib/html-lang'
+import type { HreflangAlternate } from '@/lib/hreflang-utils'
+import { SLIDER_BUTTON_RESET_CSS } from '@/lib/slider-constants'
 import { getEffectiveApplyStyle } from '@/lib/animation-utils'
+import { buildYcodeHtmlComments } from '@/lib/ycode-html-comment'
 
 import type { Layer, Page, PageFolder } from '@/types'
 
 import { VISIBILITY_BOOT_SCRIPT } from './visibility-runtime'
-
-/**
- * Extract the class string from the synthetic `body` layer so the exporter
- * can apply it to the real `<body>` element. The editor's Canvas does the
- * same thing — without it, the user's body background / text color / fonts
- * are silently dropped from the export.
- */
-export function getBodyClasses(layers: Layer[] | null | undefined): string {
-  if (!layers || layers.length === 0) return ''
-  const bodyLayer = layers.find((l) => l.id === 'body' || l.name === 'body')
-  return bodyLayer ? getClassesString(bodyLayer) : ''
-}
+export { getBodyClasses } from '@/lib/body-classes'
 
 // =============================================================================
 // Render context + body rendering
@@ -534,7 +526,7 @@ export interface BuildHtmlInput {
   studioCss?: string | null
   /** Inlined @font-face + font class CSS for Google and custom fonts. */
   fontsCss?: string | null
-  /** Custom font binaries to hint via `<link rel="preload" as="font">`. */
+  /** Font binaries (custom uploads + LCP heading's Google file) to hint via `<link rel="preload" as="font">`. */
   fontPreloads?: FontPreload[]
   includeSwiper: boolean
   interactions: ExportedInteraction[]
@@ -547,8 +539,14 @@ export interface BuildHtmlInput {
    */
   pageCustomCodeHead?: string | null
   pageCustomCodeBody?: string | null
-  /** Absolute canonical URL for this route. Omitted when no base URL is configured. */
+  /** ISO timestamp of the last publish, used for the HTML source stamp. */
+  publishedAt?: string | null
+  /** Absolute canonical URL for this export file. Omitted without a site base URL. */
   canonicalUrl?: string | null
+  /** Absolute `og:url`. Same value as canonical when present. */
+  ogUrl?: string | null
+  /** Locale alternate cluster. Empty for single-locale / noindex / error pages. */
+  hreflang?: HreflangAlternate[]
   /** Serialized JSON-LD documents (see lib/schema-generator). */
   jsonLdScripts?: string[]
 }
@@ -570,7 +568,10 @@ export function buildDocument({
   globalCustomCodeBody,
   pageCustomCodeHead,
   pageCustomCodeBody,
+  publishedAt,
   canonicalUrl,
+  ogUrl,
+  hreflang = [],
   jsonLdScripts,
 }: BuildHtmlInput): string {
   const seo = extractSeo(page)
@@ -582,12 +583,24 @@ export function buildDocument({
   const head: string[] = []
   head.push('<meta charset="UTF-8" />')
   head.push('<meta name="viewport" content="width=device-width, initial-scale=1.0" />')
+  head.push('<meta name="generator" content="Ycode" />')
   head.push(`<title>${escapeHtml(title)}</title>`)
   if (description) {
     head.push(`<meta name="description" content="${escapeHtml(description)}" />`)
     head.push(`<meta property="og:description" content="${escapeHtml(description)}" />`)
   }
+  if (canonicalUrl) {
+    head.push(`<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`)
+  }
+  for (const alt of hreflang) {
+    head.push(
+      `<link rel="alternate" hreflang="${escapeHtml(alt.hreflang)}" href="${escapeHtml(alt.href)}" />`,
+    )
+  }
   head.push(`<meta property="og:title" content="${escapeHtml(title)}" />`)
+  if (ogUrl) {
+    head.push(`<meta property="og:url" content="${escapeHtml(ogUrl)}" />`)
+  }
   head.push(`<meta property="og:type" content="website" />`)
   if (ogImage) {
     head.push(`<meta property="og:image" content="${escapeHtml(ogImage)}" />`)
@@ -595,7 +608,6 @@ export function buildDocument({
     head.push(`<meta name="twitter:image" content="${escapeHtml(ogImage)}" />`)
   }
   if (noindex) head.push('<meta name="robots" content="noindex" />')
-  if (canonicalUrl) head.push(`<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`)
 
   // Structured data — already serialized and XSS-escaped by serializeJsonLd.
   for (const script of jsonLdScripts ?? []) {
@@ -622,6 +634,7 @@ export function buildDocument({
 
   if (includeSwiper) {
     head.push(`<link rel="stylesheet" href="${SWIPER_CSS_PATH}" />`)
+    head.push(`<style>${SLIDER_BUTTON_RESET_CSS}</style>`)
   }
 
   // Custom head code: global first (site-wide), then page-specific. Emitted
@@ -667,7 +680,8 @@ export function buildDocument({
 
   return [
     '<!DOCTYPE html>',
-    `<html lang="${escapeHtml(lang)}">`,
+    ...buildYcodeHtmlComments(publishedAt).split('\n'),
+    `<html lang="${escapeHtml(lang)}" dir="${htmlDirFromLang(lang)}">`,
     '<head>',
     ...head.map((line) => indent + line),
     '</head>',

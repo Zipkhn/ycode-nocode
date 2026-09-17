@@ -6,7 +6,7 @@
 
 import type { Layer, Component, ComponentVariable, ComponentVariableValue, LayerVariables, VariantSettingsValue } from '@/types';
 import { getComponentVariantLayers } from './component-variant-utils';
-import { normalizeComponentVariableValue } from './variable-utils';
+import { normalizeComponentVariableValue, resolveLinkedHidden, resolveLinkedId } from './variable-utils';
 
 /**
  * Remap collection_layer_id in a FieldVariable using the ID map.
@@ -292,6 +292,8 @@ const OVERRIDE_CATEGORIES: OverrideCategory[] = [
   'video',
   'icon',
   'variant',
+  'visibility',
+  'id',
 ];
 
 function findOverrideByVariableId(
@@ -379,6 +381,27 @@ export function applyComponentOverrides(
       if (value && typeof value === 'object' && 'variant_id' in value && value.variant_id) {
         updatedLayer = { ...updatedLayer, componentVariantId: value.variant_id };
       }
+    }
+
+    // Visibility driven by a component variable: bake the resolved value into
+    // `settings.hidden` so every downstream hidden check (renderers, CSS
+    // generators, kept-hidden collection) sees the per-instance result.
+    const linkedHidden = resolveLinkedHidden(layer, componentVariables, overrides);
+    if (linkedHidden !== undefined && linkedHidden !== layer.settings?.hidden) {
+      updatedLayer = {
+        ...updatedLayer,
+        settings: { ...updatedLayer.settings, hidden: linkedHidden },
+      };
+    }
+
+    // Element id driven by a component variable: bake the resolved value into
+    // `settings.id` so the renderers emit the per-instance id attribute.
+    const linkedId = resolveLinkedId(layer, componentVariables, overrides);
+    if (linkedId !== undefined && linkedId !== (layer.settings?.id ?? '')) {
+      updatedLayer = {
+        ...updatedLayer,
+        settings: { ...updatedLayer.settings, id: linkedId },
+      };
     }
 
     // Check if this layer has a text variable linked

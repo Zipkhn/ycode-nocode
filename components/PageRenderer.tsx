@@ -3,9 +3,7 @@ import BodyClassApplier from '@/components/BodyClassApplier';
 import HtmlLangApplier from '@/components/HtmlLangApplier';
 import ContentHeightReporter from '@/components/ContentHeightReporter';
 import CustomCodeInjector from '@/components/CustomCodeInjector';
-import HreflangAlternateLinks from '@/components/HreflangAlternateLinks';
 import LayerRendererPublic from '@/components/LayerRendererPublic';
-import SliderInitializer from '@/components/SliderInitializer';
 import LightboxInitializer from '@/components/LightboxInitializer';
 import DialogInitializer from '@/components/DialogInitializer';
 import RuntimeVisibility from '@/components/runtime/RuntimeVisibility';
@@ -15,6 +13,7 @@ import RuntimeStateProvider from '@/components/runtime/RuntimeStateProvider';
 import RuntimeStyles from '@/components/runtime/RuntimeStyles';
 import PasswordForm from '@/components/PasswordForm';
 import InitialLoadScript from '@/components/InitialLoadScript';
+import SliderInitializer from '@/components/SliderInitializer';
 import YcodeBadge from '@/components/YcodeBadge';
 import { unstable_cache } from 'next/cache';
 import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables';
@@ -22,10 +21,10 @@ import { pageHasRuntimeState } from '@/lib/runtime-visibility';
 import { collectStateActionLayers } from '@/components/runtime/setVariableAction';
 import { buildStateDefaults } from '@/lib/project-variables';
 import { pageHasConditionalStyles } from '@/lib/conditional-styles';
-import { renderRootLayoutHeadCode } from '@/lib/parse-head-html';
 import { generateInitialAnimationCSS, type HiddenLayerInfo } from '@/lib/animation-utils';
 import { buildCustomFontsCss, buildFontClassesCss, fetchGoogleFontsCss, getCustomFontPreloads, getGoogleFontLinks } from '@/lib/font-utils';
 import type { FontPreload } from '@/lib/font-utils';
+import { findLcpTextFont, getLcpFontPreloads } from '@/lib/font-preload';
 import { buildImageSizes, collectLayerAssetIds, findLcpCandidate, generateImageSrcset, getAssetProxyUrl, getOptimizedImageUrl } from '@/lib/asset-utils';
 import { getAllPages } from '@/lib/repositories/pageRepository';
 import { getAllPageFolders } from '@/lib/repositories/pageFolderRepository';
@@ -38,13 +37,11 @@ import { getValuesByItemIds } from '@/lib/repositories/collectionItemValueReposi
 import { getFieldsByCollectionId } from '@/lib/repositories/collectionFieldRepository';
 import { REF_PAGE_PREFIX, REF_COLLECTION_PREFIX, isCollectionItemKeyword, parseCollectionLinkValue } from '@/lib/link-utils';
 import { getClassesString, hasPasswordFormLayer } from '@/lib/layer-utils';
+import { SLIDER_BUTTON_RESET_CSS } from '@/lib/slider-constants';
 import { buildGlobalsMetaMap, buildGlobalsValueMap } from '@/lib/collection-field-utils';
 import { buildLocalizedPageUrls, type LocalizedDynamicSlug } from '@/lib/page-utils';
 import { getTranslatableKey, slimTranslations } from '@/lib/locale-runtime';
 import { getSlugTranslationsByLocale } from '@/lib/repositories/translationRepository';
-import { buildPageHreflangAlternatesForPage } from '@/lib/generate-page-metadata';
-import { getSiteBaseUrl } from '@/lib/url-utils';
-import type { HreflangAlternate } from '@/lib/hreflang-utils';
 import type { Layer, BackgroundsDesign, Component, Page, CollectionItemWithValues, CollectionField, Locale, PageFolder, PasswordProtectionContext, Translation, VariableDefinition } from '@/types';
 
 interface PageLinkRef { collection_item_id: string; page_id: string }
@@ -222,6 +219,16 @@ function stripSSROnlyData(layers: Layer[]): Layer[] {
     delete stripped._collectionItemSlug;
     delete stripped._layerDataMap;
 
+    // Editor/server-only fields the public renderer never reads: `customName`
+    // (tree label), `open` (tree expand state), `restrictions` (copy/delete/move/
+    // editText guards) and `_originalLayerId` (server-side translation-lookup
+    // marker, consumed before this point). Embed iframe titles now use static
+    // generic strings instead of `customName`, so it is safe to drop here.
+    delete stripped.customName;
+    delete stripped.open;
+    delete stripped.restrictions;
+    delete (stripped as { _originalLayerId?: string })._originalLayerId;
+
     // Builder-only style resolution inputs. The flat `classes` string is the
     // already-resolved output, so the public renderer never reads these.
     delete stripped.styleIds;
@@ -268,12 +275,15 @@ function stripSSROnlyData(layers: Layer[]): Layer[] {
 /** Extract minimal animation data from the layer tree for AnimationInitializer */
 function extractAnimationLayers(layers: Layer[]): Layer[] {
   return layers
-    .filter(layer => layer.interactions?.length || layer.children?.length)
+    // Keep `settings.hidden` layers: an interaction may reveal one, and the
+    // runtime needs the flag to keep it collapsed across breakpoint resets.
+    .filter(layer => layer.interactions?.length || layer.children?.length || layer.settings?.hidden)
     .map(layer => ({
       id: layer.id,
       name: layer.name,
       classes: '',
       interactions: layer.interactions,
+      ...(layer.settings?.hidden ? { settings: { hidden: true, keepInHtml: layer.settings.keepInHtml } } : {}),
       children: layer.children ? extractAnimationLayers(layer.children) : undefined,
     }));
 }
@@ -362,6 +372,7 @@ interface PageRendererProps {
   isPreview?: boolean;
   translations?: Record<string, any> | null;
   gaMeasurementId?: string | null;
+  /** Injected into `<head>` by SiteDocumentLayout. Kept for existing call sites. */
   globalCustomCodeHead?: string | null;
   globalCustomCodeBody?: string | null;
   ycodeBadge?: boolean;
@@ -406,7 +417,6 @@ export default async function PageRenderer({
   isPreview = false,
   translations,
   gaMeasurementId,
-  globalCustomCodeHead,
   globalCustomCodeBody,
   ycodeBadge = true,
   passwordProtection,
@@ -585,24 +595,16 @@ export default async function PageRenderer({
     }
   }
 
-  // Extract custom code from page settings and resolve placeholders for dynamic pages
-  const rawPageCustomCodeHead = page.settings?.custom_code?.head || '';
+  // Extract custom body code from page settings and resolve placeholders for
+  // dynamic pages. Custom head code is injected by SiteDocumentLayout from
+  // the URL slug, so it is present in the real <head> of the SSR HTML.
   const rawPageCustomCodeBody = page.settings?.custom_code?.body || '';
-
-  const pageCustomCodeHead = page.is_dynamic && collectionItem
-    ? await resolveCustomCodePlaceholders(rawPageCustomCodeHead, collectionItem, collectionFields, usePublishedData)
-    : rawPageCustomCodeHead;
 
   const pageCustomCodeBody = page.is_dynamic && collectionItem
     ? await resolveCustomCodePlaceholders(rawPageCustomCodeBody, collectionItem, collectionFields, usePublishedData)
     : rawPageCustomCodeBody;
 
   const { bodyClasses, childLayers: rawChildLayers } = extractBodyLayer(resolvedLayers);
-  const hasLayers = rawChildLayers.length > 0;
-
-  // Language for <html lang> and the content wrapper. Falls back to the site's
-  // default locale so the document always advertises a language for a11y/SEO.
-  const resolvedLang = locale?.code || availableLocales.find((l) => l.is_default)?.code || undefined;
 
   // Generate CSS for initial animation states to prevent flickering
   const { css: initialAnimationCSS, hiddenLayerInfo } = generateInitialAnimationCSS(resolvedLayers);
@@ -613,6 +615,7 @@ export default async function PageRenderer({
   const childLayers = usePublishedData ? stripSSROnlyData(rawChildLayers) : rawChildLayers;
   const animationLayers = usePublishedData ? extractAnimationLayers(resolvedLayers) : resolvedLayers;
   const stateActionLayers = collectStateActionLayers(resolvedLayers);
+  const resolvedLang = locale?.code || availableLocales.find((l) => l.is_default)?.code || undefined;
   const stateDefaults = buildStateDefaults(
     (await getSettingByKey('project_variables').catch(() => null)) as VariableDefinition[] | null,
   );
@@ -639,6 +642,14 @@ export default async function PageRenderer({
         [`google-fonts-css-${googleFontLinkUrls.join('|')}`],
         { tags: ['all-pages'], revalidate: false },
       )();
+
+      // Preload the one Google Font file the likely LCP text (first heading)
+      // renders in. Inlining the CSS above removes the stylesheet round-trip,
+      // but the browser still discovers the woff2 only after layout — on a
+      // text-hero page that discovery gap is the LCP.
+      fontPreloads = fontPreloads.concat(
+        getLcpFontPreloads(googleFontsInlinedCss, findLcpTextFont(rawChildLayers, bodyClasses)),
+      );
     }
   } catch (error) {
     console.error('[PageRenderer] Error loading fonts:', error);
@@ -760,38 +771,8 @@ export default async function PageRenderer({
       )
       : undefined;
 
-  // Build hreflang alternates for multilingual sites. Rendered as lowercase
-  // <link rel="alternate" hreflang> tags below (not via Next metadata, which
-  // emits camelCase hrefLang). Skipped for previews, error pages, and noindex
-  // pages, mirroring the sitemap's language cluster.
-  let hreflangAlternates: HreflangAlternate[] = [];
-  if (!isPreview && availableLocales.length > 1 && page.error_page === null && !page.settings?.seo?.noindex) {
-    try {
-      const globalCanonicalUrl = await getSettingByKey('global_canonical_url').catch(() => null);
-      const baseUrl = getSiteBaseUrl({
-        globalCanonicalUrl: typeof globalCanonicalUrl === 'string' ? globalCanonicalUrl : null,
-      });
-      if (baseUrl) {
-        hreflangAlternates = await buildPageHreflangAlternatesForPage(page, baseUrl, collectionItem);
-      }
-    } catch (error) {
-      console.error('[PageRenderer] Error building hreflang alternates:', error);
-    }
-  }
-
   return (
     <>
-      {/* Global head code fallback when layout skips it (SKIP_SETUP mode) */}
-      {process.env.SKIP_SETUP === 'true' && globalCustomCodeHead && (
-        renderRootLayoutHeadCode(globalCustomCodeHead, 'global-head')
-      )}
-
-      {/* Page-specific custom head code — React 19 hoists meta/link/style/title to <head> */}
-      {pageCustomCodeHead && renderRootLayoutHeadCode(pageCustomCodeHead, 'page-head')}
-
-      {/* hreflang alternates for multilingual sites (lowercase attribute) */}
-      <HreflangAlternateLinks alternates={hreflangAlternates} />
-
       {/* Preload the LCP image so the browser starts the fetch from <head>
           rather than waiting until the parser reaches the <img> tag. Pairs
           with the eager + fetchpriority=high props the renderer sets on the
@@ -819,7 +800,7 @@ export default async function PageRenderer({
       {/* Strip native browser appearance from form elements so Tailwind classes apply */}
       <style
         id="ycode-form-reset"
-        dangerouslySetInnerHTML={{ __html: 'input,select,textarea{appearance:none;-webkit-appearance:none}select{background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23737373\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpath d=\'m6 9 6 6 6-6\'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:16px 16px}input[type="checkbox"]:checked,input[type="radio"]:checked{background-color:currentColor;border-color:transparent;background-size:100% 100%;background-position:center;background-repeat:no-repeat}input[type="checkbox"]:checked{background-image:url("data:image/svg+xml,%3csvg viewBox=\'0 0 16 16\' fill=\'white\' xmlns=\'http://www.w3.org/2000/svg\'%3e%3cpath d=\'M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z\'/%3e%3c/svg%3e")}input[type="radio"]:checked{background-image:url("data:image/svg+xml,%3csvg viewBox=\'0 0 16 16\' fill=\'white\' xmlns=\'http://www.w3.org/2000/svg\'%3e%3ccircle cx=\'8\' cy=\'8\' r=\'3\'/%3e%3c/svg%3e")}' }}
+        dangerouslySetInnerHTML={{ __html: 'input,select,textarea{appearance:none;-webkit-appearance:none}select{background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23737373\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpath d=\'m6 9 6 6 6-6\'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:16px 16px}input[type="checkbox"]:checked,input[type="radio"]:checked{background-color:currentColor;border-color:transparent;background-size:100% 100%;background-position:center;background-repeat:no-repeat}input[type="checkbox"]:checked{background-image:url("data:image/svg+xml,%3csvg viewBox=\'0 0 16 16\' fill=\'white\' xmlns=\'http://www.w3.org/2000/svg\'%3e%3cpath d=\'M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z\'/%3e%3c/svg%3e")}input[type="radio"]:checked{background-image:url("data:image/svg+xml,%3csvg viewBox=\'0 0 16 16\' fill=\'white\' xmlns=\'http://www.w3.org/2000/svg\'%3e%3ccircle cx=\'8\' cy=\'8\' r=\'3\'/%3e%3c/svg%3e")}' + SLIDER_BUTTON_RESET_CSS }}
       />
 
       {/* Inject CSS directly — React 19 hoists <style> with precedence to <head> */}
@@ -872,9 +853,10 @@ export default async function PageRenderer({
         ))
       )}
 
-      {/* Preload uploaded custom font binaries so the browser fetches them from
-          <head> instead of after CSS parsing, shrinking the font swap window.
-          `crossOrigin` is required — fonts are always fetched in CORS mode. */}
+      {/* Preload uploaded custom font binaries plus the LCP heading's Google
+          Font file so the browser fetches them from <head> instead of after
+          CSS parsing, shrinking the font swap window. `crossOrigin` is
+          required — fonts are always fetched in CORS mode. */}
       {fontPreloads.map((font) => (
         <link
           key={`font-preload-${font.href}`}
@@ -935,14 +917,10 @@ export default async function PageRenderer({
         </>
       )}
 
-      {/* Apply body layer classes: BodyClassApplier emits a synchronous FOUC
-          bootstrap script on the initial load and keeps the class in sync across
-          client navigations via useLayoutEffect. */}
+      {/* Body classes and <html lang> are baked into the SSR document by the layout.
+          These appliers keep them in sync across client (router.push) navigations
+          and replace them on error pages (401/404) rendered under another URL. */}
       <BodyClassApplier classes={bodyClasses || 'bg-white'} />
-
-      {/* Set <html lang> from the page locale. The root element is rendered by
-          the shared layout (which can't know the per-page locale), so apply it
-          here where the locale is resolved. */}
       {resolvedLang && <HtmlLangApplier lang={resolvedLang} />}
 
       <div
@@ -950,8 +928,6 @@ export default async function PageRenderer({
         className="contents"
         data-layer-id="body"
         data-layer-type="div"
-        data-is-empty={hasLayers ? 'false' : 'true'}
-        lang={resolvedLang}
       >
         <LayerRendererPublic
           layers={childLayers}

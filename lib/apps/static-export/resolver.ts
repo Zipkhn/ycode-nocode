@@ -16,6 +16,8 @@ import {
 import type { PageData } from '@/lib/page-fetcher'
 import { buildSlugPath, buildLocalizedSlugPath } from '@/lib/page-utils'
 import { getTranslatableKey } from '@/lib/locale-runtime'
+import { findLcpTextFont, type LcpTextFont } from '@/lib/font-preload'
+import type { DynamicSlugContext } from '@/lib/hreflang-utils'
 import { getValuesByFieldId } from '@/lib/repositories/collectionItemValueRepository'
 import { resolveCustomCodePlaceholders } from '@/lib/resolve-cms-variables'
 
@@ -47,6 +49,10 @@ export interface ResolvedPage {
    */
   pageCustomCodeHead: string | null
   pageCustomCodeBody: string | null
+  /** Default-locale CMS slug, used to build hreflang for dynamic pages. */
+  dynamicSlug: DynamicSlugContext | null
+  /** Family + weight of the likely LCP text (first heading), for font preloading. */
+  lcpTextFont: LcpTextFont | null
 }
 
 interface PageCmsSettings {
@@ -194,6 +200,15 @@ async function renderResolved(
     ? await resolveCustomCodePlaceholders(rawBody, data.collectionItem!, data.collectionFields!, true)
     : rawBody
 
+  const slugFieldId = page.settings?.cms?.slug_field_id
+  const dynamicSlug: DynamicSlugContext | null =
+    page.is_dynamic && data.collectionItem && slugFieldId
+      ? {
+        itemId: data.collectionItem.id,
+        defaultValue: String(data.collectionItem.values?.[slugFieldId] ?? ''),
+      }
+      : null
+
   return {
     page,
     bodyHtml,
@@ -204,5 +219,7 @@ async function renderResolved(
     interactions: collectInteractions(layers),
     pageCustomCodeHead: pageCustomCodeHead || null,
     pageCustomCodeBody: pageCustomCodeBody || null,
+    dynamicSlug,
+    lcpTextFont: findLcpTextFont(layers),
   }
 }

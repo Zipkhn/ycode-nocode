@@ -9,6 +9,7 @@
 import { randomUUID } from 'crypto'
 
 import { getAssetProxyUrl } from '@/lib/asset-utils'
+import { buildDocumentSeoLinks } from '@/lib/document-seo-links'
 import {
   buildCustomFontsCss,
   buildFontClassesCss,
@@ -17,6 +18,7 @@ import {
   getGoogleFontLinks,
 } from '@/lib/font-utils'
 import type { FontPreload } from '@/lib/font-utils'
+import { getLcpFontPreloads } from '@/lib/font-preload'
 import { generateColorVariablesCss } from '@/lib/repositories/colorVariableRepository'
 import { loadCurrentTheme } from '@/lib/studio-theme-store'
 import { renderStudioDynamicCss } from '@/lib/studio-css'
@@ -33,11 +35,12 @@ import { generateSitemapXml, type SitemapUrl } from '@/lib/sitemap-utils'
 import { getSiteBaseUrl } from '@/lib/url-utils'
 import type { SitemapSettings } from '@/types'
 
-import type { Locale, Page, PageFolder } from '@/types'
+import type { Locale, Page, PageFolder, Translation } from '@/types'
 
 import { collectPublicAssets, collectSupabaseAssets } from './asset-bundler'
 import { getExportConfig, saveLastExportJob } from './config'
 import { buildDocument, SWIPER_CSS_PATH } from './document'
+import { pagePathFromOutputKey } from './paths'
 import {
   buildTranslationsMap,
   resolvePages,
@@ -169,6 +172,7 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
       globalCustomCodeHead,
       globalCustomCodeBody,
       seoSettings,
+      publishedAt,
       localeResult,
     ] = await Promise.all([
       client
@@ -193,6 +197,7 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
         'llms_txt',
         'sitemap',
       ]).catch(() => ({} as Record<string, unknown>)),
+      getSettingByKey('published_at').catch(() => null),
       client
         .from('locales')
         .select('*')
@@ -215,6 +220,12 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
     const siteBaseUrl = getSiteBaseUrl({ globalCanonicalUrl })
     const additionalLocales = locales.filter((l) => !l.is_default)
 
+    const translationsByLocale = new Map<string, Record<string, Translation>>()
+    for (const locale of additionalLocales) {
+      const translations = await getTranslationsByLocale(locale.id, true)
+      translationsByLocale.set(locale.id, buildTranslationsMap(translations))
+    }
+
     if (!publishedCss) {
       console.warn(
         '[Static Export] No published_css found — publish the site once to generate the CSS bundle.',
@@ -223,14 +234,13 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
 
     // ---- Font CSS (Google inlined @font-face + custom @font-face + class rules)
     let fontsCss = ''
+    let googleCss = ''
     let fontPreloads: FontPreload[] = []
     if (fonts.length > 0) {
       const googleLinks = getGoogleFontLinks(fonts)
-      const [googleCss] = await Promise.all([
-        googleLinks.length > 0
-          ? fetchGoogleFontsCss(googleLinks).catch(() => '')
-          : Promise.resolve(''),
-      ])
+      googleCss = googleLinks.length > 0
+        ? await fetchGoogleFontsCss(googleLinks).catch(() => '')
+        : ''
       fontsCss = [googleCss, buildCustomFontsCss(fonts), buildFontClassesCss(fonts)]
         .filter(Boolean)
         .join('\n')
@@ -250,15 +260,23 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
       try {
         for await (const resolved of resolvePages(page, folders, pages, ctx)) {
           yieldedAny = true
+          const seoLinks = buildDocumentSeoLinks({
+            pagePath: pagePathFromOutputKey(resolved.outputKey),
+            baseUrl: siteBaseUrl,
+            page: resolved.page,
+            folders,
+            locales,
+            translationsByLocale,
+            dynamicSlug: resolved.dynamicSlug,
+          })
           const pagePath = sitePathFor(resolved.outputKey)
-          const canonicalUrl = siteBaseUrl ? `${siteBaseUrl}${pagePath === '/' ? '' : pagePath}` : null
           const jsonLdScripts = generatePageJsonLd({
             baseUrl: siteBaseUrl,
             ogSiteName: seoSettings.og_site_name as string | null,
             schemaOrgName: seoSettings.schema_org_name as string | null,
             schemaOrgLogoUrl: seoSettings.schema_org_logo_url as string | null,
             govCtx: { page: resolved.page, pagePath, globalCanonicalUrl },
-            pageCanonicalUrl: canonicalUrl,
+            pageCanonicalUrl: seoLinks.canonical,
           })
           const html = buildDocument({
             page: resolved.page,
@@ -270,14 +288,19 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
             colorVariablesCss: colorVariablesCss ?? null,
             studioCss: studioCss ?? null,
             fontsCss: fontsCss || null,
-            fontPreloads,
+            // Per page: the LCP heading's Google Font file, on top of the
+            // site-wide custom font preloads.
+            fontPreloads: fontPreloads.concat(getLcpFontPreloads(googleCss, resolved.lcpTextFont)),
             includeSwiper: resolved.hasSlider,
             interactions: resolved.interactions,
             globalCustomCodeHead: globalCustomCodeHead ?? null,
             globalCustomCodeBody: globalCustomCodeBody ?? null,
             pageCustomCodeHead: resolved.pageCustomCodeHead,
             pageCustomCodeBody: resolved.pageCustomCodeBody,
-            canonicalUrl,
+            publishedAt: typeof publishedAt === 'string' ? publishedAt : null,
+            canonicalUrl: seoLinks.canonical,
+            ogUrl: seoLinks.ogUrl,
+            hreflang: seoLinks.hreflang,
             jsonLdScripts,
           })
 
@@ -331,8 +354,7 @@ export async function exportSite(presetJobId?: string): Promise<ExportJob> {
     }
 
     for (const locale of additionalLocales) {
-      const translations = await getTranslationsByLocale(locale.id, true)
-      const translationsMap = buildTranslationsMap(translations)
+      const translationsMap = translationsByLocale.get(locale.id) ?? {}
       const ctx: LocaleContext = { locale, translations: translationsMap }
       for (const page of pages) {
         await renderPage(page, ctx)

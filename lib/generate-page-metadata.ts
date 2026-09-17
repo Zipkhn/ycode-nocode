@@ -42,6 +42,7 @@ export interface GlobalPageSettings {
   globalCustomCodeHead?: string | null;
   globalCustomCodeBody?: string | null;
   ycodeBadge?: boolean;
+  publishedAt?: string | null;
   faviconUrl?: string | null;
   faviconMimeType?: string | null;
   webClipUrl?: string | null;
@@ -114,6 +115,7 @@ async function fetchGlobalPageSettingsImpl(isPreview = false): Promise<GlobalPag
     'custom_code_head',
     'custom_code_body',
     'ycode_badge',
+    'published_at',
     'favicon_asset_id',
     'web_clip_asset_id',
     'og_site_name',
@@ -164,6 +166,7 @@ async function fetchGlobalPageSettingsImpl(isPreview = false): Promise<GlobalPag
     globalCustomCodeHead: settings.custom_code_head || null,
     globalCustomCodeBody: settings.custom_code_body || null,
     ycodeBadge: settings.ycode_badge ?? true,
+    publishedAt: typeof settings.published_at === 'string' ? settings.published_at : null,
     faviconUrl,
     faviconMimeType,
     webClipUrl,
@@ -240,7 +243,7 @@ const fetchHreflangDataset = cache(async (): Promise<HreflangDataset> => {
  * Build the hreflang alternates for a page on a multilingual site. Returns an
  * empty array when hreflang shouldn't be emitted (single locale or no
  * resolvable alternates). Rendered as lowercase `<link rel="alternate"
- * hreflang>` tags (see HreflangAlternateLinks) rather than via Next's
+ * hreflang>` tags (see HreflangAlternateLinks / SiteDocumentLayout) rather than via Next's
  * `metadata.alternates.languages`, which React 19 emits as camelCase `hrefLang`.
  */
 export async function buildPageHreflangAlternatesForPage(
@@ -382,8 +385,8 @@ export async function generatePageMetadata(
       metadata.alternates = { ...metadata.alternates, canonical: canonicalUrl };
     }
 
-    // hreflang alternates are rendered as lowercase <link> tags in the page
-    // head (see HreflangAlternateLinks / PageRenderer), not via
+    // hreflang alternates are rendered as lowercase <link> tags in the document
+    // layout (see HreflangAlternateLinks / SiteDocumentLayout), not via
     // metadata.alternates.languages — React 19 emits that map's `hrefLang`
     // prop verbatim, but the HTML/Google standard is lowercase `hreflang`.
   }

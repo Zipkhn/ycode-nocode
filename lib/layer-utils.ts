@@ -13,7 +13,6 @@ import { resolveFieldFromSources } from '@/lib/cms-variables-utils';
 import { compareDateFilter, isDateFieldType, isDatePreset, parseItemIdList, resolveDateFilterValue } from '@/lib/collection-field-utils';
 import { parseMultiReferenceValue, normalizeBooleanValue } from '@/lib/collection-utils';
 import { getInheritedValue } from '@/lib/tailwind-class-mapper';
-import cloneDeep from 'lodash/cloneDeep';
 import { layerHasLink, hasLinkInTree, hasRichTextLinks } from '@/lib/link-utils';
 import { HTML_TO_REACT_ATTRS } from '@/lib/parse-head-html';
 
@@ -1372,6 +1371,24 @@ export function canPasteIntoParent(layers: Layer[], parentId: string, childToPas
 /**
  * Check if a layer can have children based on its name/type
  */
+/** Layer types that never contain child layers (media, text, form controls, embeds). */
+const LEAF_LAYER_NAMES = new Set([
+  'icon', 'image', 'audio', 'video', 'iframe',
+  'heading', 'text', 'richText', 'span', 'label', 'hr',
+  'input', 'textarea', 'select', 'checkbox', 'radio',
+  'htmlEmbed', 'map',
+]);
+
+/**
+ * Whether a layer is a leaf element by type (cannot contain children).
+ * Unlike canHaveChildren this ignores component instances, so it describes
+ * the element itself rather than whether the editor allows nesting into it.
+ */
+export function isLeafLayer(layer: Layer | null | undefined): boolean {
+  if (!layer) return false;
+  return LEAF_LAYER_NAMES.has(layer.name ?? '');
+}
+
 export function canHaveChildren(layer: Layer, childLayerType?: string): boolean {
   // Component instances cannot have children added to them
   // Children can only be edited in the master component
@@ -1379,19 +1396,12 @@ export function canHaveChildren(layer: Layer, childLayerType?: string): boolean 
     return false;
   }
 
-  const blocksWithoutChildren = [
-    'icon', 'image', 'audio', 'video', 'iframe',
-    'heading', 'text', 'richText', 'span', 'label', 'hr',
-    'input', 'textarea', 'select', 'checkbox', 'radio',
-    'htmlEmbed', 'map',
-  ];
-
   // Sections cannot contain other sections
   if (layer.name === 'section' && childLayerType === 'section') {
     return false;
   }
 
-  return !blocksWithoutChildren.includes(layer.name ?? '');
+  return !isLeafLayer(layer);
 }
 
 /**
@@ -1793,11 +1803,11 @@ const LAYER_NAME_TO_HTML_TAG: Record<string, string> = {
   slides: 'div',
   slide: 'div',
   slideNavigationWrapper: 'div',
-  slideButtonPrev: 'div',
-  slideButtonNext: 'div',
+  slideButtonPrev: 'button',
+  slideButtonNext: 'button',
   slidePaginationWrapper: 'div',
   slideBullets: 'div',
-  slideBullet: 'div',
+  slideBullet: 'button',
   slideFraction: 'div',
 
   // Lightbox
@@ -1814,16 +1824,33 @@ const LAYER_NAME_TO_HTML_TAG: Record<string, string> = {
   radio: 'input',
 };
 
-export function getLayerHtmlTag(layer: Layer): string {
+export function getLayerHtmlTag(layer: Layer, parentName?: string): string {
   if (layer.id === 'body' || layer.name === 'body') {
     return 'div';
   }
 
   if (layer.settings?.tag) {
-    return layer.settings.tag;
+    return coerceSliderNavChildTag(layer.settings.tag, layer, parentName);
   }
 
-  return LAYER_NAME_TO_HTML_TAG[layer.name] || layer.name || 'div';
+  const tag = LAYER_NAME_TO_HTML_TAG[layer.name] || layer.name || 'div';
+  return coerceSliderNavChildTag(tag, layer, parentName);
+}
+
+/**
+ * Prev/next slider wrappers render as <button>. Their visual child is stored
+ * as a `div`, which is invalid inside a button — coerce it to `span`.
+ */
+function coerceSliderNavChildTag(tag: string, layer: Layer, parentName?: string): string {
+  if (
+    (parentName === 'slideButtonPrev' || parentName === 'slideButtonNext')
+    && layer.name === 'div'
+    && tag === 'div'
+  ) {
+    return 'span';
+  }
+
+  return tag;
 }
 
 /**
@@ -2926,50 +2953,6 @@ export function assignOrderClassToNewLayer(
   }
 
   return processLayers(layers);
-}
-
-/**
- * Creates a component via API and returns the result
- */
-export async function createComponentViaApi(
-  componentName: string,
-  layers: Layer[]
-): Promise<Component | null> {
-  try {
-    const response = await fetch('/ycode/api/components', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: componentName,
-        layers: layers.map(layer => cloneDeep(layer)),
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error || errorMessage;
-      } catch {
-        errorMessage = errorText || errorMessage;
-      }
-      console.error('Failed to create component:', errorMessage);
-      return null;
-    }
-
-    const result = await response.json();
-
-    if (result.error || !result.data) {
-      console.error('Failed to create component:', result.error);
-      return null;
-    }
-
-    return result.data;
-  } catch (error) {
-    console.error('Failed to create component:', error);
-    return null;
-  }
 }
 
 /**

@@ -18,7 +18,7 @@ import gsap from 'gsap';
 
 import LayerRenderer from '@/components/LayerRenderer';
 import { serializeLayers, getClassesString } from '@/lib/layer-utils';
-import { collectEditorHiddenLayerIds } from '@/lib/animation-utils';
+import { collectEditorHiddenLayerIds, collectKeptHiddenLayerIds, type HiddenLayerInfo } from '@/lib/animation-utils';
 import { getCanvasIframeHtml, updateViewportOverrides, measureContentExtent, injectStudioTheme, isNonContentLayer, getClippedLayerRect } from '@/lib/canvas-utils';
 import { CanvasPortalProvider } from '@/lib/canvas-portal-context';
 import { cn } from '@/lib/utils';
@@ -140,6 +140,8 @@ interface CanvasContentProps {
   editingComponentVariables?: ComponentVariable[];
   editingComponentId?: string | null;
   editorHiddenLayerIds?: Map<string, Breakpoint[]>;
+  /** `settings.hidden` layers kept in the DOM (collapsed) instead of omitted — reveal targets and keepInHtml */
+  hiddenLayerInfo?: HiddenLayerInfo[];
   editorBreakpoint?: Breakpoint;
   zoom?: number;
   onComponentEdit?: (componentId: string, instanceLayerId: string) => void;
@@ -163,6 +165,7 @@ function CanvasContent({
   editingComponentVariables,
   editingComponentId,
   editorHiddenLayerIds,
+  hiddenLayerInfo,
   editorBreakpoint,
   zoom = 100,
   onComponentEdit,
@@ -330,6 +333,7 @@ function CanvasContent({
           liveComponentUpdates={liveComponentUpdates}
           editingComponentVariables={editingComponentVariables}
           editorHiddenLayerIds={editorHiddenLayerIds}
+          hiddenLayerInfo={hiddenLayerInfo}
           editorBreakpoint={editorBreakpoint}
           ancestorComponentIds={initialAncestorIds}
           onComponentEdit={onComponentEdit}
@@ -498,6 +502,14 @@ const Canvas = React.memo(function Canvas({
     }
     return hiddenMap;
   }, [resolvedLayers, forceVisibleLayerIds]);
+
+  // `settings.hidden` layers kept in HTML (reveal targets, keepInHtml) must exist
+  // on canvas (collapsed via editorHiddenLayerIds above) so they can be selected
+  // and edited. Everything else hidden stays unrendered.
+  const hiddenLayerInfo = useMemo<HiddenLayerInfo[]>(() => {
+    const ids = collectKeptHiddenLayerIds(resolvedLayers);
+    return Array.from(ids, (layerId) => ({ layerId, breakpoints: null }));
+  }, [resolvedLayers]);
 
   // Handle layer click with component resolution
   const handleLayerClick = useCallback((layerId: string, event?: React.MouseEvent) => {
@@ -764,6 +776,7 @@ const Canvas = React.memo(function Canvas({
         editingComponentVariables={editingComponentVariables}
         editingComponentId={editingComponentId}
         editorHiddenLayerIds={editorHiddenLayerIds}
+        hiddenLayerInfo={hiddenLayerInfo}
         editorBreakpoint={breakpoint}
         zoom={zoom}
         onComponentEdit={onComponentEdit}
@@ -790,6 +803,7 @@ const Canvas = React.memo(function Canvas({
     liveLayerUpdates,
     liveComponentUpdates,
     editorHiddenLayerIds,
+    hiddenLayerInfo,
     breakpoint,
     zoom,
     onComponentEdit,
