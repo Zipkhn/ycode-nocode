@@ -8,7 +8,7 @@
  * - StaticTextVariable
  */
 
-import type { AssetVariable, FieldVariable, DynamicTextVariable, DynamicRichTextVariable, StaticTextVariable, ComponentVariable, ComponentVariableValue, Layer, VisibilitySettingsValue } from '@/types';
+import type { AssetVariable, FieldVariable, DynamicTextVariable, DynamicRichTextVariable, StaticTextVariable, ComponentVariable, ComponentVariableValue, IdSettingsValue, Layer, VisibilitySettingsValue } from '@/types';
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
 import { buildFieldVariablePath, resolveFieldFromSources } from '@/lib/cms-variables-utils';
 import { DEFAULT_ASSETS } from '@/lib/asset-constants';
@@ -27,6 +27,7 @@ export const EMPTY_OVERRIDES: NonNullable<Layer['componentOverrides']> = {
   icon: {},
   variant: {},
   visibility: {},
+  id: {},
   variableLinks: {},
 };
 
@@ -67,6 +68,46 @@ export function getEffectiveHidden(
   overrides: Layer['componentOverrides'] | undefined,
 ): boolean {
   return resolveLinkedHidden(layer, componentVariables, overrides) ?? layer.settings?.hidden ?? false;
+}
+
+/** Type guard for the `{ id }` value of an 'id' component variable */
+export function isIdValue(value: unknown): value is IdSettingsValue {
+  return typeof value === 'object' && value !== null && typeof (value as IdSettingsValue).id === 'string';
+}
+
+/**
+ * Resolve the effective HTML `id` for a layer whose element id is driven by a
+ * component variable (`settings.idVariableId`).
+ *
+ * Returns `undefined` when the layer is not linked, or when the variable is out of
+ * scope (no matching definition and no override) — e.g. an outer component pass
+ * over an already-resolved nested instance — so callers fall back to
+ * `settings.id`. A linked variable with an empty/unset value resolves to `''`
+ * (no id attribute), not the stored static id.
+ */
+export function resolveLinkedId(
+  layer: Layer,
+  componentVariables: ComponentVariable[] | undefined,
+  overrides: Layer['componentOverrides'] | undefined,
+): string | undefined {
+  const variableId = layer.settings?.idVariableId;
+  if (!variableId) return undefined;
+
+  const variableDef = componentVariables?.find((v) => v.id === variableId);
+  const overrideValue = overrides?.id?.[variableId];
+  if (overrideValue === undefined && !variableDef) return undefined;
+
+  const value = overrideValue ?? variableDef?.default_value;
+  return isIdValue(value) ? value.id : '';
+}
+
+/** Effective element id: the linked variable when present, else the static setting */
+export function getEffectiveId(
+  layer: Layer,
+  componentVariables: ComponentVariable[] | undefined,
+  overrides: Layer['componentOverrides'] | undefined,
+): string | undefined {
+  return resolveLinkedId(layer, componentVariables, overrides) ?? layer.settings?.id;
 }
 
 /**
