@@ -18,7 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { base62ToUuid } from '@/lib/convertion-utils';
-import { getAssetProxyUrl, getInlineSvgAssetUrl, isAssetOfType, ASSET_CATEGORIES } from '@/lib/asset-utils';
+import { getAssetProxyUrl, getInlineSvgAssetUrl, isAssetOfType, withSvgIntrinsicSize, ASSET_CATEGORIES } from '@/lib/asset-utils';
 import { getAssetForProxy } from '@/lib/repositories/assetRepository';
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { STORAGE_BUCKET } from '@/lib/asset-constants';
@@ -87,11 +87,14 @@ export async function GET(
       if (asset.mime_type !== 'image/svg+xml' || !asset.content) {
         return new Response('Not found', { status: 404 });
       }
-      const canonicalPath = getInlineSvgAssetUrl({ id: asset.id, filename: asset.filename });
+      const canonicalPath = getInlineSvgAssetUrl(asset).split('?')[0];
       if (requestedName !== canonicalPath.split('/').slice(3).join('/')) {
         return redirectToCanonical(canonicalPath);
       }
-      return new Response(asset.content, {
+      // Inject the asset's width/height like the data-URI path does — a
+      // viewBox-only SVG has no intrinsic size in an <img>, so `w-auto h-auto`
+      // layouts collapse it to 0×0 and the image never shows.
+      return new Response(withSvgIntrinsicSize(asset.content, asset.width, asset.height), {
         status: 200,
         headers: {
           'Content-Type': 'image/svg+xml; charset=utf-8',

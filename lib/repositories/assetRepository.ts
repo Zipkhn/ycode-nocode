@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '@/lib/supabase-server';
 import { SUPABASE_IN_FILTER_CHUNK_SIZE, SUPABASE_QUERY_LIMIT, SUPABASE_WRITE_BATCH_SIZE } from '@/lib/supabase-constants';
 import { STORAGE_BUCKET, STORAGE_FOLDERS } from '@/lib/asset-constants';
+import { getInlineSvgAssetVersion } from '@/lib/asset-utils';
 import { cleanupOrphanedStorageFiles } from '@/lib/storage-utils';
 import { chunk } from '@/lib/utils';
 import { generateAssetContentHash } from '../hash-utils';
@@ -207,17 +208,17 @@ export async function getAssetById(id: string, isPublished: boolean = false, ten
   return data;
 }
 
-export type ProxyAsset = Pick<Asset, 'id' | 'filename' | 'storage_path' | 'mime_type' | 'content' | 'content_hash' | 'is_published'>;
+export type ProxyAsset = Pick<Asset, 'id' | 'filename' | 'storage_path' | 'mime_type' | 'content' | 'width' | 'height' | 'is_published'>;
 
 /**
  * Fetch the fields the `/a/` proxy needs to serve an asset.
  *
  * Draft and published rows share an id. Storage-backed assets point at the
  * same file either way, but inline-SVG `content` can differ between them, so
- * when the URL carries a `?v=<content_hash prefix>` the matching row wins;
- * otherwise the published row is preferred.
+ * when the URL carries a `?v=` version (see getInlineSvgAssetVersion) the row
+ * whose bytes produce that version wins; otherwise the published row is preferred.
  */
-export async function getAssetForProxy(id: string, contentHashPrefix?: string | null): Promise<ProxyAsset | null> {
+export async function getAssetForProxy(id: string, version?: string | null): Promise<ProxyAsset | null> {
   const client = await getSupabaseAdmin();
 
   if (!client) {
@@ -226,7 +227,7 @@ export async function getAssetForProxy(id: string, contentHashPrefix?: string | 
 
   const { data, error } = await client
     .from('assets')
-    .select('id, filename, storage_path, mime_type, content, content_hash, is_published')
+    .select('id, filename, storage_path, mime_type, content, width, height, is_published')
     .eq('id', id)
     .is('deleted_at', null)
     .limit(2);
@@ -236,8 +237,8 @@ export async function getAssetForProxy(id: string, contentHashPrefix?: string | 
   }
 
   const rows = data as ProxyAsset[];
-  const byVersion = contentHashPrefix
-    ? rows.find((row) => row.content_hash?.startsWith(contentHashPrefix))
+  const byVersion = version
+    ? rows.find((row) => getInlineSvgAssetVersion(row) === version)
     : undefined;
 
   return byVersion ?? rows.find((row) => row.is_published) ?? rows[0];
