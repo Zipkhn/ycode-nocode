@@ -646,6 +646,93 @@ function getInlineImageUrl(srcVar: unknown): string | undefined {
   return typeof content === 'string' ? content : undefined;
 }
 
+// Tailwind's numeric spacing scale: `w-10` = 10 × 0.25rem = 40px.
+const TAILWIND_SPACING_PX = 4;
+// Browser default root font size, used to convert rem/em lengths to px.
+const ROOT_FONT_SIZE_PX = 16;
+
+/**
+ * Parse an absolute CSS length ("40px", "2.5rem", "40") into pixels.
+ * Relative units (%, vw, auto, …) return null — they need layout to resolve.
+ */
+function parseCssLengthPx(value: string): number | null {
+  const match = value.trim().match(/^(\d*\.?\d+)(px|rem|em)?$/i);
+  if (!match) return null;
+  const n = parseFloat(match[1]);
+  if (isNaN(n)) return null;
+  const unit = (match[2] || 'px').toLowerCase();
+  return unit === 'px' ? n : n * ROOT_FONT_SIZE_PX;
+}
+
+/**
+ * Resolve the value part of a Tailwind sizing utility (after `w-` / `size-` /
+ * `max-w-`) into pixels. Handles arbitrary values (`[40px]`, `[2.5rem]`), the
+ * numeric spacing scale (`10` → 40px) and `px`. Named values (`full`, `auto`,
+ * `screen`, fractions) are fluid and return null.
+ */
+function tailwindSizeToPx(value: string): number | null {
+  if (value.startsWith('[') && value.endsWith(']')) {
+    return parseCssLengthPx(value.slice(1, -1));
+  }
+  if (value === 'px') return 1;
+  if (/^\d*\.?\d+$/.test(value)) return parseFloat(value) * TAILWIND_SPACING_PX;
+  return null;
+}
+
+/** True when a class carries a breakpoint or state variant (`md:`, `hover:`). */
+function hasVariantPrefix(cls: string): boolean {
+  const bracket = cls.indexOf('[');
+  const head = bracket === -1 ? cls : cls.slice(0, bracket);
+  return head.includes(':');
+}
+
+/**
+ * Best-effort *rendered* desktop width of a layer in pixels.
+ *
+ * Reads the compiled Tailwind classes (`w-10`, `w-[40px]`, `size-10`,
+ * `max-w-[40px]`) and falls back to `design.sizing` when present (draft /
+ * preview — published pages strip `design` before render). Only unprefixed
+ * (desktop) classes count; breakpoint and state variants are ignored. Later
+ * classes win, matching Tailwind's cascade for same-property utilities.
+ *
+ * Returns null when the width is fluid (`w-full`, `w-1/2`, `%`, `vw`) or
+ * not set — callers should treat null as "unknown", not "small".
+ */
+export function getRenderedWidthPx(layer: Layer): number | null {
+  const classes = Array.isArray(layer.classes)
+    ? layer.classes
+    : (layer.classes || '').split(/\s+/);
+
+  let width: number | null = null;
+  let maxWidth: number | null = null;
+
+  for (const cls of classes) {
+    if (!cls || hasVariantPrefix(cls)) continue;
+
+    if (cls.startsWith('max-w-')) {
+      const px = tailwindSizeToPx(cls.slice(6));
+      if (px !== null) maxWidth = px;
+    } else if (cls.startsWith('size-')) {
+      const px = tailwindSizeToPx(cls.slice(5));
+      if (px !== null) width = px;
+    } else if (cls.startsWith('w-')) {
+      const px = tailwindSizeToPx(cls.slice(2));
+      if (px !== null) width = px;
+    }
+  }
+
+  const sizing = layer.design?.sizing;
+  if (width === null && sizing?.width) {
+    width = parseCssLengthPx(sizing.width);
+  }
+  if (maxWidth === null && sizing?.maxWidth) {
+    maxWidth = parseCssLengthPx(sizing.maxWidth);
+  }
+
+  if (width !== null && maxWidth !== null) return Math.min(width, maxWidth);
+  return width ?? maxWidth;
+}
+
 export interface LcpCandidate {
   layerId: string;
   /** Asset id of the candidate image, when backed by a static asset variable. */
@@ -656,10 +743,14 @@ export interface LcpCandidate {
  * Find the LCP (Largest Contentful Paint) candidate for a given page tree.
  * Walks the tree in render order and returns the first `image`-named layer that:
  *   - is NOT a descendant of a `header`, `footer`, or `nav` layer (logos),
- *   - is NOT backed by an SVG asset (vector logos / icons), and
+ *   - is NOT backed by an SVG asset (vector logos / icons),
+ *   - does NOT render narrower than `minWidth` pixels (avatars, badges), and
  *   - has an effective intrinsic width unknown or at least `minWidth` pixels.
  *
- * Width resolution order:
+ * Rendered width comes from the layer's compiled classes / `design.sizing`
+ * (see {@link getRenderedWidthPx}); unknown (fluid) widths pass through.
+ *
+ * Intrinsic width resolution order:
  *   1. `layer.attributes.width` (parsed as int)
  *   2. Asset record width via `resolvedAssets[assetId]`
  *   3. Unknown — treat as candidate (best effort)
@@ -697,7 +788,14 @@ export function findLcpCandidate(
       // SVGs are vector logos / icons in practice — never the hero image.
       const isSvg = isSvgAsset(asset) || (inlineUrl ? isSvgUrl(inlineUrl) : false);
 
-      if (!isSvg) {
+      // Rendered size beats intrinsic size: a 300px asset displayed at 40px
+      // (avatar, social-proof logo) is never the LCP, and preloading it with
+      // fetchpriority=high steals bandwidth from the real LCP — typically
+      // hero text waiting on its webfont.
+      const renderedWidth = getRenderedWidthPx(layer);
+      const isTiny = renderedWidth !== null && renderedWidth < minWidth;
+
+      if (!isSvg && !isTiny) {
         let width = parseWidth(layer.attributes?.width);
         if (width === null && asset?.width) {
           width = asset.width as number;
