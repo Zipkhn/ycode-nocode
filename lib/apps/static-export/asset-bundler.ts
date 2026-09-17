@@ -17,6 +17,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 
+import { withSvgIntrinsicSize } from '@/lib/asset-utils'
 import { base62ToUuid } from '@/lib/convertion-utils'
 import { getSupabaseAdmin } from '@/lib/supabase-server'
 
@@ -46,6 +47,8 @@ interface SupabaseAssetClient {
                 mime_type: string
                 public_url: string | null
                 content: string | null
+                width: number | null
+                height: number | null
               } | null
               error: { message: string } | null
             }>
@@ -103,7 +106,7 @@ async function fetchAssetByProxyUrl(
 
   const { data: asset, error } = await client
     .from('assets')
-    .select('id, filename, mime_type, public_url, content')
+    .select('id, filename, mime_type, public_url, content, width, height')
     .eq('id', assetId)
     .eq('is_published', true)
     .is('deleted_at', null)
@@ -115,10 +118,11 @@ async function fetchAssetByProxyUrl(
   }
 
   // Inline SVGs have no file in storage — the markup itself is the asset.
+  // Inject width/height so a viewBox-only SVG keeps an intrinsic size in <img>.
   if (!asset.public_url) {
     return {
       key: proxyUrl.replace(/^\/+/, ''),
-      body: asset.content ?? '',
+      body: withSvgIntrinsicSize(asset.content ?? '', asset.width, asset.height),
       contentType: asset.mime_type || 'image/svg+xml',
     }
   }
