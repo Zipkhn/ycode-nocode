@@ -382,6 +382,57 @@ export function getAssetProxyUrl(
 }
 
 /**
+ * Inline-SVG assets (stored as `content`, no storage_path) up to this many
+ * bytes of markup are embedded as data URIs; larger ones are served through
+ * the `/a/` proxy instead.
+ *
+ * A data URI is repeated in every `<img>` that uses it AND again in the RSC
+ * flight payload that hydrates the page, so a 300 KB illustration used twice
+ * adds >1 MB to the HTML — far more than one cacheable request costs. Small
+ * icons/logos stay inline where a round-trip would cost more than the bytes.
+ */
+export const INLINE_SVG_MAX_BYTES = 4096;
+
+/** Minimal asset shape needed to resolve an inline-SVG asset to a URL. */
+export interface InlineSvgAssetLike {
+  id?: string;
+  filename?: string;
+  content?: string | null;
+  content_hash?: string | null;
+  width?: number | null;
+  height?: number | null;
+}
+
+/**
+ * Build the `/a/` proxy URL for an inline-SVG asset (one with `content` but no
+ * storage_path). The proxy serves `content` with an `image/svg+xml` header.
+ *
+ * `/a/*` responses are cached immutably, but SVG content can be edited in
+ * place, so a short content-hash version is appended to bust the cache and
+ * let the proxy pick the row (draft vs published) that matches.
+ */
+export function getInlineSvgAssetUrl(asset: { id: string; filename: string; content_hash?: string | null }): string {
+  const hash = uuidToBase62(asset.id);
+  const slug = sanitizeSlug(asset.filename.replace(/\.[^/.]+$/, '')) || 'file';
+  const version = asset.content_hash ? `?v=${asset.content_hash.slice(0, 8)}` : '';
+  return `/a/${hash}/${slug}.svg${version}`;
+}
+
+/**
+ * Resolve an inline-SVG asset to something usable as an `<img src>`: a data
+ * URI for small markup, the `/a/` proxy URL once it exceeds
+ * `INLINE_SVG_MAX_BYTES`. Falls back to a data URI when the asset lacks the
+ * id/filename needed to build a proxy URL. Returns null without content.
+ */
+export function resolveInlineSvgAssetSrc(asset: InlineSvgAssetLike): string | null {
+  if (!asset.content) return null;
+  if (asset.content.length <= INLINE_SVG_MAX_BYTES || !asset.id || !asset.filename) {
+    return buildSvgDataUrl(asset.content, asset.width, asset.height);
+  }
+  return getInlineSvgAssetUrl({ id: asset.id, filename: asset.filename, content_hash: asset.content_hash });
+}
+
+/**
  * Default max width applied to bitmap images served to the builder canvas.
  * Caps decoded image bitmaps so a 11k×6k hero doesn't allocate ~260 MB of
  * RGBA per copy in the iframe.
@@ -443,19 +494,22 @@ function isProxyUrl(url: string): boolean {
   return url.startsWith('/a/');
 }
 
-/** Cheap extension sniff: does the URL path end in `.gif`? */
-function isGifUrl(url: string): boolean {
+/**
+ * Cheap extension sniff for formats the proxy never resizes: animated GIFs
+ * (Sharp would flatten them to one frame) and SVGs (vector — a `?width=`
+ * ladder would just re-request the same file under nine URLs).
+ */
+function isNonResizableImageUrl(url: string): boolean {
   const path = url.split('?')[0].split('#')[0].toLowerCase();
-  return path.endsWith('.gif');
+  return path.endsWith('.gif') || path.endsWith('.svg');
 }
 
 /**
  * Check if a URL supports image transformation params.
- * GIFs are excluded — Sharp flattens animated GIFs to a single frame, so
- * appending `width`/`quality` would break the animation.
+ * GIFs and SVGs are excluded — see isNonResizableImageUrl.
  */
 function isTransformableUrl(url: string): boolean {
-  if (isGifUrl(url)) return false;
+  if (isNonResizableImageUrl(url)) return false;
   if (isProxyUrl(url)) return true;
   try {
     const urlObj = new URL(url);

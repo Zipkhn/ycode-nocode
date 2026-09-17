@@ -12,7 +12,7 @@ import type { AssetVariable, FieldVariable, DynamicTextVariable, DynamicRichText
 import { resolveInlineVariablesFromData } from '@/lib/inline-variables';
 import { buildFieldVariablePath, resolveFieldFromSources } from '@/lib/cms-variables-utils';
 import { DEFAULT_ASSETS } from '@/lib/asset-constants';
-import { buildSvgDataUrl } from '@/lib/asset-utils';
+import { resolveInlineSvgAssetSrc, type InlineSvgAssetLike } from '@/lib/asset-utils';
 import { parseCollectionLinkValue } from '@/lib/link-utils';
 import { stringToTiptapContent } from '@/lib/text-format-utils';
 
@@ -343,6 +343,9 @@ function unwrapLinkFieldUrl(resolvedValue: string): string {
   return '';
 }
 
+/** Asset fields `getImageUrlFromVariable` needs to resolve an image source. */
+export type ImageAssetLike = InlineSvgAssetLike & { public_url: string | null };
+
 /**
  * Get image URL from image src variable
  * - AssetVariable -> gets asset URL from store
@@ -358,7 +361,7 @@ function unwrapLinkFieldUrl(resolvedValue: string): string {
  */
 export function getImageUrlFromVariable(
   src: AssetVariable | FieldVariable | DynamicTextVariable | undefined | null,
-  getAsset?: (id: string) => { public_url: string | null; content?: string | null; width?: number | null; height?: number | null } | null,
+  getAsset?: (id: string) => ImageAssetLike | null,
   collectionItemData?: Record<string, string>,
   pageCollectionItemData?: Record<string, string> | null,
   useDefault: boolean = true
@@ -375,14 +378,8 @@ export function getImageUrlFromVariable(
     }
     if (!getAsset) return undefined;
     const asset = getAsset(src.data.asset_id);
-    // Return public_url if available, otherwise convert SVG content to data URL
-    if (asset?.public_url) {
-      return asset.public_url;
-    }
-    if (asset?.content) {
-      return buildSvgDataUrl(asset.content, asset.width, asset.height);
-    }
-    return undefined;
+    // Prefer public_url; inline SVGs resolve to a data URI or the /a/ proxy by size
+    return asset ? (asset.public_url || resolveInlineSvgAssetSrc(asset) || undefined) : undefined;
   }
 
   if (isFieldVariable(src)) {
@@ -413,12 +410,8 @@ export function getImageUrlFromVariable(
     // The field value may be an asset ID - look up the asset to get the URL
     if (getAsset) {
       const asset = getAsset(unwrapped);
-      if (asset?.public_url) {
-        return asset.public_url;
-      }
-      if (asset?.content) {
-        return buildSvgDataUrl(asset.content, asset.width, asset.height);
-      }
+      const assetSrc = asset ? asset.public_url || resolveInlineSvgAssetSrc(asset) : null;
+      if (assetSrc) return assetSrc;
     }
 
     // If getAsset is not available or asset not found, return the raw value
